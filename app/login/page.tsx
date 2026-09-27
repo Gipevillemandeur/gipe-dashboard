@@ -1,0 +1,54 @@
+'use client';
+
+import { FormEvent, useState } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
+import { LogIn, ShieldCheck } from 'lucide-react';
+import { createClient } from '@/lib/supabase/client';
+
+export default function LoginPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const next = searchParams.get('next') || '/';
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  async function onSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setLoading(true);
+    setError('');
+
+    const supabase = createClient();
+    const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+
+    if (signInError) {
+      setError('Email ou mot de passe incorrect.');
+      setLoading(false);
+      return;
+    }
+
+    router.replace(next.startsWith('/') ? next : '/');
+    router.refresh();
+  }
+
+  return (
+    <main className="login-page">
+      <section className="login-card card">
+        <div className="login-mark">G</div>
+        <div className="eyebrow">GIPE Villemandeur</div>
+        <h1>Centre de gestion</h1>
+        <p className="section-sub">Connecte-toi pour accéder aux outils administratifs du GIPE.</p>
+
+        <form className="login-form" onSubmit={onSubmit}>
+          <label>Email<input className="input" type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} required /></label>
+          <label>Mot de passe<input className="input" type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required /></label>
+          {error && <div className="login-error">{error}</div>}
+          <button className="btn btn-primary login-submit" disabled={loading} type="submit"><LogIn size={15}/>{loading ? 'Connexion…' : 'Se connecter'}</button>
+        </form>
+
+        <div className="login-security"><ShieldCheck size={16}/><span>Authentification gérée par Supabase. Aucun mot de passe n'est stocké dans le code du dashboard.</span></div>
+      </section>
+    </main>
+  );
+}

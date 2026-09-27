@@ -1,35 +1,56 @@
-# Prochaines étapes de développement
+# GIPE Dashboard — avancement
 
-## Phase 1 — fondations
+## Préparé dans cette version
 
-- [x] Interface dashboard
-- [x] Gestion des classes
-- [x] Classe TEST persistante
-- [x] Import `.xls` / `.xlsx` côté navigateur
-- [x] Schéma Supabase cible
-- [x] Règles métier documentées
+- Authentification Supabase par email/mot de passe.
+- Session Supabase côté serveur avec cookies.
+- Protection des pages par middleware.
+- Comptes autorisés via la table privée `gipe_admins`.
+- Parser commun des fichiers `.xls` / `.xlsx` du collège.
+- Détection des classes, élèves, enseignants, direction et codes de classe.
+- Aperçu de l'import avant application.
+- Endpoint serveur d'application de l'import.
+- Fonction SQL transactionnelle pour remplacer l'état courant.
+- Classe `TEST` permanente, hors import collège.
+- Conservation des identifiants de classes afin de ne pas casser les dates de conseils déjà préparées.
+- Règles RLS du dashboard.
+- Documentation d'installation et de passage de relais.
 
-## Phase 2 — données réelles
+## À développer ensuite
 
-- [ ] Créer dépôt `Gipevillemandeur/gipe-dashboard`
-- [ ] Créer/configurer Supabase
-- [ ] Authentification par compte GIPE
-- [ ] Import automatique du fichier collège
-- [ ] Remplacement atomique des données actives
-- [ ] Création/recréation automatique de la classe TEST
-- [ ] Gestion des codes d'accès des classes
+### 1. Conseils de classe
 
-## Phase 3 — appconseils
+Brancher `/conseils` sur Supabase et afficher :
 
-- [ ] Cesser de lire une clé Google directement dans le navigateur
-- [ ] Fournir les classes/élèves/enseignants au format attendu par `appconseils`
-- [ ] Synchroniser le Google Sheets de compatibilité
-- [ ] Conserver l'envoi des PDF vers la boîte GIPE
+- classes actives ;
+- effectifs ;
+- équipe pédagogique ;
+- direction ;
+- code d'accès ;
+- date du conseil ;
+- trimestre ;
+- état : brouillon / ouvert / fermé.
 
-## Phase 4 — siteV2
+### 2. Compatibilité avec `appconseils`
 
-- [ ] Centraliser l'administration des actualités
-- [ ] Centraliser l'administration des événements
-- [ ] Centraliser les documents
-- [ ] Centraliser les paramètres du site
-- [ ] Garder le site public indépendant du dashboard
+Créer une couche de synchronisation qui expose uniquement les données nécessaires à l'application de conseil de classe. Le fichier Google Sheets actuel peut rester comme compatibilité transitoire.
+
+### 3. Gestion du site
+
+Reprendre progressivement dans le dashboard les fonctions actuellement présentes dans `siteV2` : actualités, événements, documents, bandeau et paramètres.
+
+### 4. Déploiement
+
+Déployer sur une plateforme prenant en charge Next.js côté serveur. Renseigner les variables d'environnement dans les secrets de la plateforme.
+
+### 5. Passation
+
+Ajouter un écran « Guide de passation » avec les opérations annuelles :
+
+1. recevoir le fichier du collège ;
+2. importer ;
+3. contrôler les éventuelles anomalies ;
+4. vérifier les conseils ;
+5. ouvrir les conseils ;
+6. utiliser `TEST` pour les démonstrations ;
+7. maintenir le site depuis le même centre de gestion.

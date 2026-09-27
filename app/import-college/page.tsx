@@ -1,125 +1,112 @@
 'use client';
 
 import { ChangeEvent, useMemo, useState } from 'react';
-import { ArrowLeft, CheckCircle2, FileSpreadsheet, UploadCloud, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, FileSpreadsheet, UploadCloud, AlertTriangle, Database, ShieldCheck } from 'lucide-react';
 import Link from 'next/link';
-import * as XLSX from 'xlsx';
+import { parseCollegeWorkbook, summarizeImport, type CollegeImport } from '@/lib/college-import';
 
-type ParsedClass = { name: string; teachers: number; students: number };
+type ApplyResult = { ok: boolean; fileName?: string; summary?: ReturnType<typeof summarizeImport>; error?: string };
 
-type ParsedImport = { classes: ParsedClass[]; ignored: string[]; warnings: string[]; totalStudents: number };
-
-const RESERVED = new Set(['code classe', 'direction']);
-
-function headerIndex(headers: string[], wanted: string[]) {
-  return headers.findIndex((h) => wanted.some((w) => h.includes(w)));
-}
-
-function parseWorkbook(data: ArrayBuffer): ParsedImport {
-  const wb = XLSX.read(data, { type: 'array' });
-  const classes: ParsedClass[] = [];
-  const ignored: string[] = [];
-  const warnings: string[] = [];
-
-  for (const sheetName of wb.SheetNames) {
-    const normalized = sheetName.trim().toLowerCase();
-    if (RESERVED.has(normalized)) { ignored.push(sheetName); continue; }
-
-    const rows = XLSX.utils.sheet_to_json<unknown[]>(wb.Sheets[sheetName], { header: 1, defval: '' });
-    const header = (rows[0] ?? []).map((v) => String(v).trim().toLowerCase());
-    const nameCol = headerIndex(header, ['nom']);
-    const firstNameCol = headerIndex(header, ['prenom', 'prénom']);
-    const teacherCol = headerIndex(header, ['professeur', 'prof']);
-
-    let students = 0;
-    let teacherSet = new Set<string>();
-    for (const row of rows.slice(1)) {
-      const values = row as unknown[];
-      const nom = nameCol >= 0 ? String(values[nameCol] ?? '').trim() : '';
-      const prenom = firstNameCol >= 0 ? String(values[firstNameCol] ?? '').trim() : '';
-      const prof = teacherCol >= 0 ? String(values[teacherCol] ?? '').trim() : '';
-      if (nom || prenom) students += 1;
-      if (prof) prof.split(/\n+/).map((p)=>p.trim()).filter(Boolean).forEach((p)=>teacherSet.add(p));
-    }
-
-    if (students === 0 && teacherSet.size === 0) {
-      warnings.push(`L'onglet « ${sheetName} » ne contient pas de données reconnaissables.`);
-      continue;
-    }
-    classes.push({ name: sheetName, teachers: teacherSet.size, students });
-  }
-
-  const totalStudents = classes.reduce((sum, c) => sum + c.students, 0);
-  return { classes, ignored, warnings, totalStudents };
-}
+const defaultSchoolYear = process.env.NEXT_PUBLIC_DEFAULT_SCHOOL_YEAR || '2026-2027';
 
 export default function ImportCollegePage() {
-  const [fileName, setFileName] = useState('');
-  const [parsed, setParsed] = useState<ParsedImport | null>(null);
+  const [file, setFile] = useState<File | null>(null);
+  const [parsed, setParsed] = useState<CollegeImport | null>(null);
+  const [schoolYear, setSchoolYear] = useState(defaultSchoolYear);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const summary = useMemo(() => {
-    if (!parsed) return null;
-    const levels = new Map<string, number>();
-    for (const c of parsed.classes) {
-      const m = c.name.match(/^(6|5|4|3)/);
-      if (m) levels.set(m[1], (levels.get(m[1]) ?? 0) + 1);
-    }
-    return Array.from(levels.entries()).map(([level,count]) => `${level}e : ${count}`).join(' · ');
-  }, [parsed]);
+  const summary = useMemo(() => parsed ? summarizeImport(parsed) : null, [parsed]);
 
   async function onFile(e: ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setFileName(file.name);
+    const selected = e.target.files?.[0] || null;
+    setFile(selected);
     setParsed(null);
     setError('');
+    setSuccess('');
+    if (!selected) return;
+
     try {
-      const buffer = await file.arrayBuffer();
-      const result = parseWorkbook(buffer);
+      const result = parseCollegeWorkbook(await selected.arrayBuffer());
       setParsed(result);
-    } catch (err) {
-      console.error(err);
-      setError('Impossible de lire ce fichier. Utilise un fichier .xls ou .xlsx provenant du collège.');
+    } catch {
+      setError('Impossible de lire ce fichier. Utilise le fichier .xls ou .xlsx transmis par le collège.');
+    }
+  }
+
+  async function applyImport() {
+    if (!file || !parsed) return;
+    setLoading(true);
+    setError('');
+    setSuccess('');
+
+    try {
+      const formData = new FormData();
+      formData.set('file', file);
+      formData.set('schoolYearLabel', schoolYear);
+
+      const response = await fetch('/api/import/apply', { method: 'POST', body: formData });
+      const result = await response.json() as ApplyResult;
+      if (!response.ok || !result.ok) {
+        setError(result.error || 'L’import n’a pas été appliqué.');
+      } else {
+        setSuccess(`Import appliqué : ${result.summary?.classes ?? parsed.classes.length} classes et ${result.summary?.students ?? parsed.totalStudents} élèves pour ${schoolYear}.`);
+      }
+    } catch {
+      setError('Impossible de contacter le serveur d’import.');
+    } finally {
+      setLoading(false);
     }
   }
 
   return (
     <>
       <div className="topbar">
-        <div><div className="eyebrow">Conseils de classe</div><h1>Importer les listes du collège</h1><div className="kicker">Le fichier reçu régulièrement devient la référence pour l'état actuel.</div></div>
+        <div><div className="eyebrow">Conseils de classe</div><h1>Importer les listes du collège</h1><div className="kicker">Le fichier reçu devient la référence pour l’état courant.</div></div>
         <div className="topbar-right"><Link className="btn" href="/conseils"><ArrowLeft size={14}/> Conseils</Link></div>
       </div>
 
       <section className="card section-card">
         <div className="upload">
           <FileSpreadsheet size={34} style={{opacity:.75}}/>
-          <strong>{fileName || 'Dépose le fichier du collège ici'}</strong>
-          <p>Formats acceptés : .xls et .xlsx. L'import ne demande pas de validation pour chaque élève ou professeur : le fichier du collège décrit la situation courante.</p>
+          <strong>{file?.name || 'Dépose le fichier du collège ici'}</strong>
+          <p>Formats acceptés : .xls et .xlsx. Le fichier est analysé localement pour l’aperçu puis relu côté serveur au moment de l’application.</p>
           <label className="btn btn-gold"><UploadCloud size={14}/> Choisir le fichier<input className="hidden" type="file" accept=".xls,.xlsx" onChange={onFile}/></label>
         </div>
       </section>
 
-      {error && <div className="card section-card" style={{marginTop:18}}><div className="notice"><AlertTriangle size={17}/><div>{error}</div></div></div>}
+      {(error || success) && <div className="card section-card" style={{marginTop:18}}><div className={error ? 'notice notice-error' : 'notice'}>{error ? <AlertTriangle size={17}/> : <CheckCircle2 size={17}/>}<div>{error || success}</div></div></div>}
 
       {parsed && <section className="page-grid" style={{marginTop:18}}>
         <div className="card section-card">
-          <div className="section-head"><div><h2 className="section-title">Import analysé</h2><p className="section-sub">{summary}</p></div><span className="badge badge-ok"><CheckCircle2 size={12}/> Lecture terminée</span></div>
-          <div className="page-grid cards-4" style={{gridTemplateColumns:'repeat(3,minmax(0,1fr))'}}>
-            <div className="card stat"><div className="stat-label">Classes détectées</div><div className="stat-value">{parsed.classes.length}</div></div>
-            <div className="card stat"><div className="stat-label">Élèves détectés</div><div className="stat-value">{parsed.totalStudents}</div></div>
-            <div className="card stat"><div className="stat-label">Onglets ignorés</div><div className="stat-value">{parsed.ignored.length}</div></div>
+          <div className="section-head">
+            <div><h2 className="section-title">Import analysé</h2><p className="section-sub">Vérifie seulement les anomalies techniques. Il n’y a pas de validation élève par élève.</p></div>
+            <span className="badge badge-ok"><CheckCircle2 size={12}/> Lecture terminée</span>
+          </div>
+          <div className="page-grid cards-4" style={{gridTemplateColumns:'repeat(4,minmax(0,1fr))'}}>
+            <div className="card stat"><div className="stat-label">Classes</div><div className="stat-value">{summary?.classes}</div></div>
+            <div className="card stat"><div className="stat-label">Élèves</div><div className="stat-value">{summary?.students}</div></div>
+            <div className="card stat"><div className="stat-label">Enseignants</div><div className="stat-value">{summary?.teachers}</div></div>
+            <div className="card stat"><div className="stat-label">Direction</div><div className="stat-value">{summary?.direction}</div></div>
           </div>
         </div>
 
         <div className="card section-card">
-          <div className="section-head"><div><h2 className="section-title">Classes détectées</h2><p className="section-sub">La classe TEST n'a pas besoin d'être dans le fichier : elle reste gérée à part.</p></div></div>
-          <table className="table"><thead><tr><th>Classe</th><th>Élèves</th><th>Enseignants</th></tr></thead><tbody>{parsed.classes.map(c=><tr key={c.name}><td><strong>{c.name}</strong></td><td>{c.students}</td><td>{c.teachers}</td></tr>)}</tbody></table>
+          <div className="section-head"><div><h2 className="section-title">Année scolaire et application</h2><p className="section-sub">La classe TEST reste indépendante et permanente.</p></div><span className="badge badge-info"><Database size={12}/> Base privée</span></div>
+          <div className="page-grid two-col" style={{gridTemplateColumns:'1fr 1fr'}}>
+            <label className="login-form" style={{marginTop:0}}>Année scolaire<input className="input" value={schoolYear} onChange={(e) => setSchoolYear(e.target.value)} placeholder="2026-2027" /></label>
+            <div className="notice"><ShieldCheck size={17}/><div><strong>Import contrôlé</strong><br/>Le serveur vérifie le compte administrateur avant toute modification.</div></div>
+          </div>
+          <div className="btn-row" style={{marginTop:14}}><button className="btn btn-primary" onClick={applyImport} disabled={loading || parsed.classes.length === 0}>{loading ? 'Application…' : 'Appliquer l’import'}</button></div>
         </div>
 
-        {parsed.warnings.length > 0 && <div className="card section-card"><div className="notice"><AlertTriangle size={17}/><div><strong>Quelques onglets nécessitent une vérification</strong><br/>{parsed.warnings.map((w)=><div key={w}>{w}</div>)}</div></div></div>}
+        <div className="card section-card">
+          <div className="section-head"><div><h2 className="section-title">Classes détectées</h2><p className="section-sub">Les onglets « code classe » et « direction » sont utilisés séparément.</p></div></div>
+          <table className="table"><thead><tr><th>Classe</th><th>Niveau</th><th>Élèves</th><th>Enseignants</th><th>Code</th></tr></thead><tbody>{parsed.classes.map(c=><tr key={c.name}><td><strong>{c.name}</strong></td><td>{c.level}</td><td>{c.students.length}</td><td>{c.teachers.length}</td><td>{c.accessCode ? 'Détecté' : 'Absent'}</td></tr>)}</tbody></table>
+        </div>
 
-        <div className="card section-card"><div className="notice"><CheckCircle2 size={17} color="#1d6d3a"/><div><strong>Dans la version connectée</strong><br/>Ce bouton déclenchera le remplacement des données actuelles de l'année dans Supabase et la synchronisation vers l'outil Conseil de classe. La classe TEST sera conservée automatiquement.</div></div><div className="btn-row" style={{marginTop:14}}><button className="btn btn-primary" disabled>Appliquer l'import — prochaine étape</button></div></div>
+        {(parsed.warnings.length > 0 || parsed.ignoredSheets.length > 0) && <div className="card section-card"><div className="notice notice-error"><AlertTriangle size={17}/><div><strong>Informations à contrôler</strong>{parsed.warnings.map((w)=><div key={w}>{w}</div>)}{parsed.ignoredSheets.length > 0 && <div style={{marginTop:6}}>Onglets réservés : {parsed.ignoredSheets.join(', ')}.</div>}</div></div></div>}
       </section>}
     </>
   );

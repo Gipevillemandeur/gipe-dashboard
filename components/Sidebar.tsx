@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { CalendarDays, FileText, Home, Settings, Users, Globe2, Upload, BookOpen } from 'lucide-react';
+import LogoutButton from '@/components/LogoutButton';
 
 const items = [
   { href: '/', label: 'Tableau de bord', icon: Home },
@@ -24,12 +25,14 @@ export default function Sidebar() {
       <nav className="nav">
         {items.map((item) => {
           const Icon = item.icon;
-          const active = item.href !== '#' && pathname === item.href;
+          const active = item.href !== '#' && (pathname === item.href || pathname.startsWith(`${item.href}/`));
           return <Link className={active ? 'active' : ''} href={item.href} key={item.label}><Icon size={16}/>{item.label}</Link>;
         })}
         <div className="nav-sep" />
         <Link href="#"><Settings size={16}/>Configuration</Link>
         <Link href="#"><BookOpen size={16}/>Guide de passation</Link>
+        <div className="nav-sep" />
+        <LogoutButton />
       </nav>
     </aside>
   );

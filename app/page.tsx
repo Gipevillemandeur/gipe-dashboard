@@ -1,23 +1,26 @@
 import Link from 'next/link';
 import { CalendarDays, FileText, GraduationCap, Users, Upload, Globe2, ArrowRight, CheckCircle2 } from 'lucide-react';
-import { classes } from '@/lib/mock-data';
+import { getDashboardSnapshot } from '@/lib/dashboard-data';
 
-export default function DashboardPage() {
-  const realClasses = classes.filter((c) => c.status === 'active');
-  const demo = classes.find((c) => c.status === 'demo');
-  const students = 618;
+export const dynamic = 'force-dynamic';
+
+export default async function DashboardPage() {
+  const snapshot = await getDashboardSnapshot();
+  const realClasses = snapshot.classes.filter((c) => c.status === 'active');
+  const students = realClasses.reduce((sum, c) => sum + c.students, 0);
+  const demo = snapshot.classes.find((c) => c.status === 'demo');
 
   return (
     <>
       <div className="topbar">
-        <div><div className="eyebrow">Année scolaire 2026–2027</div><h1>Tableau de bord</h1><div className="kicker">Tout ce qui concerne le GIPE, depuis un seul endroit.</div></div>
+        <div><div className="eyebrow">Année scolaire {snapshot.schoolYear.replace("-", "–")}</div><h1>Tableau de bord</h1><div className="kicker">Tout ce qui concerne le GIPE, depuis un seul endroit.</div></div>
         <div className="topbar-right"><span className="user-pill">Administrateur GIPE</span></div>
       </div>
 
       <div className="page-grid cards-4">
         <div className="card stat"><div className="stat-top"><div className="stat-label">Classes actives</div><div className="stat-icon"><GraduationCap size={17}/></div></div><div className="stat-value">{realClasses.length}</div><div className="stat-note">La liste se met à jour depuis le fichier du collège.</div></div>
         <div className="card stat"><div className="stat-top"><div className="stat-label">Élèves</div><div className="stat-icon"><Users size={17}/></div></div><div className="stat-value">{students}</div><div className="stat-note">Situation actuelle de l'établissement.</div></div>
-        <div className="card stat"><div className="stat-top"><div className="stat-label">Conseils à préparer</div><div className="stat-icon"><CalendarDays size={17}/></div></div><div className="stat-value">6</div><div className="stat-note">Prochains conseils programmés.</div></div>
+        <div className="card stat"><div className="stat-top"><div className="stat-label">Conseils à préparer</div><div className="stat-icon"><CalendarDays size={17}/></div></div><div className="stat-value">—</div><div className="stat-note">Dates à préparer dans le module Conseils.</div></div>
         <div className="card stat"><div className="stat-top"><div className="stat-label">Classe TEST</div><div className="stat-icon"><CheckCircle2 size={17}/></div></div><div className="stat-value">Active</div><div className="stat-note">Toujours conservée pour les démonstrations.</div></div>
       </div>
 
@@ -47,7 +50,7 @@ export default function DashboardPage() {
         <div className="notice"><CheckCircle2 size={16} color="#1d6d3a"/><div><strong>Import automatique de l'état courant</strong><br/>Le prochain fichier du collège remplacera la situation actuelle des élèves et des équipes. Les anciens PDF de comptes rendus restent dans la boîte mail du GIPE.</div></div>
       </section>
 
-      <div className="footer-note">Prototype du futur centre de gestion GIPE — aucune connexion à Supabase ou Google n'est activée dans cette première version.</div>
+      <div className="footer-note">{snapshot.connected ? "Données chargées depuis Supabase." : "Mode démonstration : Supabase n'est pas encore connecté ou aucune année active n'est configurée."}</div>
     </>
   );
 }
