@@ -2,6 +2,12 @@ import { type NextRequest, NextResponse } from 'next/server';
 import { updateSession } from '@/lib/supabase/proxy';
 
 export async function middleware(request: NextRequest) {
+  // API publique utilisée par appconseils
+  // Elle ne doit pas être redirigée vers /login.
+  if (request.nextUrl.pathname === '/api/conseils/public') {
+    return NextResponse.next();
+  }
+
   if (request.nextUrl.pathname === '/login') {
     return NextResponse.next();
   }
