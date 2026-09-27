@@ -82,12 +82,12 @@ export async function GET(request: Request) {
   }
 
   const safeClasses = (classes ?? []).map((row) => ({
-    name: row.name,
-    level: row.level,
-    kind: row.kind,
-    active: row.active,
-    requiresCode: Boolean(String(row.access_code ?? '').trim()),
-  }));
+  name: row.name,
+  level: row.level,
+  kind: row.kind,
+  active: row.active,
+  requiresCode: true,
+}));
 
   return cors(
     NextResponse.json({
@@ -130,9 +130,33 @@ export async function GET(request: Request) {
     // ----------------------------------------------------------
     // CONTRÔLE DU CODE
     // ----------------------------------------------------------
-    const expected = String(classRow.access_code ?? '').trim();
+   const expected = String(classRow.access_code ?? '').trim();
 
-    if (expected && expected !== code) {
+// Une classe sans code configuré est inaccessible.
+if (!expected) {
+  return cors(
+    NextResponse.json(
+      {
+        error: 'Aucun code d’accès n’est configuré pour cette classe.',
+        requiresCode: true,
+      },
+      { status: 403 }
+    )
+  );
+}
+
+// Code obligatoire et vérification stricte.
+if (expected !== code) {
+  return cors(
+    NextResponse.json(
+      {
+        error: 'Code incorrect.',
+        requiresCode: true,
+      },
+      { status: 403 }
+    )
+  );
+}
       return cors(
         NextResponse.json(
           {
