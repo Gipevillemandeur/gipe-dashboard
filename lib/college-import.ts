@@ -3,6 +3,7 @@ import * as XLSX from 'xlsx';
 export type ImportedTeacher = {
   displayName: string;
   subject: string;
+  isPP: boolean;
 };
 
 export type ImportedStudent = {
@@ -26,10 +27,12 @@ export type CollegeImport = {
   totalStudents: number;
 };
 
+const STUDENT_SHEET = 'liste eleves';
 const RESERVED = new Set(['code classe', 'direction', 'test']);
+const TEAM_SHEET_RE = /^equipe peda\s+([3456][a-z])$/i;
 
 function clean(value: unknown): string {
-  return String(value ?? '').replace(/\\s+/g, ' ').trim();
+  return String(value ?? '').replace(/\s+/g, ' ').trim();
 }
 
 function normalize(value: unknown): string {
@@ -48,8 +51,8 @@ function levelFromClassName(name: string): string {
 function uniqueStudents(rows: ImportedStudent[]): ImportedStudent[] {
   const seen = new Set<string>();
   return rows.filter((student) => {
-    const key = `${normalize(student.lastName)}|${normalize(student.firstName)}`;
     if (!student.lastName && !student.firstName) return false;
+    const key = `${normalize(student.lastName)}|${normalize(student.firstName)}`;
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
@@ -76,10 +79,12 @@ function parseAccessCodes(sheet: XLSX.WorkSheet | undefined): Map<string, string
   const classCol = findColumn(headers, ['classe']);
   const codeCol = findColumn(headers, ['code', 'deverouillage', 'déverrouillage']);
 
-  for (const row of (classCol >= 0 && codeCol >= 0 ? rows.slice(1) : rows)) {
+  if (classCol < 0 || codeCol < 0) return codes;
+
+  for (const row of rows.slice(1)) {
     const values = row as unknown[];
-    const className = clean(values[classCol >= 0 ? classCol : 0]);
-    const code = clean(values[codeCol >= 0 ? codeCol : 1]);
+    const className = clean(values[classCol]);
+    const code = clean(values[codeCol]);
     if (className && code) codes.set(className.toLocaleUpperCase('fr-FR'), code);
   }
 
@@ -89,55 +94,88 @@ function parseAccessCodes(sheet: XLSX.WorkSheet | undefined): Map<string, string
 function parseDirection(sheet: XLSX.WorkSheet | undefined): string[] {
   if (!sheet) return [];
   const rows = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, defval: '' });
-  return rows.flatMap((row, index) => {
-    const text = clean((row as unknown[])[0]);
-    if (!text) return [];
-    if (index === 0 && normalize(text).includes('direction')) return [];
-    return [text];
-  });
-}
+  const values: string[] = [];
 
-function parseClass(sheetName: string, sheet: XLSX.WorkSheet, accessCodes: Map<string, string>): { item: ImportedClass | null; warning?: string } {
-  const rows = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, defval: '' });
-  const header = (rows[0] ?? []).map(normalize);
-  const nameCol = findColumn(header, ['nom']);
-  const firstNameCol = findColumn(header, ['prenom', 'prénom']);
-  const teacherCol = findColumn(header, ['professeur', 'prof']);
-  const subjectCol = findColumn(header, ['matiere', 'matière', 'discipline']);
-
-  if (nameCol < 0 && firstNameCol < 0 && teacherCol < 0) {
-    return { item: null, warning: `L'onglet « ${sheetName} » ne contient pas de colonnes reconnues.` };
+  for (const row of rows) {
+    const cells = row as unknown[];
+    const text = clean(cells[0]);
+    if (text) values.push(text);
   }
 
-  const students: ImportedStudent[] = [];
-  const teachers: ImportedTeacher[] = [];
+  if (values.length > 0 && normalize(values[0]).includes('direction')) values.shift();
+  return values;
+}
+
+function parseStudentsSheet(
+  sheet: XLSX.WorkSheet | undefined,
+): Map<string, ImportedStudent[]> {
+  const byClass = new Map<string, ImportedStudent[]>();
+  if (!sheet) return byClass;
+
+  const rows = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, defval: '' });
+  const headers = (rows[0] ?? []).map(normalize);
+  const nameCol = findColumn(headers, ['nom']);
+  const firstNameCol = findColumn(headers, ['prenom', 'prénom']);
+  const classCol = findColumn(headers, ['division', 'classe']);
+
+  if (nameCol < 0 || firstNameCol < 0 || classCol < 0) return byClass;
 
   for (const row of rows.slice(1)) {
     const values = row as unknown[];
-    const lastName = clean(nameCol >= 0 ? values[nameCol] : '');
-    const firstName = clean(firstNameCol >= 0 ? values[firstNameCol] : '');
-    const displayName = clean(teacherCol >= 0 ? values[teacherCol] : '');
-    const subject = clean(subjectCol >= 0 ? values[subjectCol] : '');
+    const className = clean(values[classCol]).toLocaleUpperCase('fr-FR');
+    const lastName = clean(values[nameCol]);
+    const firstName = clean(values[firstNameCol]);
+    if (!className || (!lastName && !firstName)) continue;
 
-    if (lastName || firstName) students.push({ lastName, firstName });
-    if (displayName) teachers.push({ displayName, subject });
+    const list = byClass.get(className) ?? [];
+    list.push({ lastName, firstName });
+    byClass.set(className, list);
   }
 
-  const cleanStudents = uniqueStudents(students);
-  const cleanTeachers = uniqueTeachers(teachers);
+  for (const [className, students] of byClass) {
+    byClass.set(className, uniqueStudents(students));
+  }
 
-  if (cleanStudents.length === 0 && cleanTeachers.length === 0) {
-    return { item: null, warning: `L'onglet « ${sheetName} » est vide ou ne contient pas de données exploitables.` };
+  return byClass;
+}
+
+function parseTeamSheet(
+  sheetName: string,
+  sheet: XLSX.WorkSheet | undefined,
+  students: ImportedStudent[],
+  accessCodes: Map<string, string>,
+): ImportedClass | null {
+  if (!sheet) return null;
+
+  const match = normalize(sheetName).match(TEAM_SHEET_RE);
+  if (!match) return null;
+  const className = match[1].toLocaleUpperCase('fr-FR');
+
+  const rows = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, defval: '' });
+  const header = (rows[0] ?? []).map(normalize);
+  const nameCol = findColumn(header, ['nom']);
+  const subjectCol = findColumn(header, ['matiere/fonction', 'matière/fonction', 'matiere', 'matière', 'fonction']);
+  const ppCol = findColumn(header, ['professeur principal', 'pp']);
+
+  if (nameCol < 0 || subjectCol < 0) return null;
+
+  const teachers: ImportedTeacher[] = [];
+  for (const row of rows.slice(2)) {
+    const values = row as unknown[];
+    const displayName = clean(values[nameCol]);
+    const subject = clean(values[subjectCol]);
+    if (!displayName) continue;
+    // The second row contains counts such as "12 professeurs" and is skipped above.
+    const isPP = ppCol >= 0 && normalize(values[ppCol]) === 'x';
+    teachers.push({ displayName, subject, isPP });
   }
 
   return {
-    item: {
-      name: sheetName.trim(),
-      level: levelFromClassName(sheetName),
-      accessCode: accessCodes.get(sheetName.trim().toLocaleUpperCase('fr-FR')) ?? null,
-      teachers: cleanTeachers,
-      students: cleanStudents,
-    },
+    name: className,
+    level: levelFromClassName(className),
+    accessCode: accessCodes.get(className) ?? null,
+    teachers: uniqueTeachers(teachers),
+    students,
   };
 }
 
@@ -145,27 +183,54 @@ export function parseCollegeWorkbook(data: ArrayBuffer): CollegeImport {
   const workbook = XLSX.read(data, { type: 'array', cellDates: false });
   const accessCodes = parseAccessCodes(workbook.Sheets['code classe']);
   const direction = parseDirection(workbook.Sheets['direction']);
+  const studentsByClass = parseStudentsSheet(workbook.Sheets['LISTE ELEVES']);
   const classes: ImportedClass[] = [];
   const ignoredSheets: string[] = [];
   const warnings: string[] = [];
 
+  if (!workbook.Sheets['LISTE ELEVES']) {
+    warnings.push('L’onglet « LISTE ELEVES » est absent : les élèves ne pourront pas être importés.');
+  }
+
+  if (!workbook.Sheets['code classe']) {
+    warnings.push('Aucun onglet « code classe » dans ce fichier : les codes de déverrouillage existants seront conservés.');
+  }
+
+  if (!workbook.Sheets['direction']) {
+    warnings.push('Aucun onglet « direction » dans ce fichier : les informations de direction existantes seront conservées.');
+  }
+
   for (const sheetName of workbook.SheetNames) {
     const normalized = normalize(sheetName);
-    if (RESERVED.has(normalized)) {
+
+    if (RESERVED.has(normalized) || normalized === STUDENT_SHEET) {
       ignoredSheets.push(sheetName);
       continue;
     }
 
-    const result = parseClass(sheetName, workbook.Sheets[sheetName], accessCodes);
-    if (result.item) classes.push(result.item);
-    if (result.warning) warnings.push(result.warning);
+    if (TEAM_SHEET_RE.test(normalized)) {
+      const match = normalized.match(TEAM_SHEET_RE);
+      const className = match?.[1]?.toLocaleUpperCase('fr-FR');
+      if (!className) continue;
+
+      const item = parseTeamSheet(
+        sheetName,
+        workbook.Sheets[sheetName],
+        studentsByClass.get(className) ?? [],
+        accessCodes,
+      );
+      if (item) classes.push(item);
+      continue;
+    }
+
+    ignoredSheets.push(sheetName);
   }
 
   const realClasses = classes.filter((item) => normalize(item.name) !== 'test');
   const totalStudents = realClasses.reduce((sum, item) => sum + item.students.length, 0);
 
   if (realClasses.length === 0) {
-    warnings.push('Aucune classe réelle exploitable n\'a été détectée dans le fichier.');
+    warnings.push('Aucune classe réelle exploitable n’a été détectée dans le fichier.');
   }
 
   return {

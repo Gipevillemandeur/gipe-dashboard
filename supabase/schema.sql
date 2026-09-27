@@ -149,7 +149,7 @@ begin
   insert into public.classes (school_year_id, name, level, kind, access_code, active)
   values (v_year_id, 'TEST', 'Démonstration', 'demo', '1234', true)
   on conflict (school_year_id, name) do update
-    set kind = 'demo', level = 'Démonstration', access_code = '1234', active = true;
+    set kind = 'demo', level = 'Démonstration', active = true;
 
   -- Real classes not present in the new college file become inactive.
   update public.classes
@@ -176,7 +176,7 @@ begin
     )
     on conflict (school_year_id, name) do update set
       level = excluded.level,
-      access_code = excluded.access_code,
+      access_code = coalesce(excluded.access_code, public.classes.access_code),
       kind = 'real',
       active = true
     returning id into v_class_id;
@@ -217,7 +217,7 @@ begin
   end loop;
 
   -- Teachers no longer present in the current file are retained as inactive rows.
-  update public.teachers set active = false;
+  update public.teachers set active = false where active = true;
   update public.teachers t
   set active = true
   where exists (
@@ -230,14 +230,17 @@ begin
       and c.kind = 'real'
   );
 
-  -- Replace current direction/management information.
-  delete from public.school_management;
-  for v_name in select value::text from jsonb_array_elements_text(coalesce(p_direction, '[]'::jsonb)) loop
-    if trim(v_name) <> '' then
-      insert into public.school_management (display_name, active)
-      values (trim(v_name), true);
-    end if;
-  end loop;
+  -- Replace current direction/management information only when the source file provides it.
+  -- The college workbook may not contain a direction sheet; in that case preserve the current data.
+  if jsonb_array_length(coalesce(p_direction, '[]'::jsonb)) > 0 then
+    delete from public.school_management;
+    for v_name in select value::text from jsonb_array_elements_text(coalesce(p_direction, '[]'::jsonb)) loop
+      if trim(v_name) <> '' then
+        insert into public.school_management (display_name, active)
+        values (trim(v_name), true);
+      end if;
+    end loop;
+  end if;
 end;
 $$;
 

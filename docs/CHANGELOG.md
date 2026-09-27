@@ -33,3 +33,10 @@
 - `docs/SETUP.md` : installation et première configuration.
 - `docs/NEXT-STEPS.md` : prochaines fonctions à développer.
 - `docs/ARCHITECTURE.md` : architecture métier et technique.
+
+## V4 — configuration dashboard
+- Ajout d'un espace Configuration pour modifier les codes de déverrouillage des conseils.
+- Ajout d'un espace Direction, indépendant du fichier du collège.
+- Un import sans onglet `direction` conserve désormais la direction enregistrée dans le dashboard.
+- Un import sans codes conserve désormais les codes existants par classe.
+- Le code de la classe TEST est conservé lors des imports.
