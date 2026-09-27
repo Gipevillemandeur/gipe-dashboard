@@ -48,41 +48,55 @@ export async function GET(request: Request) {
     // ----------------------------------------------------------
     // LISTE DES CLASSES
     // ----------------------------------------------------------
-    if (!classe) {
-      const { data: classes, error } = await admin
-        .from('classes')
-        .select('name,level,kind,active,access_code')
-        .eq('school_year_id', year.id)
-        .eq('active', true)
-        .order('kind')
-        .order('name');
+   if (!classe) {
+  const { data: classes, error } = await admin
+    .from('classes')
+    .select('name,level,kind,active,access_code')
+    .eq('school_year_id', year.id)
+    .eq('active', true)
+    .order('kind')
+    .order('name');
 
-      if (error) {
-        return cors(
-          NextResponse.json(
-            { error: 'Lecture des classes impossible.' },
-            { status: 500 }
-          )
-        );
-      }
+  if (error) {
+    return cors(
+      NextResponse.json(
+        { error: 'Lecture des classes impossible.' },
+        { status: 500 }
+      )
+    );
+  }
 
-      // IMPORTANT :
-      // On ne renvoie jamais le code lui-même.
-      const safeClasses = (classes ?? []).map((row) => ({
-        name: row.name,
-        level: row.level,
-        kind: row.kind,
-        active: row.active,
-        requiresCode: Boolean(String(row.access_code ?? '').trim()),
-      }));
+  const { data: direction, error: directionError } = await admin
+    .from('school_management')
+    .select('display_name,role')
+    .eq('active', true)
+    .order('display_name');
 
-      return cors(
-        NextResponse.json({
-          schoolYear: year.label,
-          classes: safeClasses,
-        })
-      );
-    }
+  if (directionError) {
+    return cors(
+      NextResponse.json(
+        { error: 'Lecture de la direction impossible.' },
+        { status: 500 }
+      )
+    );
+  }
+
+  const safeClasses = (classes ?? []).map((row) => ({
+    name: row.name,
+    level: row.level,
+    kind: row.kind,
+    active: row.active,
+    requiresCode: Boolean(String(row.access_code ?? '').trim()),
+  }));
+
+  return cors(
+    NextResponse.json({
+      schoolYear: year.label,
+      classes: safeClasses,
+      direction: direction ?? [],
+    })
+  );
+}
 
     // ----------------------------------------------------------
     // CLASSE DEMANDÉE
