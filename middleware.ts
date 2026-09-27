@@ -2,9 +2,12 @@ import { type NextRequest, NextResponse } from 'next/server';
 import { updateSession } from '@/lib/supabase/proxy';
 
 export async function middleware(request: NextRequest) {
-  // API publique utilisée par appconseils
-  // Elle ne doit pas être redirigée vers /login.
-  if (request.nextUrl.pathname === '/api/conseils/public') {
+  // APIs publiques utilisées par appconseils
+  // Elles ne doivent pas être redirigées vers /login.
+  if (
+    request.nextUrl.pathname === '/api/conseils/public' ||
+    request.nextUrl.pathname === '/api/conseils/send-pdf'
+  ) {
     return NextResponse.next();
   }
 
@@ -16,16 +19,15 @@ export async function middleware(request: NextRequest) {
 
   if (!authenticated || !admin) {
     const loginUrl = new URL('/login', request.url);
-    if (authenticated && !admin) loginUrl.searchParams.set('error', 'unauthorized');
+
+    if (authenticated && !admin) {
+      loginUrl.searchParams.set('error', 'unauthorized');
+    }
+
     loginUrl.searchParams.set('next', request.nextUrl.pathname);
+
     return NextResponse.redirect(loginUrl);
   }
 
   return response;
 }
-
-export const config = {
-  matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
-  ],
-};
