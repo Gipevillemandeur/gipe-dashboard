@@ -157,17 +157,7 @@ if (expected !== code) {
     )
   );
 }
-      return cors(
-        NextResponse.json(
-          {
-            error: 'Code incorrect.',
-            requiresCode: true,
-          },
-          { status: 403 }
-        )
-      );
-    }
-
+      
     // ----------------------------------------------------------
     // DONNÉES DU CONSEIL
     // ----------------------------------------------------------
