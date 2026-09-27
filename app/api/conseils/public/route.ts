@@ -6,22 +6,38 @@ function cors(response: NextResponse) {
   response.headers.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
   response.headers.set('Access-Control-Allow-Headers', 'Content-Type');
   response.headers.set('Cache-Control', 'no-store');
+
   return response;
 }
 
 export async function OPTIONS() {
-  return cors(new NextResponse(null, { status: 204 }));
+  return cors(
+    new NextResponse(null, {
+      status: 204,
+    })
+  );
 }
 
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
-    const classe = (searchParams.get('classe') || '').trim();
-    const code = (searchParams.get('code') || '').trim();
+
+    const classe =
+      (searchParams.get('classe') || '').trim();
+
+    const code =
+      (searchParams.get('code') || '').trim();
 
     const admin = createAdminClient();
 
-    const { data: year, error: yearError } = await admin
+    // ==========================================================
+    // ANNÉE SCOLAIRE ACTIVE
+    // ==========================================================
+
+    const {
+      data: year,
+      error: yearError,
+    } = await admin
       .from('school_years')
       .select('id,label')
       .eq('is_active', true)
@@ -30,8 +46,12 @@ export async function GET(request: Request) {
     if (yearError) {
       return cors(
         NextResponse.json(
-          { error: 'Lecture année scolaire impossible.' },
-          { status: 500 }
+          {
+            error: 'Lecture année scolaire impossible.',
+          },
+          {
+            status: 500,
+          }
         )
       );
     }
@@ -41,69 +61,98 @@ export async function GET(request: Request) {
         NextResponse.json({
           schoolYear: null,
           classes: [],
+          direction: [],
         })
       );
     }
 
-    // ----------------------------------------------------------
+    // ==========================================================
     // LISTE DES CLASSES
-    // ----------------------------------------------------------
-   if (!classe) {
-  const { data: classes, error } = await admin
-    .from('classes')
-    .select('name,level,kind,active,access_code')
-    .eq('school_year_id', year.id)
-    .eq('active', true)
-    .order('kind')
-    .order('name');
+    // ==========================================================
 
-  if (error) {
-    return cors(
-      NextResponse.json(
-        { error: 'Lecture des classes impossible.' },
-        { status: 500 }
-      )
-    );
-  }
+    if (!classe) {
+      const {
+        data: classes,
+        error: classesError,
+      } = await admin
+        .from('classes')
+        .select(
+          'name,level,kind,active,access_code'
+        )
+        .eq('school_year_id', year.id)
+        .eq('active', true)
+        .order('kind')
+        .order('name');
 
-  const { data: direction, error: directionError } = await admin
-    .from('school_management')
-    .select('display_name,role')
-    .eq('active', true)
-    .order('display_name');
+      if (classesError) {
+        return cors(
+          NextResponse.json(
+            {
+              error:
+                'Lecture des classes impossible.',
+            },
+            {
+              status: 500,
+            }
+          )
+        );
+      }
 
-  if (directionError) {
-    return cors(
-      NextResponse.json(
-        { error: 'Lecture de la direction impossible.' },
-        { status: 500 }
-      )
-    );
-  }
+      const {
+        data: direction,
+        error: directionError,
+      } = await admin
+        .from('school_management')
+        .select('display_name,role')
+        .eq('active', true)
+        .order('display_name');
 
-  const safeClasses = (classes ?? []).map((row) => ({
-  name: row.name,
-  level: row.level,
-  kind: row.kind,
-  active: row.active,
-  requiresCode: true,
-}));
+      if (directionError) {
+        return cors(
+          NextResponse.json(
+            {
+              error:
+                'Lecture de la direction impossible.',
+            },
+            {
+              status: 500,
+            }
+          )
+        );
+      }
 
-  return cors(
-    NextResponse.json({
-      schoolYear: year.label,
-      classes: safeClasses,
-      direction: direction ?? [],
-    })
-  );
-}
+      // Toutes les classes nécessitent désormais
+      // un code d'accès.
+      const safeClasses =
+        (classes ?? []).map((row) => ({
+          name: row.name,
+          level: row.level,
+          kind: row.kind,
+          active: row.active,
+          requiresCode: true,
+        }));
 
-    // ----------------------------------------------------------
+      return cors(
+        NextResponse.json({
+          schoolYear: year.label,
+          classes: safeClasses,
+          direction: direction ?? [],
+        })
+      );
+    }
+
+    // ==========================================================
     // CLASSE DEMANDÉE
-    // ----------------------------------------------------------
-    const { data: classRow, error: classError } = await admin
+    // ==========================================================
+
+    const {
+      data: classRow,
+      error: classError,
+    } = await admin
       .from('classes')
-      .select('id,name,level,kind,access_code,active')
+      .select(
+        'id,name,level,kind,access_code,active'
+      )
       .eq('school_year_id', year.id)
       .eq('name', classe)
       .eq('active', true)
@@ -112,8 +161,13 @@ export async function GET(request: Request) {
     if (classError) {
       return cors(
         NextResponse.json(
-          { error: 'Lecture de la classe impossible.' },
-          { status: 500 }
+          {
+            error:
+              'Lecture de la classe impossible.',
+          },
+          {
+            status: 500,
+          }
         )
       );
     }
@@ -121,50 +175,72 @@ export async function GET(request: Request) {
     if (!classRow) {
       return cors(
         NextResponse.json(
-          { error: 'Classe inconnue.' },
-          { status: 404 }
+          {
+            error: 'Classe inconnue.',
+          },
+          {
+            status: 404,
+          }
         )
       );
     }
 
-    // ----------------------------------------------------------
+    // ==========================================================
     // CONTRÔLE DU CODE
-    // ----------------------------------------------------------
-   const expected = String(classRow.access_code ?? '').trim();
+    // ==========================================================
 
-// Une classe sans code configuré est inaccessible.
-if (!expected) {
-  return cors(
-    NextResponse.json(
-      {
-        error: 'Aucun code d’accès n’est configuré pour cette classe.',
-        requiresCode: true,
-      },
-      { status: 403 }
-    )
-  );
-}
+    const expected =
+      String(classRow.access_code ?? '').trim();
 
-// Code obligatoire et vérification stricte.
-if (expected !== code) {
-  return cors(
-    NextResponse.json(
-      {
-        error: 'Code incorrect.',
-        requiresCode: true,
-      },
-      { status: 403 }
-    )
-  );
-}
-      
-    // ----------------------------------------------------------
+    // Une classe sans code configuré
+    // est inaccessible.
+    if (!expected) {
+      return cors(
+        NextResponse.json(
+          {
+            error:
+              'Aucun code d’accès n’est configuré pour cette classe.',
+            requiresCode: true,
+          },
+          {
+            status: 403,
+          }
+        )
+      );
+    }
+
+    // Le code est obligatoire.
+    if (expected !== code) {
+      return cors(
+        NextResponse.json(
+          {
+            error: 'Code incorrect.',
+            requiresCode: true,
+          },
+          {
+            status: 403,
+          }
+        )
+      );
+    }
+
+    // ==========================================================
     // DONNÉES DU CONSEIL
-    // ----------------------------------------------------------
+    // ==========================================================
+
     const [
-      { data: students, error: studentsError },
-      { data: teacherRows, error: teacherError },
-      { data: direction, error: directionError },
+      {
+        data: students,
+        error: studentsError,
+      },
+      {
+        data: teacherRows,
+        error: teacherError,
+      },
+      {
+        data: direction,
+        error: directionError,
+      },
     ] = await Promise.all([
       admin
         .from('students')
@@ -176,7 +252,9 @@ if (expected !== code) {
 
       admin
         .from('class_teachers')
-        .select('subject,is_pp,teachers(display_name)')
+        .select(
+          'subject,is_pp,teachers(display_name)'
+        )
         .eq('class_id', classRow.id),
 
       admin
@@ -186,22 +264,43 @@ if (expected !== code) {
         .order('display_name'),
     ]);
 
-    if (studentsError || teacherError || directionError) {
+    if (
+      studentsError ||
+      teacherError ||
+      directionError
+    ) {
       return cors(
         NextResponse.json(
-          { error: 'Lecture des données du conseil impossible.' },
-          { status: 500 }
+          {
+            error:
+              'Lecture des données du conseil impossible.',
+          },
+          {
+            status: 500,
+          }
         )
       );
     }
 
-    const teachers = (teacherRows ?? [])
-      .map((row: any) => ({
-        subject: row.subject ?? '',
-        prof: row.teachers?.display_name ?? '',
-        isPP: Boolean(row.is_pp),
-      }))
-      .filter((row) => row.prof || row.subject);
+    // ==========================================================
+    // ÉQUIPE PÉDAGOGIQUE
+    // ==========================================================
+
+    const teachers =
+      (teacherRows ?? [])
+        .map((row: any) => ({
+          subject: row.subject ?? '',
+          prof:
+            row.teachers?.display_name ?? '',
+          isPP: Boolean(row.is_pp),
+        }))
+        .filter(
+          (row) => row.prof || row.subject
+        );
+
+    // ==========================================================
+    // RÉPONSE
+    // ==========================================================
 
     return cors(
       NextResponse.json({
@@ -214,17 +313,26 @@ if (expected !== code) {
         },
 
         students: students ?? [],
+
         teachers,
+
         direction: direction ?? [],
       })
     );
   } catch (error) {
-    console.error('Conseils public API:', error);
+    console.error(
+      'Conseils public API:',
+      error
+    );
 
     return cors(
       NextResponse.json(
-        { error: 'Erreur serveur.' },
-        { status: 500 }
+        {
+          error: 'Erreur serveur.',
+        },
+        {
+          status: 500,
+        }
       )
     );
   }
