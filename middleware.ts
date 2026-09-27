@@ -6,10 +6,11 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  const { response, authenticated } = await updateSession(request);
+  const { response, authenticated, admin } = await updateSession(request);
 
-  if (!authenticated) {
+  if (!authenticated || !admin) {
     const loginUrl = new URL('/login', request.url);
+    if (authenticated && !admin) loginUrl.searchParams.set('error', 'unauthorized');
     loginUrl.searchParams.set('next', request.nextUrl.pathname);
     return NextResponse.redirect(loginUrl);
   }

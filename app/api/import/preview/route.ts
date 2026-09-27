@@ -7,9 +7,20 @@ export const runtime = 'nodejs';
 export async function POST(request: Request) {
   const supabase = await createClient();
   const { data } = await supabase.auth.getClaims();
+  const userId = data?.claims?.sub;
 
-  if (!data?.claims?.sub) {
+  if (!userId) {
     return NextResponse.json({ error: 'Non authentifié.' }, { status: 401 });
+  }
+
+  const { data: adminRow, error: adminError } = await supabase
+    .from('gipe_admins')
+    .select('user_id')
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  if (adminError || !adminRow) {
+    return NextResponse.json({ error: 'Accès administrateur requis.' }, { status: 403 });
   }
 
   const formData = await request.formData();
@@ -22,7 +33,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Le fichier est trop volumineux (10 Mo maximum).' }, { status: 413 });
   }
 
-  const allowed = /\\.(xls|xlsx)$/i;
+  const allowed = /\.(xls|xlsx)$/i;
   if (!allowed.test(file.name)) {
     return NextResponse.json({ error: 'Format non accepté. Utilise un fichier .xls ou .xlsx.' }, { status: 415 });
   }

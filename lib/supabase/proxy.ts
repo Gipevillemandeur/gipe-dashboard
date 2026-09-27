@@ -24,5 +24,22 @@ export async function updateSession(request: NextRequest) {
   );
 
   const { data } = await supabase.auth.getClaims();
-  return { response: supabaseResponse, authenticated: Boolean(data?.claims?.sub) };
+  const userId = data?.claims?.sub;
+
+  if (!userId) {
+    return { response: supabaseResponse, authenticated: false, admin: false };
+  }
+
+  // RLS on gipe_admins permits an authenticated user to read only their own row.
+  const { data: adminRow } = await supabase
+    .from('gipe_admins')
+    .select('user_id')
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  return {
+    response: supabaseResponse,
+    authenticated: true,
+    admin: Boolean(adminRow),
+  };
 }

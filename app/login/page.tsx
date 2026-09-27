@@ -8,10 +8,12 @@ import { createClient } from '@/lib/supabase/client';
 export default function LoginPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const next = searchParams.get('next') || '/';
+  const requestedNext = searchParams.get('next') || '/';
+  const next = requestedNext.startsWith('/') && !requestedNext.startsWith('//') ? requestedNext : '/';
+  const unauthorized = searchParams.get('error') === 'unauthorized';
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
+  const [error, setError] = useState(unauthorized ? 'Ce compte n’est pas autorisé à accéder au centre de gestion.' : '');
   const [loading, setLoading] = useState(false);
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
@@ -28,7 +30,7 @@ export default function LoginPage() {
       return;
     }
 
-    router.replace(next.startsWith('/') ? next : '/');
+    router.replace(next);
     router.refresh();
   }
 
