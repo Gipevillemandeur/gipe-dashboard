@@ -9,9 +9,13 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <div className="shell">
-      <Sidebar />
-      <main className="content">{children}</main>
-    </div>
+    <html lang="fr">
+      <body>
+        <div className="shell">
+          <Sidebar />
+          <main className="content">{children}</main>
+        </div>
+      </body>
+    </html>
   );
 }

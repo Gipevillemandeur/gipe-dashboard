@@ -77,7 +77,9 @@ h1 { margin:4px 0 0; font-size:30px; line-height:1.12; }
 .btn { border:1px solid var(--gipe-line); background:white; color:var(--gipe-ink); border-radius:10px; padding:9px 12px; cursor:pointer; font-size:12px; font-weight:700; }
 .btn:hover { background:#fffaf4; }
 .btn-primary { border-color:var(--gipe-maroon); background:var(--gipe-maroon); color:white; }
-.btn-gold { border-color:#df8c00; background:var(--gipe-gold); color:#2b2321; }
+.btn-primary:hover { border-color:var(--gipe-maroon); background:white; color:var(--gipe-maroon); }
+.btn-primary:disabled { opacity:.55; cursor:not-allowed; }
+.btn-gold { border-color:#df8c00; background:var(--gipe-gold); color:#2b2321; display:inline-flex; align-items:center; justify-content:center; gap:8px; line-height:1; white-space:nowrap; }
 .btn-row { display:flex; gap:8px; flex-wrap:wrap; }
 .table { width:100%; border-collapse:collapse; }
 .table th, .table td { padding:11px 10px; border-bottom:1px solid #f0e8df; text-align:left; font-size:12px; vertical-align:middle; }

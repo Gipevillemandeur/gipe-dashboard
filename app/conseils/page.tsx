@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { ArrowLeft, Pencil, FlaskConical, ShieldCheck } from 'lucide-react';
+import { ArrowLeft, Pencil, FlaskConical, ShieldCheck, Settings } from 'lucide-react';
 import { getDashboardSnapshot } from '@/lib/dashboard-data';
 
 export const dynamic = 'force-dynamic';
@@ -11,7 +11,7 @@ export default async function ConseilsPage() {
     <>
       <div className="topbar">
         <div><div className="eyebrow">Conseils de classe</div><h1>Gestion des classes</h1><div className="kicker">{snapshot.connected ? `Année active : ${snapshot.schoolYear}` : 'Mode démonstration : base Supabase non connectée.'}</div></div>
-        <div className="topbar-right"><Link className="btn" href="/"><ArrowLeft size={14}/> Accueil</Link><Link className="btn btn-primary" href="/import-college">Importer le collège</Link></div>
+        <div className="topbar-right"><Link className="btn" href="/"><ArrowLeft size={14}/> Accueil</Link><Link className="btn" href="/configuration"><Settings size={14}/> Configuration</Link><Link className="btn btn-primary" href="/import-college">Importer le collège</Link></div>
       </div>
 
       <section className="card section-card">

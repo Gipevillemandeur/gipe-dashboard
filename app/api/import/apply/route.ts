@@ -35,13 +35,13 @@ export async function POST(request: Request) {
   if (!(file instanceof File)) {
     return NextResponse.json({ error: 'Aucun fichier reçu.' }, { status: 400 });
   }
-  if (!/^\\d{4}-\\d{4}$/.test(schoolYearLabel)) {
+  if (!/^\d{4}-\d{4}$/.test(schoolYearLabel)) {
     return NextResponse.json({ error: 'Année scolaire invalide. Exemple : 2026-2027.' }, { status: 400 });
   }
   if (file.size > 10 * 1024 * 1024) {
     return NextResponse.json({ error: 'Le fichier est trop volumineux (10 Mo maximum).' }, { status: 413 });
   }
-  if (!/\\.(xls|xlsx)$/i.test(file.name)) {
+  if (!/\.(xls|xlsx)$/i.test(file.name)) {
     return NextResponse.json({ error: 'Format non accepté. Utilise un fichier .xls ou .xlsx.' }, { status: 415 });
   }
 
