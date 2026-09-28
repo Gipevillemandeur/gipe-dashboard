@@ -22,7 +22,12 @@ export default function ConfigurationPage() {
         </div>
       </div>
 
-      <div className="page-grid two-col">
+      <div
+  className="page-grid"
+  style={{
+    gridTemplateColumns: '1fr 1fr',
+  }}
+>
 
         <Link
           href="/configuration/classes"
