@@ -8,7 +8,8 @@ import {
   Home,
   Users,
   Globe2,
-  BookOpen
+  BookOpen,
+  UserRoundPlus
 } from 'lucide-react';
 
 import LogoutButton from '@/components/LogoutButton';
@@ -23,6 +24,11 @@ const items = [
     href: '/conseils',
     label: 'Conseils de classe',
     icon: Users
+  },
+  {
+    href: '/adherents',
+    label: 'Adhérents',
+    icon: UserRoundPlus
   },
   {
     href: '#',
