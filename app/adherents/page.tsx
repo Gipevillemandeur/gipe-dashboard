@@ -380,10 +380,13 @@ export default function AdherentsPage() {
         return 'Espèces';
 
       case 'transfer':
-        return 'Virement';
+  return 'Virement';
 
-      case 'other':
-        return 'Autre';
+case 'online':
+  return 'Paiement en ligne';
+
+case 'other':
+  return 'Autre';
 
       default:
         return '—';
