@@ -1424,12 +1424,16 @@ case 'other':
                       </option>
 
                       <option value="transfer">
-                        Virement
-                      </option>
+  Virement
+</option>
 
-                      <option value="other">
-                        Autre
-                      </option>
+<option value="online">
+  Paiement en ligne
+</option>
+
+<option value="other">
+  Autre
+</option>
                     </select>
                   </label>
 
