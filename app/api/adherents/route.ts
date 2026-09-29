@@ -52,6 +52,32 @@ async function requireAdmin() {
 }
 
 
+function isValidCouncilParticipation(value: string) {
+  return [
+    'no',
+    'child_class',
+    'all_classes',
+  ].includes(value);
+}
+
+
+function isValidPaymentMethod(value: string) {
+  return [
+    'cheque',
+    'cash',
+    'transfer',
+    'online',
+    'other',
+  ].includes(value);
+}
+
+
+function cleanNullableString(value: unknown) {
+  const result = String(value || '').trim();
+  return result || null;
+}
+
+
 export async function GET() {
   const auth = await requireAdmin();
 
@@ -83,7 +109,6 @@ export async function GET() {
       members: [],
     });
   }
-
 
   const { data: memberships, error } =
     await admin
@@ -126,14 +151,12 @@ export async function GET() {
         ascending: false,
       });
 
-
   if (error) {
     return NextResponse.json(
       { error: error.message },
       { status: 500 }
     );
   }
-
 
   const members = (memberships || []).map(
     (membership: any) => ({
@@ -155,7 +178,8 @@ export async function GET() {
       email:
         membership.gipe_adherents?.email || '',
 
-      renewal: membership.renewal,
+      renewal:
+        membership.renewal,
 
       councilParticipation:
         membership.council_participation,
@@ -189,13 +213,14 @@ export async function GET() {
               link.gipe_children?.last_name || '',
             firstName:
               link.gipe_children?.first_name || '',
+            classId:
+              link.classes?.id || '',
             className:
               link.classes?.name || '',
           })
         ),
     })
   );
-
 
   const classCounts: Record<string, number> = {};
 
@@ -207,7 +232,6 @@ export async function GET() {
         (classCounts[child.className] || 0) + 1;
     }
   }
-
 
   const byClass = Object.entries(classCounts)
     .map(([className, count]) => ({
@@ -221,7 +245,6 @@ export async function GET() {
         { numeric: true }
       )
     );
-
 
   return NextResponse.json({
     schoolYear: year.label,
@@ -252,7 +275,6 @@ export async function POST(request: Request) {
     );
   }
 
-
   const {
     lastName,
     firstName,
@@ -271,7 +293,6 @@ export async function POST(request: Request) {
     children,
   } = body;
 
-
   if (
     !String(lastName || '').trim() ||
     !String(firstName || '').trim()
@@ -285,9 +306,8 @@ export async function POST(request: Request) {
     );
   }
 
-
   if (
-    !['no', 'child_class', 'all_classes'].includes(
+    !isValidCouncilParticipation(
       councilParticipation || 'no'
     )
   ) {
@@ -300,12 +320,9 @@ export async function POST(request: Request) {
     );
   }
 
-
   if (
     paymentMethod &&
-    !['cheque', 'cash', 'transfer', 'online', 'other'].includes(
-  paymentMethod
-)
+    !isValidPaymentMethod(paymentMethod)
   ) {
     return NextResponse.json(
       {
@@ -314,7 +331,6 @@ export async function POST(request: Request) {
       { status: 400 }
     );
   }
-
 
   if (
     chequeNumber &&
@@ -328,7 +344,6 @@ export async function POST(request: Request) {
       { status: 400 }
     );
   }
-
 
   const { data: year, error: yearError } =
     await admin
@@ -348,25 +363,27 @@ export async function POST(request: Request) {
     );
   }
 
-
   const { data: adherent, error: adherentError } =
     await admin
       .from('gipe_adherents')
       .insert({
         last_name:
           String(lastName).trim(),
+
         first_name:
           String(firstName).trim(),
+
         address:
-          String(address || '').trim() || null,
+          cleanNullableString(address),
+
         phone:
-          String(phone || '').trim() || null,
+          cleanNullableString(phone),
+
         email:
-          String(email || '').trim() || null,
+          cleanNullableString(email),
       })
       .select('id')
       .single();
-
 
   if (adherentError || !adherent) {
     return NextResponse.json(
@@ -379,7 +396,6 @@ export async function POST(request: Request) {
     );
   }
 
-
   const { data: membership, error: membershipError } =
     await admin
       .from('gipe_memberships')
@@ -387,7 +403,8 @@ export async function POST(request: Request) {
         adherent_id: adherent.id,
         school_year_id: year.id,
 
-        renewal: Boolean(renewal),
+        renewal:
+          Boolean(renewal),
 
         council_participation:
           councilParticipation || 'no',
@@ -420,7 +437,6 @@ export async function POST(request: Request) {
       .select('id')
       .single();
 
-
   if (membershipError || !membership) {
     await admin
       .from('gipe_adherents')
@@ -437,14 +453,12 @@ export async function POST(request: Request) {
     );
   }
 
-
-  const childList = Array.isArray(children)
-    ? children
-    : [];
-
+  const childList =
+    Array.isArray(children)
+      ? children
+      : [];
 
   for (const child of childList) {
-
     if (
       !String(child.lastName || '').trim() ||
       !String(child.firstName || '').trim()
@@ -452,19 +466,18 @@ export async function POST(request: Request) {
       continue;
     }
 
-
     const { data: createdChild, error: childError } =
       await admin
         .from('gipe_children')
         .insert({
           last_name:
             String(child.lastName).trim(),
+
           first_name:
             String(child.firstName).trim(),
         })
         .select('id')
         .single();
-
 
     if (childError || !createdChild) {
       return NextResponse.json(
@@ -476,7 +489,6 @@ export async function POST(request: Request) {
         { status: 500 }
       );
     }
-
 
     const { error: linkError } =
       await admin
@@ -492,6 +504,354 @@ export async function POST(request: Request) {
             child.classId || null,
         });
 
+    if (linkError) {
+      return NextResponse.json(
+        {
+          error:
+            linkError.message,
+        },
+        { status: 500 }
+      );
+    }
+  }
+
+  return NextResponse.json(
+    {
+      success: true,
+      membershipId:
+        membership.id,
+    },
+    { status: 201 }
+  );
+}
+
+
+export async function PUT(request: Request) {
+  const auth = await requireAdmin();
+
+  if ('error' in auth) {
+    return auth.error;
+  }
+
+  const { admin } = auth;
+
+  const body = await request
+    .json()
+    .catch(() => null) as any;
+
+  if (!body) {
+    return NextResponse.json(
+      { error: 'Données invalides.' },
+      { status: 400 }
+    );
+  }
+
+  const {
+    id,
+    lastName,
+    firstName,
+    address,
+    phone,
+    email,
+    renewal,
+    councilParticipation,
+    boardMember,
+    caMember,
+    paymentReceived,
+    paymentDate,
+    paymentMethod,
+    chequeNumber,
+    amount,
+    children,
+  } = body;
+
+  if (!id) {
+    return NextResponse.json(
+      { error: 'Adhérent introuvable.' },
+      { status: 400 }
+    );
+  }
+
+  if (
+    !String(lastName || '').trim() ||
+    !String(firstName || '').trim()
+  ) {
+    return NextResponse.json(
+      {
+        error:
+          'Le nom et le prénom sont obligatoires.',
+      },
+      { status: 400 }
+    );
+  }
+
+  if (
+    !isValidCouncilParticipation(
+      councilParticipation || 'no'
+    )
+  ) {
+    return NextResponse.json(
+      {
+        error:
+          'Choix de participation aux conseils invalide.',
+      },
+      { status: 400 }
+    );
+  }
+
+  if (
+    paymentMethod &&
+    !isValidPaymentMethod(paymentMethod)
+  ) {
+    return NextResponse.json(
+      {
+        error: 'Mode de paiement invalide.',
+      },
+      { status: 400 }
+    );
+  }
+
+  if (
+    chequeNumber &&
+    paymentMethod !== 'cheque'
+  ) {
+    return NextResponse.json(
+      {
+        error:
+          'Le numéro de chèque nécessite un paiement par chèque.',
+      },
+      { status: 400 }
+    );
+  }
+
+  const { data: year, error: yearError } =
+    await admin
+      .from('school_years')
+      .select('id')
+      .eq('is_active', true)
+      .maybeSingle();
+
+  if (yearError || !year) {
+    return NextResponse.json(
+      {
+        error:
+          yearError?.message ||
+          'Aucune année scolaire active.',
+      },
+      { status: 409 }
+    );
+  }
+
+  const { data: membership, error: membershipError } =
+    await admin
+      .from('gipe_memberships')
+      .select(`
+        id,
+        adherent_id
+      `)
+      .eq('id', id)
+      .eq('school_year_id', year.id)
+      .maybeSingle();
+
+  if (membershipError || !membership) {
+    return NextResponse.json(
+      {
+        error:
+          membershipError?.message ||
+          'Adhésion introuvable pour cette année scolaire.',
+      },
+      { status: 404 }
+    );
+  }
+
+  const { error: adherentError } =
+    await admin
+      .from('gipe_adherents')
+      .update({
+        last_name:
+          String(lastName).trim(),
+
+        first_name:
+          String(firstName).trim(),
+
+        address:
+          cleanNullableString(address),
+
+        phone:
+          cleanNullableString(phone),
+
+        email:
+          cleanNullableString(email),
+
+        updated_at:
+          new Date().toISOString(),
+      })
+      .eq('id', membership.adherent_id);
+
+  if (adherentError) {
+    return NextResponse.json(
+      {
+        error:
+          adherentError.message,
+      },
+      { status: 500 }
+    );
+  }
+
+  const { error: updateMembershipError } =
+    await admin
+      .from('gipe_memberships')
+      .update({
+        renewal:
+          Boolean(renewal),
+
+        council_participation:
+          councilParticipation || 'no',
+
+        board_member:
+          Boolean(boardMember),
+
+        ca_member:
+          Boolean(caMember),
+
+        payment_received:
+          Boolean(paymentReceived),
+
+        payment_date:
+          paymentDate || null,
+
+        payment_method:
+          paymentMethod || null,
+
+        cheque_number:
+          chequeNumber || null,
+
+        amount:
+          amount === '' ||
+          amount === null ||
+          amount === undefined
+            ? null
+            : Number(amount),
+
+        updated_at:
+          new Date().toISOString(),
+      })
+      .eq('id', membership.id);
+
+  if (updateMembershipError) {
+    return NextResponse.json(
+      {
+        error:
+          updateMembershipError.message,
+      },
+      { status: 500 }
+    );
+  }
+
+  /*
+   * On reconstruit les liens enfants de cette adhésion.
+   * Les anciennes lignes enfants ne sont pas supprimées
+   * de gipe_children afin de ne pas casser d'éventuels
+   * liens historiques.
+   */
+  const { error: deleteLinksError } =
+    await admin
+      .from('gipe_membership_children')
+      .delete()
+      .eq('membership_id', membership.id);
+
+  if (deleteLinksError) {
+    return NextResponse.json(
+      {
+        error:
+          deleteLinksError.message,
+      },
+      { status: 500 }
+    );
+  }
+
+  const childList =
+    Array.isArray(children)
+      ? children
+      : [];
+
+  for (const child of childList) {
+    if (
+      !String(child.lastName || '').trim() ||
+      !String(child.firstName || '').trim()
+    ) {
+      continue;
+    }
+
+    let childId =
+      String(child.id || '').trim();
+
+    if (childId) {
+      const { error: childUpdateError } =
+        await admin
+          .from('gipe_children')
+          .update({
+            last_name:
+              String(child.lastName).trim(),
+
+            first_name:
+              String(child.firstName).trim(),
+
+            updated_at:
+              new Date().toISOString(),
+          })
+          .eq('id', childId);
+
+      if (childUpdateError) {
+        return NextResponse.json(
+          {
+            error:
+              childUpdateError.message,
+          },
+          { status: 500 }
+        );
+      }
+    } else {
+      const { data: createdChild, error: childError } =
+        await admin
+          .from('gipe_children')
+          .insert({
+            last_name:
+              String(child.lastName).trim(),
+
+            first_name:
+              String(child.firstName).trim(),
+          })
+          .select('id')
+          .single();
+
+      if (childError || !createdChild) {
+        return NextResponse.json(
+          {
+            error:
+              childError?.message ||
+              'Impossible de créer un enfant.',
+          },
+          { status: 500 }
+        );
+      }
+
+      childId = createdChild.id;
+    }
+
+    const { error: linkError } =
+      await admin
+        .from('gipe_membership_children')
+        .insert({
+          membership_id:
+            membership.id,
+
+          child_id:
+            childId,
+
+          class_id:
+            child.classId || null,
+        });
 
     if (linkError) {
       return NextResponse.json(
@@ -504,12 +864,9 @@ export async function POST(request: Request) {
     }
   }
 
-
-  return NextResponse.json(
-    {
-      success: true,
-      membershipId: membership.id,
-    },
-    { status: 201 }
-  );
+  return NextResponse.json({
+    success: true,
+    membershipId:
+      membership.id,
+  });
 }
