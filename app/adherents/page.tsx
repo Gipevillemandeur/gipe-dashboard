@@ -8,12 +8,14 @@ import {
   CreditCard,
   GraduationCap,
   X,
+  Pencil,
 } from 'lucide-react';
 
 type Child = {
   id?: string;
   lastName: string;
   firstName: string;
+  classId?: string;
   className: string;
 };
 
@@ -44,15 +46,35 @@ type ClassItem = {
   name: string;
 };
 
-
 type FormChild = {
+  id?: string;
   lastName: string;
   firstName: string;
   classId: string;
 };
 
+type AdherentForm = {
+  lastName: string;
+  firstName: string;
+  address: string;
+  phone: string;
+  email: string;
+  renewal: boolean;
+  councilParticipation:
+    | 'no'
+    | 'child_class'
+    | 'all_classes';
+  boardMember: boolean;
+  caMember: boolean;
+  paymentReceived: boolean;
+  paymentDate: string;
+  paymentMethod: string;
+  chequeNumber: string;
+  amount: string;
+  children: FormChild[];
+};
 
-const emptyForm = {
+const emptyForm: AdherentForm = {
   lastName: '',
   firstName: '',
   address: '',
@@ -61,8 +83,7 @@ const emptyForm = {
 
   renewal: false,
 
-  councilParticipation:
-    'no' as 'no' | 'child_class' | 'all_classes',
+  councilParticipation: 'no',
 
   boardMember: false,
   caMember: false,
@@ -73,7 +94,7 @@ const emptyForm = {
   chequeNumber: '',
   amount: '',
 
-  children: [] as FormChild[],
+  children: [],
 };
 
 
@@ -100,38 +121,39 @@ export default function AdherentsPage() {
   const [showForm, setShowForm] =
     useState(false);
 
+  const [editingMember, setEditingMember] =
+    useState<Member | null>(null);
+
   const [saving, setSaving] =
     useState(false);
 
   const [form, setForm] =
-    useState(emptyForm);
+    useState<AdherentForm>(emptyForm);
 
 
   async function load() {
-
     setLoading(true);
     setError('');
 
     try {
+      const [
+        membersResponse,
+        configResponse,
+      ] = await Promise.all([
+        fetch('/api/adherents', {
+          cache: 'no-store',
+        }),
 
-      const [membersResponse, configResponse] =
-        await Promise.all([
-          fetch('/api/adherents', {
-            cache: 'no-store',
-          }),
-
-          fetch('/api/configuration', {
-            cache: 'no-store',
-          }),
-        ]);
-
+        fetch('/api/configuration', {
+          cache: 'no-store',
+        }),
+      ]);
 
       const membersData =
         await membersResponse.json();
 
       const configData =
         await configResponse.json();
-
 
       if (!membersResponse.ok) {
         throw new Error(
@@ -140,14 +162,12 @@ export default function AdherentsPage() {
         );
       }
 
-
       if (!configResponse.ok) {
         throw new Error(
           configData.error ||
           'Impossible de charger les classes.'
         );
       }
-
 
       setMembers(
         membersData.members || []
@@ -315,6 +335,94 @@ export default function AdherentsPage() {
   }
 
 
+  function openNewMember() {
+
+    setEditingMember(null);
+    setForm(emptyForm);
+    setError('');
+    setShowForm(true);
+  }
+
+
+  function openEditMember(member: Member) {
+
+    setEditingMember(member);
+
+    setForm({
+      lastName:
+        member.lastName,
+
+      firstName:
+        member.firstName,
+
+      address:
+        member.address || '',
+
+      phone:
+        member.phone || '',
+
+      email:
+        member.email || '',
+
+      renewal:
+        member.renewal,
+
+      councilParticipation:
+        member.councilParticipation,
+
+      boardMember:
+        member.boardMember,
+
+      caMember:
+        member.caMember,
+
+      paymentReceived:
+        member.paymentReceived,
+
+      paymentDate:
+        member.paymentDate || '',
+
+      paymentMethod:
+        member.paymentMethod || '',
+
+      chequeNumber:
+        member.chequeNumber || '',
+
+      amount:
+        member.amount !== null &&
+        member.amount !== undefined
+          ? String(member.amount)
+          : '',
+
+      children:
+        member.children.map(
+          (child) => ({
+            id: child.id,
+            lastName:
+              child.lastName,
+            firstName:
+              child.firstName,
+            classId:
+              child.classId || '',
+          })
+        ),
+    });
+
+    setError('');
+    setShowForm(true);
+  }
+
+
+  function closeForm() {
+
+    if (saving) return;
+
+    setShowForm(false);
+    setEditingMember(null);
+    setForm(emptyForm);
+  }
+
+
   async function saveMember() {
 
     setSaving(true);
@@ -322,22 +430,37 @@ export default function AdherentsPage() {
 
     try {
 
+      const isEditing =
+        Boolean(editingMember);
+
+      const payload = {
+        ...form,
+
+        ...(isEditing
+          ? {
+              id: editingMember?.id,
+            }
+          : {}),
+      };
+
       const response =
         await fetch('/api/adherents', {
-          method: 'POST',
+          method:
+            isEditing
+              ? 'PUT'
+              : 'POST',
 
           headers: {
             'Content-Type':
               'application/json',
           },
 
-          body: JSON.stringify(form),
+          body:
+            JSON.stringify(payload),
         });
-
 
       const data =
         await response.json();
-
 
       if (!response.ok) {
         throw new Error(
@@ -346,8 +469,8 @@ export default function AdherentsPage() {
         );
       }
 
-
       setShowForm(false);
+      setEditingMember(null);
       setForm(emptyForm);
 
       await load();
@@ -373,6 +496,7 @@ export default function AdherentsPage() {
   ) {
 
     switch (method) {
+
       case 'cheque':
         return 'Chèque';
 
@@ -380,13 +504,13 @@ export default function AdherentsPage() {
         return 'Espèces';
 
       case 'transfer':
-  return 'Virement';
+        return 'Virement';
 
-case 'online':
-  return 'Paiement en ligne';
+      case 'online':
+        return 'Paiement en ligne';
 
-case 'other':
-  return 'Autre';
+      case 'other':
+        return 'Autre';
 
       default:
         return '—';
@@ -439,11 +563,7 @@ case 'other':
 
           <button
             className="btn btn-primary"
-            onClick={() => {
-              setForm(emptyForm);
-              setShowForm(true);
-              setError('');
-            }}
+            onClick={openNewMember}
           >
             <Plus size={14} />
             Ajouter un adhérent
@@ -465,6 +585,8 @@ case 'other':
         </div>
       )}
 
+
+      {/* VIGNETTE DU HAUT — INCHANGÉE */}
 
       <section
         className="card"
@@ -528,11 +650,13 @@ case 'other':
                 marginBottom: 12,
               }}
             >
+
               <GraduationCap size={17} />
 
               <strong>
                 Répartition par classe
               </strong>
+
             </div>
 
 
@@ -577,6 +701,8 @@ case 'other':
 
       </section>
 
+
+      {/* LISTE DES ADHÉRENTS */}
 
       <section className="card section-card">
 
@@ -674,7 +800,6 @@ case 'other':
               premier adhérent de l'année.
             </p>
 
-            
           </div>
 
         ) : (
@@ -710,10 +835,34 @@ case 'other':
                     <tr key={member.id}>
 
                       <td>
-                        <strong>
+
+                        <button
+                          type="button"
+                          onClick={() =>
+                            openEditMember(member)
+                          }
+                          style={{
+                            border: 'none',
+                            background:
+                              'transparent',
+                            padding: 0,
+                            margin: 0,
+                            cursor: 'pointer',
+                            color: '#241c1b',
+                            fontWeight: 700,
+                            textAlign: 'left',
+                            textDecoration:
+                              'underline',
+                            textDecorationColor:
+                              '#d8c8bd',
+                            textUnderlineOffset:
+                              '3px',
+                          }}
+                        >
                           {member.lastName}{' '}
                           {member.firstName}
-                        </strong>
+                        </button>
+
 
                         <div
                           style={{
@@ -727,6 +876,7 @@ case 'other':
                             member.email ||
                             '—'}
                         </div>
+
                       </td>
 
 
@@ -762,6 +912,7 @@ case 'other':
                                 >
                                   {child.lastName}{' '}
                                   {child.firstName}
+
                                   {child.className
                                     ? ` · ${child.className}`
                                     : ''}
@@ -786,6 +937,7 @@ case 'other':
 
 
                       <td>
+
                         {member.renewal
                           ? (
                             <span className="badge badge-ok">
@@ -797,6 +949,7 @@ case 'other':
                               Non
                             </span>
                           )}
+
                       </td>
 
 
@@ -805,10 +958,15 @@ case 'other':
                         {member.paymentReceived
                           ? (
                             <span className="badge badge-ok">
-                              <CreditCard size={11} />
+
+                              <CreditCard
+                                size={11}
+                              />
+
                               {paymentLabel(
                                 member.paymentMethod
                               )}
+
                             </span>
                           )
                           : (
@@ -848,6 +1006,8 @@ case 'other':
       </section>
 
 
+      {/* FICHE / FORMULAIRE */}
+
       {showForm && (
 
         <div
@@ -882,7 +1042,9 @@ case 'other':
               <div>
 
                 <div className="eyebrow">
-                  Nouvelle adhésion
+                  {editingMember
+                    ? 'Fiche adhérent'
+                    : 'Nouvelle adhésion'}
                 </div>
 
                 <h2
@@ -891,7 +1053,9 @@ case 'other':
                     marginTop: 4,
                   }}
                 >
-                  Ajouter un adhérent
+                  {editingMember
+                    ? `${editingMember.lastName} ${editingMember.firstName}`
+                    : 'Ajouter un adhérent'}
                 </h2>
 
               </div>
@@ -899,9 +1063,8 @@ case 'other':
 
               <button
                 className="btn"
-                onClick={() =>
-                  setShowForm(false)
-                }
+                onClick={closeForm}
+                disabled={saving}
               >
                 <X size={15} />
               </button>
@@ -915,6 +1078,8 @@ case 'other':
                 gap: 22,
               }}
             >
+
+              {/* INFORMATIONS */}
 
               <div>
 
@@ -1003,11 +1168,11 @@ case 'other':
               </div>
 
 
+              {/* ENFANTS */}
+
               <div>
 
-                <div
-                  className="section-head"
-                >
+                <div className="section-head">
 
                   <div>
 
@@ -1025,6 +1190,7 @@ case 'other':
                   <button
                     className="btn"
                     onClick={addChild}
+                    type="button"
                   >
                     <Plus size={14} />
                     Ajouter un enfant
@@ -1033,11 +1199,23 @@ case 'other':
                 </div>
 
 
+                {form.children.length === 0 && (
+
+                  <p className="kicker">
+                    Aucun enfant renseigné.
+                  </p>
+
+                )}
+
+
                 {form.children.map(
                   (child, index) => (
 
                     <div
-                      key={index}
+                      key={
+                        child.id ||
+                        `new-${index}`
+                      }
                       style={{
                         display:
                           'grid',
@@ -1114,6 +1292,7 @@ case 'other':
 
                       <button
                         className="btn"
+                        type="button"
                         title="Supprimer"
                         onClick={() =>
                           removeChild(index)
@@ -1129,6 +1308,8 @@ case 'other':
 
               </div>
 
+
+              {/* PARTICIPATION */}
 
               <div>
 
@@ -1184,6 +1365,7 @@ case 'other':
                       Non
                     </label>
 
+
                     <label>
                       <input
                         type="radio"
@@ -1202,6 +1384,7 @@ case 'other':
                       />{' '}
                       Classe de mon enfant
                     </label>
+
 
                     <label>
                       <input
@@ -1295,6 +1478,8 @@ case 'other':
               </div>
 
 
+              {/* PAIEMENT */}
+
               <div>
 
                 <h3 className="section-title">
@@ -1321,6 +1506,7 @@ case 'other':
                       gap: 6,
                     }}
                   >
+
                     <span>
                       Paiement
                     </span>
@@ -1341,6 +1527,7 @@ case 'other':
                         })
                       }
                     >
+
                       <option value="no">
                         Non payé
                       </option>
@@ -1348,7 +1535,9 @@ case 'other':
                       <option value="yes">
                         Payé
                       </option>
+
                     </select>
+
                   </label>
 
 
@@ -1360,6 +1549,7 @@ case 'other':
                       gap: 6,
                     }}
                   >
+
                     <span>
                       Date
                     </span>
@@ -1378,6 +1568,7 @@ case 'other':
                         })
                       }
                     />
+
                   </label>
 
 
@@ -1389,6 +1580,7 @@ case 'other':
                       gap: 6,
                     }}
                   >
+
                     <span>
                       Mode de paiement
                     </span>
@@ -1403,6 +1595,7 @@ case 'other':
                           ...form,
                           paymentMethod:
                             e.target.value,
+
                           chequeNumber:
                             e.target.value ===
                             'cheque'
@@ -1411,6 +1604,7 @@ case 'other':
                         })
                       }
                     >
+
                       <option value="">
                         Choisir
                       </option>
@@ -1424,17 +1618,19 @@ case 'other':
                       </option>
 
                       <option value="transfer">
-  Virement
-</option>
+                        Virement
+                      </option>
 
-<option value="online">
-  Paiement en ligne
-</option>
+                      <option value="online">
+                        Paiement en ligne
+                      </option>
 
-<option value="other">
-  Autre
-</option>
+                      <option value="other">
+                        Autre
+                      </option>
+
                     </select>
+
                   </label>
 
 
@@ -1446,6 +1642,7 @@ case 'other':
                       gap: 6,
                     }}
                   >
+
                     <span>
                       Montant
                     </span>
@@ -1466,6 +1663,7 @@ case 'other':
                         })
                       }
                     />
+
                   </label>
 
                 </div>
@@ -1489,6 +1687,7 @@ case 'other':
                         gap: 6,
                       }}
                     >
+
                       <span>
                         Numéro de chèque
                       </span>
@@ -1517,6 +1716,8 @@ case 'other':
               </div>
 
 
+              {/* BOUTONS */}
+
               <div
                 style={{
                   display:
@@ -1532,22 +1733,27 @@ case 'other':
 
                 <button
                   className="btn"
-                  onClick={() =>
-                    setShowForm(false)
-                  }
+                  type="button"
+                  onClick={closeForm}
                   disabled={saving}
                 >
                   Annuler
                 </button>
 
+
                 <button
                   className="btn btn-primary"
+                  type="button"
                   onClick={saveMember}
                   disabled={saving}
                 >
+
                   {saving
                     ? 'Enregistrement…'
-                    : 'Enregistrer l’adhérent'}
+                    : editingMember
+                      ? 'Enregistrer les modifications'
+                      : 'Enregistrer l’adhérent'}
+
                 </button>
 
               </div>
