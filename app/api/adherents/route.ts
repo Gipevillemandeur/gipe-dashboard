@@ -303,9 +303,9 @@ export async function POST(request: Request) {
 
   if (
     paymentMethod &&
-    !['cheque', 'cash', 'transfer', 'other'].includes(
-      paymentMethod
-    )
+    !['cheque', 'cash', 'transfer', 'online', 'other'].includes(
+  paymentMethod
+)
   ) {
     return NextResponse.json(
       {
