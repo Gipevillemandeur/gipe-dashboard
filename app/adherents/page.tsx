@@ -671,20 +671,7 @@ export default function AdherentsPage() {
               premier adhérent de l'année.
             </p>
 
-            <button
-              className="btn btn-primary"
-              style={{
-                marginTop: 14,
-              }}
-              onClick={() => {
-                setForm(emptyForm);
-                setShowForm(true);
-              }}
-            >
-              <Plus size={14} />
-              Ajouter un adhérent
-            </button>
-
+            
           </div>
 
         ) : (
