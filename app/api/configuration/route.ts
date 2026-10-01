@@ -38,6 +38,65 @@ export async function GET() {
     classes: classes ?? [],
     direction: direction ?? [],
   });
+    const [
+    { data: classes, error: classesError },
+    { data: direction, error: directionError },
+    { data: lastImport, error: importError },
+  ] = await Promise.all([
+    admin
+      .from('classes')
+      .select(
+        'id,name,level,kind,access_code,active'
+      )
+      .eq('school_year_id', year.id)
+      .eq('active', true)
+      .order('kind')
+      .order('name'),
+
+    admin
+      .from('school_management')
+      .select(
+        'id,display_name,role,active'
+      )
+      .eq('active', true)
+      .order('display_name'),
+
+    admin
+      .from('gipe_college_imports')
+      .select(
+        'file_name,imported_at,classes_count,students_count,teachers_count,direction_count'
+      )
+      .eq('school_year_id', year.id)
+      .order('imported_at', {
+        ascending: false,
+      })
+      .limit(1)
+      .maybeSingle(),
+  ]);
+
+  if (
+    classesError ||
+    directionError ||
+    importError
+  ) {
+    return NextResponse.json(
+      {
+        error:
+          classesError?.message ||
+          directionError?.message ||
+          importError?.message ||
+          'Lecture impossible.',
+      },
+      { status: 500 }
+    );
+  }
+
+  return NextResponse.json({
+    schoolYear: year.label,
+    classes: classes ?? [],
+    direction: direction ?? [],
+    lastImport: lastImport ?? null,
+  });
 }
 
 export async function PATCH(request: Request) {
