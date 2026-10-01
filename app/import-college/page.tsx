@@ -63,7 +63,13 @@ export default function ImportCollegePage() {
   return (
     <>
       <div className="topbar">
-        <div><div className="eyebrow">Conseils de classe</div><h1>Importer les listes du collège</h1><div className="kicker">Le fichier reçu devient la référence pour l’état courant.</div></div>
+        <div><div className="eyebrow">
+  Configuration
+</div>
+
+<h1>
+  Importer le listing collège
+</h1><div className="kicker">Le fichier reçu devient la référence pour l’état courant.</div></div>
         <div className="topbar-right"><Link className="btn" href="/conseils"><ArrowLeft size={14}/> Conseils</Link></div>
       </div>
 
