@@ -503,11 +503,11 @@ export default function ConfigurationPage() {
 
 
             <button
-              type="button"
-              className="btn"
-              onClick={
-                openClosure
-              }
+  type="button"
+  className="btn btn-primary"
+  onClick={
+    openClosure
+  }
               disabled={
                 !schoolYear
               }
