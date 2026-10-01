@@ -247,113 +247,152 @@ export default function ConfigurationPage() {
       {/* ANNÉE SCOLAIRE */}
 
       <div
-        className="card"
+  className="card"
+  style={{
+    marginTop: 20,
+  }}
+>
+  <div
+    style={{
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'flex-start',
+      gap: 20,
+      flexWrap: 'wrap',
+    }}
+  >
+    <div>
+      <div className="stat-label">
+        Listing collège
+      </div>
+
+      <h2
+        className="section-title"
+        style={{ marginTop: 10 }}
+      >
+        Import des données du collège
+      </h2>
+
+      <p
+        className="section-sub"
         style={{
-          marginTop: 20,
+          marginTop: 8,
+          maxWidth: 650,
         }}
       >
+        Le listing collège devient la référence pour
+        les classes, élèves et équipes pédagogiques
+        de l’année active.
+      </p>
+    </div>
+
+    <div className="stat-icon">
+      📄
+    </div>
+  </div>
+
+  <div
+    style={{
+      marginTop: 22,
+      paddingTop: 18,
+      borderTop: '1px solid #e5e7eb',
+    }}
+  >
+    {lastImport ? (
+      <>
         <div
           style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'flex-start',
-            gap: 20,
+            fontSize: 11,
+            textTransform: 'uppercase',
+            letterSpacing: '.08em',
+            fontWeight: 700,
+            color: '#756a67',
           }}
         >
-          <div>
-            <div className="stat-top">
-              <div className="stat-label">
-                Année scolaire
-              </div>
-
-              <div className="stat-icon">
-                <CalendarDays size={17} />
-              </div>
-            </div>
-
-            <h2
-              className="section-title"
-              style={{ marginTop: 14 }}
-            >
-              Gestion de l’année scolaire
-            </h2>
-
-            <p
-              className="section-sub"
-              style={{ marginTop: 8 }}
-            >
-              L’année active contient les classes, élèves et
-              adhésions actuellement utilisés par le GIPE.
-            </p>
-          </div>
-
-          <div
-            style={{
-              minWidth: 180,
-              textAlign: 'right',
-            }}
-          >
-            <div
-              style={{
-                fontSize: 12,
-                color: '#64748b',
-                marginBottom: 4,
-              }}
-            >
-              Année active
-            </div>
-
-            <div
-              style={{
-                fontSize: 24,
-                fontWeight: 700,
-                letterSpacing: '-0.02em',
-              }}
-            >
-              {schoolYear || '—'}
-            </div>
-          </div>
+          Dernier import
         </div>
 
         <div
           style={{
-            marginTop: 24,
-            paddingTop: 20,
-            borderTop: '1px solid #e5e7eb',
+            marginTop: 8,
+            fontSize: 14,
+            fontWeight: 700,
+          }}
+        >
+          {lastImport.file_name}
+        </div>
+
+        <div
+          className="section-sub"
+          style={{ marginTop: 5 }}
+        >
+          Importé le{' '}
+          {new Date(
+            lastImport.imported_at
+          ).toLocaleString('fr-FR')}
+        </div>
+
+        <div
+          style={{
             display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            gap: 16,
+            gap: 18,
             flexWrap: 'wrap',
+            marginTop: 16,
+            fontSize: 12,
           }}
         >
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 10,
-              color: '#64748b',
-              fontSize: 13,
-            }}
-          >
-            <LockKeyhole size={16} />
+          <span>
+            <strong>
+              {lastImport.classes_count}
+            </strong>{' '}
+            classes
+          </span>
 
-            <span>
-              La clôture conserve l’historique de l’année.
-            </span>
-          </div>
+          <span>
+            <strong>
+              {lastImport.students_count}
+            </strong>{' '}
+            élèves
+          </span>
 
-          <button
-            type="button"
-            className="btn"
-            onClick={openClosure}
-            disabled={!schoolYear}
-          >
-            <LockKeyhole size={14} />
-            Clôturer l’année scolaire
-          </button>
+          <span>
+            <strong>
+              {lastImport.teachers_count}
+            </strong>{' '}
+            enseignants
+          </span>
+
+          <span>
+            <strong>
+              {lastImport.direction_count}
+            </strong>{' '}
+            direction
+          </span>
         </div>
+      </>
+    ) : (
+      <div className="notice">
+        Aucun listing collège n’a encore été importé
+        pour cette année scolaire.
       </div>
+    )}
+  </div>
+
+  <div
+    style={{
+      marginTop: 20,
+      display: 'flex',
+      justifyContent: 'flex-end',
+    }}
+  >
+    <Link
+      href="/import-college"
+      className="btn btn-primary"
+    >
+      Importer le listing collège →
+    </Link>
+  </div>
+</div>
 
       {/* BILAN GÉNÉRÉ */}
 
