@@ -56,8 +56,9 @@ export default function ConfigurationPage() {
         const data = await response.json();
 
         if (response.ok) {
-          setSchoolYear(data.schoolYear || null);
-        }
+  setSchoolYear(data.schoolYear || null);
+  setLastImport(data.lastImport || null);
+}
       } catch {
         // Rien à afficher ici : les autres sections restent utilisables.
       }
