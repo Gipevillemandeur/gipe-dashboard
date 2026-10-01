@@ -34,6 +34,7 @@ type LastImport = {
 };
 
 export default function ConfigurationPage() {
+
   const [schoolYear, setSchoolYear] =
     useState<string | null>(null);
 
@@ -56,18 +57,24 @@ export default function ConfigurationPage() {
     useState('');
 
   useEffect(() => {
-    async function loadConfiguration() {
-      try {
-        const response = await fetch(
-          '/api/configuration',
-          {
-            cache: 'no-store',
-          }
-        );
 
-        const data = await response.json();
+    async function loadConfiguration() {
+
+      try {
+
+        const response =
+          await fetch(
+            '/api/configuration',
+            {
+              cache: 'no-store',
+            }
+          );
+
+        const data =
+          await response.json();
 
         if (response.ok) {
+
           setSchoolYear(
             data.schoolYear || null
           );
@@ -75,45 +82,63 @@ export default function ConfigurationPage() {
           setLastImport(
             data.lastImport || null
           );
+
         }
+
       } catch {
-        // Les autres sections restent utilisables
-        // même si le chargement échoue.
+        // Rien à afficher.
       }
+
     }
 
     loadConfiguration();
+
   }, []);
 
+
   function openClosure() {
+
     setError('');
     setNewYearLabel('');
     setShowClosure(true);
+
   }
 
+
   function closeClosure() {
+
     if (closing) return;
 
     setShowClosure(false);
     setError('');
+
   }
 
+
   async function handleClosure() {
-    const label = newYearLabel.trim();
+
+    const label =
+      newYearLabel.trim();
 
     if (!label) {
+
       setError(
         'Indique le libellé de la nouvelle année scolaire.'
       );
+
       return;
     }
 
     if (
-      !/^\d{4}-\d{4}$/.test(label)
+      !/^\d{4}-\d{4}$/.test(
+        label
+      )
     ) {
+
       setError(
         'Format invalide. Exemple : 2027-2028.'
       );
+
       return;
     }
 
@@ -122,33 +147,42 @@ export default function ConfigurationPage() {
         `Confirmer la clôture de ${schoolYear} et la création de ${label} ?\n\nCette opération créera le bilan annuel et ouvrira la nouvelle année scolaire.`
       )
     ) {
+
       return;
+
     }
 
     setClosing(true);
     setError('');
 
     try {
-      const response = await fetch(
-        '/api/annee/cloturer',
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            newYearLabel: label,
-          }),
-        }
-      );
 
-      const data = await response.json();
+      const response =
+        await fetch(
+          '/api/annee/cloturer',
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type':
+                'application/json',
+            },
+            body: JSON.stringify({
+              newYearLabel:
+                label,
+            }),
+          }
+        );
+
+      const data =
+        await response.json();
 
       if (!response.ok) {
+
         throw new Error(
           data?.error ||
             'Impossible de clôturer l’année scolaire.'
         );
+
       }
 
       setClosureResult(
@@ -162,25 +196,35 @@ export default function ConfigurationPage() {
       );
 
       setLastImport(null);
+
     } catch (err) {
+
       setError(
         err instanceof Error
           ? err.message
           : 'Une erreur est survenue.'
       );
+
     } finally {
+
       setClosing(false);
+
     }
+
   }
+
 
   return (
     <>
-      {/* ================================================== */}
+
+      {/* ================================================= */}
       {/* EN-TÊTE */}
-      {/* ================================================== */}
+      {/* ================================================= */}
 
       <div className="topbar">
+
         <div>
+
           <div className="eyebrow">
             Configuration
           </div>
@@ -190,12 +234,14 @@ export default function ConfigurationPage() {
           </h1>
 
           <div className="kicker">
-            Gère séparément les classes, la direction,
+            Gère les classes, la direction,
             l’année scolaire et le listing du collège.
           </div>
+
         </div>
 
         <div className="topbar-right">
+
           <Link
             className="btn"
             href="/conseils"
@@ -203,12 +249,15 @@ export default function ConfigurationPage() {
             <ArrowLeft size={14} />
             Conseils de classe
           </Link>
+
         </div>
+
       </div>
 
-      {/* ================================================== */}
-      {/* CLASSES + DIRECTION */}
-      {/* ================================================== */}
+
+      {/* ================================================= */}
+      {/* LIGNE 1 : CLASSES + DIRECTION */}
+      {/* ================================================= */}
 
       <div
         className="page-grid"
@@ -218,8 +267,6 @@ export default function ConfigurationPage() {
         }}
       >
 
-        {/* CLASSES */}
-
         <Link
           href="/configuration/classes"
           className="card section-card"
@@ -228,7 +275,9 @@ export default function ConfigurationPage() {
             color: 'inherit',
           }}
         >
+
           <div className="stat-top">
+
             <div className="stat-label">
               Classes
             </div>
@@ -236,6 +285,7 @@ export default function ConfigurationPage() {
             <div className="stat-icon">
               <GraduationCap size={17} />
             </div>
+
           </div>
 
           <h2
@@ -262,13 +312,15 @@ export default function ConfigurationPage() {
               marginTop: 18,
             }}
           >
+
             <span className="btn btn-primary">
               Ouvrir la gestion des classes →
             </span>
+
           </div>
+
         </Link>
 
-        {/* DIRECTION */}
 
         <Link
           href="/configuration/direction"
@@ -278,7 +330,9 @@ export default function ConfigurationPage() {
             color: 'inherit',
           }}
         >
+
           <div className="stat-top">
+
             <div className="stat-label">
               Direction
             </div>
@@ -286,6 +340,7 @@ export default function ConfigurationPage() {
             <div className="stat-icon">
               <Users size={17} />
             </div>
+
           </div>
 
           <h2
@@ -312,78 +367,83 @@ export default function ConfigurationPage() {
               marginTop: 18,
             }}
           >
+
             <span className="btn btn-primary">
               Ouvrir la gestion de la direction →
             </span>
+
           </div>
+
         </Link>
 
       </div>
 
-      {/* ================================================== */}
-      {/* ANNÉE SCOLAIRE */}
-      {/* ================================================== */}
+
+      {/* ================================================= */}
+      {/* LIGNE 2 : ANNÉE + LISTING */}
+      {/* ================================================= */}
 
       <div
-        className="card"
+        className="page-grid"
         style={{
-          marginTop: 20,
+          gridTemplateColumns:
+            '1fr 1fr',
+          marginTop: 18,
         }}
       >
 
+        {/* ================= ANNÉE ================= */}
+
         <div
-          style={{
-            display: 'flex',
-            justifyContent:
-              'space-between',
-            alignItems:
-              'flex-start',
-            gap: 20,
-            flexWrap: 'wrap',
-          }}
+          className="card section-card"
         >
 
-          <div>
-            <div className="stat-top">
-              <div className="stat-label">
-                Année scolaire
-              </div>
+          <div className="stat-top">
 
-              <div className="stat-icon">
-                <CalendarDays size={17} />
-              </div>
+            <div className="stat-label">
+              Année scolaire
             </div>
 
-            <h2
-              className="section-title"
-              style={{
-                marginTop: 14,
-              }}
-            >
-              Gestion de l’année scolaire
-            </h2>
+            <div className="stat-icon">
+              <CalendarDays size={17} />
+            </div>
 
-            <p
-              className="section-sub"
-              style={{
-                marginTop: 8,
-                maxWidth: 650,
-              }}
-            >
-              L’année active contient les classes,
-              élèves et adhésions actuellement utilisés
-              par le GIPE.
-            </p>
           </div>
 
-          {/* ANNÉE EN COURS */}
+          <h2
+            className="section-title"
+            style={{
+              marginTop: 14,
+            }}
+          >
+            Gestion de l’année scolaire
+          </h2>
+
+          <p
+            className="section-sub"
+            style={{
+              marginTop: 8,
+            }}
+          >
+            L’année active contient les classes,
+            élèves et adhésions actuellement utilisés
+            par le GIPE.
+          </p>
+
 
           <div
             style={{
-              minWidth: 170,
-              textAlign: 'right',
+              marginTop: 20,
+              padding:
+                '14px 16px',
+              border:
+                '1px solid #eee2d7',
+              borderRadius: 10,
+              background:
+                '#fffaf3',
             }}
           >
+
             <div
               style={{
                 fontSize: 10,
@@ -391,9 +451,8 @@ export default function ConfigurationPage() {
                   'uppercase',
                 letterSpacing:
                   '.08em',
-                color: '#756a67',
                 fontWeight: 700,
-                marginBottom: 7,
+                color: '#756a67',
               }}
             >
               Année en cours
@@ -401,306 +460,267 @@ export default function ConfigurationPage() {
 
             <div
               style={{
-                display:
-                  'inline-flex',
-                alignItems:
-                  'center',
-                padding:
-                  '8px 12px',
-                borderRadius: 10,
-                background:
-                  '#fff1dc',
-                color:
-                  '#7d201a',
-                fontSize: 18,
+                fontSize: 25,
                 fontWeight: 800,
+                marginTop: 5,
+                color: '#7d201a',
               }}
             >
               {schoolYear || '—'}
             </div>
+
           </div>
-        </div>
 
-        {/* BAS DE CARTE */}
-
-        <div
-          style={{
-            marginTop: 24,
-            paddingTop: 20,
-            borderTop:
-              '1px solid #e5e7eb',
-            display: 'flex',
-            justifyContent:
-              'space-between',
-            alignItems:
-              'center',
-            gap: 16,
-            flexWrap: 'wrap',
-          }}
-        >
 
           <div
             style={{
+              marginTop: 18,
               display: 'flex',
+              justifyContent:
+                'space-between',
               alignItems:
                 'center',
-              gap: 10,
-              color: '#64748b',
-              fontSize: 13,
+              gap: 12,
             }}
           >
-            <LockKeyhole size={16} />
 
-            <span>
-              La clôture conserve l’historique de l’année.
-            </span>
-          </div>
+            <div
+              style={{
+                display: 'flex',
+                alignItems:
+                  'center',
+                gap: 7,
+                color: '#64748b',
+                fontSize: 12,
+              }}
+            >
+              <LockKeyhole size={14} />
 
-          <button
-            type="button"
-            className="btn"
-            onClick={openClosure}
-            disabled={!schoolYear}
-          >
-            <LockKeyhole size={14} />
-            Clôturer l’année scolaire
-          </button>
-
-        </div>
-      </div>
-
-      {/* ================================================== */}
-      {/* LISTING COLLÈGE */}
-      {/* ================================================== */}
-
-      <div
-        className="card"
-        style={{
-          marginTop: 20,
-        }}
-      >
-
-        <div
-          style={{
-            display: 'flex',
-            justifyContent:
-              'space-between',
-            alignItems:
-              'flex-start',
-            gap: 20,
-            flexWrap: 'wrap',
-          }}
-        >
-
-          <div>
-
-            <div className="stat-top">
-
-              <div className="stat-label">
-                Listing collège
-              </div>
-
-              <div className="stat-icon">
-                <FileSpreadsheet size={17} />
-              </div>
-
+              <span>
+                Historique conservé
+              </span>
             </div>
 
-            <h2
-              className="section-title"
-              style={{
-                marginTop: 14,
-              }}
-            >
-              Import des données du collège
-            </h2>
 
-            <p
-              className="section-sub"
-              style={{
-                marginTop: 8,
-                maxWidth: 700,
-              }}
+            <button
+              type="button"
+              className="btn"
+              onClick={
+                openClosure
+              }
+              disabled={
+                !schoolYear
+              }
             >
-              Le listing collège devient la référence
-              pour les classes, élèves et équipes
-              pédagogiques de l’année active.
-            </p>
+              Clôturer l’année
+            </button>
 
           </div>
 
         </div>
 
-        {/* DERNIER IMPORT */}
+
+        {/* ================= LISTING ================= */}
 
         <div
-          style={{
-            marginTop: 22,
-            paddingTop: 20,
-            borderTop:
-              '1px solid #e5e7eb',
-          }}
+          className="card section-card"
         >
 
-          {lastImport ? (
-            <>
+          <div className="stat-top">
 
-              <div
-                style={{
-                  fontSize: 10,
-                  textTransform:
-                    'uppercase',
-                  letterSpacing:
-                    '.08em',
-                  fontWeight: 700,
-                  color: '#756a67',
-                }}
-              >
-                Dernier import
-              </div>
+            <div className="stat-label">
+              Listing collège
+            </div>
 
-              <div
-                style={{
-                  marginTop: 8,
-                  fontSize: 15,
-                  fontWeight: 700,
-                }}
-              >
-                {lastImport.file_name}
-              </div>
+            <div className="stat-icon">
+              <FileSpreadsheet size={17} />
+            </div>
 
-              <div
-                className="section-sub"
-                style={{
-                  marginTop: 5,
-                }}
-              >
-                Importé le{' '}
-                {new Date(
-                  lastImport.imported_at
-                ).toLocaleString(
-                  'fr-FR'
-                )}
-              </div>
+          </div>
+
+          <h2
+            className="section-title"
+            style={{
+              marginTop: 14,
+            }}
+          >
+            Importer le listing collège
+          </h2>
+
+          <p
+            className="section-sub"
+            style={{
+              marginTop: 8,
+            }}
+          >
+            Le listing devient la référence pour les
+            classes, élèves et équipes pédagogiques.
+          </p>
+
+
+          <div
+            style={{
+              marginTop: 20,
+              padding:
+                '14px 16px',
+              border:
+                '1px solid #eee2d7',
+              borderRadius: 10,
+              background:
+                '#fffaf3',
+              minHeight: 86,
+            }}
+          >
+
+            {lastImport ? (
+
+              <>
+
+                <div
+                  style={{
+                    fontSize: 10,
+                    textTransform:
+                      'uppercase',
+                    letterSpacing:
+                      '.08em',
+                    fontWeight: 700,
+                    color: '#756a67',
+                  }}
+                >
+                  Dernier import
+                </div>
+
+                <div
+                  style={{
+                    marginTop: 5,
+                    fontSize: 13,
+                    fontWeight: 700,
+                    overflow:
+                      'hidden',
+                    textOverflow:
+                      'ellipsis',
+                    whiteSpace:
+                      'nowrap',
+                  }}
+                  title={
+                    lastImport.file_name
+                  }
+                >
+                  {lastImport.file_name}
+                </div>
+
+                <div
+                  style={{
+                    marginTop: 4,
+                    fontSize: 11,
+                    color: '#64748b',
+                  }}
+                >
+                  {new Date(
+                    lastImport.imported_at
+                  ).toLocaleString(
+                    'fr-FR'
+                  )}
+
+                  {' · '}
+
+                  {lastImport.classes_count}
+                  {' classes · '}
+
+                  {lastImport.students_count}
+                  {' élèves · '}
+
+                  {lastImport.teachers_count}
+                  {' enseignants'}
+                </div>
+
+              </>
+
+            ) : (
 
               <div
                 style={{
                   display: 'flex',
-                  gap: 20,
-                  flexWrap:
-                    'wrap',
-                  marginTop: 16,
-                  fontSize: 13,
+                  alignItems:
+                    'center',
+                  height: '100%',
+                  minHeight: 58,
+                  gap: 9,
+                  color: '#64748b',
+                  fontSize: 12,
                 }}
               >
 
-                <span>
-                  <strong>
-                    {lastImport.classes_count}
-                  </strong>{' '}
-                  classes
-                </span>
+                <FileSpreadsheet
+                  size={16}
+                />
 
                 <span>
-                  <strong>
-                    {lastImport.students_count}
-                  </strong>{' '}
-                  élèves
-                </span>
-
-                <span>
-                  <strong>
-                    {lastImport.teachers_count}
-                  </strong>{' '}
-                  enseignants
-                </span>
-
-                <span>
-                  <strong>
-                    {lastImport.direction_count}
-                  </strong>{' '}
-                  direction
+                  Aucun listing importé pour
+                  cette année.
                 </span>
 
               </div>
 
-            </>
-          ) : (
+            )}
 
-            <div className="notice">
-              <FileSpreadsheet size={17} />
+          </div>
 
-              <div>
-                Aucun listing collège n’a encore été
-                importé pour cette année scolaire.
-              </div>
-            </div>
 
-          )}
-
-        </div>
-
-        {/* BOUTON IMPORT */}
-
-        <div
-          style={{
-            marginTop: 20,
-            display: 'flex',
-            justifyContent:
-              'flex-end',
-          }}
-        >
-          <Link
-            href="/import-college"
-            className="btn btn-primary"
+          <div
+            style={{
+              marginTop: 18,
+              display: 'flex',
+              justifyContent:
+                'flex-end',
+            }}
           >
-            <FileSpreadsheet size={14} />
-            Importer le listing collège →
-          </Link>
+
+            <Link
+              href="/import-college"
+              className="btn btn-primary"
+            >
+              <FileSpreadsheet
+                size={14}
+              />
+
+              Importer le listing →
+            </Link>
+
+          </div>
+
         </div>
 
       </div>
 
-      {/* ================================================== */}
+
+      {/* ================================================= */}
       {/* BILAN APRÈS CLÔTURE */}
-      {/* ================================================== */}
+      {/* ================================================= */}
 
       {closureResult && (
+
         <div
-          className="card"
+          className="card section-card"
           style={{
-            marginTop: 20,
+            marginTop: 18,
             border:
               '1px solid #bbf7d0',
           }}
         >
 
-          <div
-            style={{
-              display: 'flex',
-              alignItems:
-                'center',
-              gap: 10,
-            }}
-          >
-
-            <CheckCircle2 size={20} />
+          <div className="section-head">
 
             <div>
 
-              <div
-                style={{
-                  fontSize: 12,
-                  color: '#64748b',
-                }}
-              >
+              <div className="stat-label">
                 Clôture effectuée
               </div>
 
               <h2
                 className="section-title"
                 style={{
-                  marginTop: 3,
+                  marginTop: 5,
                 }}
               >
                 Bilan de{' '}
@@ -709,64 +729,47 @@ export default function ConfigurationPage() {
 
             </div>
 
+            <CheckCircle2
+              size={20}
+            />
+
           </div>
 
+
           <div
+            className="page-grid"
             style={{
-              display: 'grid',
               gridTemplateColumns:
-                'repeat(auto-fit, minmax(180px, 1fr))',
-              gap: 14,
-              marginTop: 22,
+                '1fr 1fr',
+              marginTop: 18,
             }}
           >
 
-            <div
-              style={{
-                padding: 16,
-                border:
-                  '1px solid #e5e7eb',
-                borderRadius: 12,
-              }}
-            >
+            <div className="card stat">
 
               <div className="stat-label">
                 Adhérents
               </div>
 
-              <div
-                style={{
-                  fontSize: 28,
-                  fontWeight: 700,
-                  marginTop: 6,
-                }}
-              >
-                {closureResult.totalAdherents}
+              <div className="stat-value">
+                {
+                  closureResult.totalAdherents
+                }
               </div>
 
             </div>
 
-            <div
-              style={{
-                padding: 16,
-                border:
-                  '1px solid #e5e7eb',
-                borderRadius: 12,
-              }}
-            >
+
+            <div className="card stat">
 
               <div className="stat-label">
                 Nouvelle année
               </div>
 
-              <div
-                style={{
-                  fontSize: 20,
-                  fontWeight: 700,
-                  marginTop: 8,
-                }}
-              >
-                {closureResult.newYear}
+              <div className="stat-value">
+                {
+                  closureResult.newYear
+                }
               </div>
 
             </div>
@@ -775,14 +778,14 @@ export default function ConfigurationPage() {
 
           <div
             style={{
-              marginTop: 24,
+              marginTop: 20,
             }}
           >
 
             <div
               className="stat-label"
               style={{
-                marginBottom: 12,
+                marginBottom: 10,
               }}
             >
               Répartition des adhérents par classe
@@ -811,6 +814,7 @@ export default function ConfigurationPage() {
                   .adherentsByClass
                   .map(
                     (item) => (
+
                       <div
                         key={
                           item.className
@@ -820,11 +824,12 @@ export default function ConfigurationPage() {
                             '12px 14px',
                           border:
                             '1px solid #e5e7eb',
-                          borderRadius: 10,
-                          display: 'flex',
+                          borderRadius:
+                            10,
+                          display:
+                            'flex',
                           justifyContent:
                             'space-between',
-                          gap: 10,
                         }}
                       >
 
@@ -837,6 +842,7 @@ export default function ConfigurationPage() {
                         </strong>
 
                       </div>
+
                     )
                   )}
 
@@ -847,13 +853,16 @@ export default function ConfigurationPage() {
           </div>
 
         </div>
+
       )}
 
-      {/* ================================================== */}
+
+      {/* ================================================= */}
       {/* MODALE CLÔTURE */}
-      {/* ================================================== */}
+      {/* ================================================= */}
 
       {showClosure && (
+
         <div
           style={{
             position: 'fixed',
@@ -903,6 +912,7 @@ export default function ConfigurationPage() {
 
             </div>
 
+
             <p
               className="section-sub"
               style={{
@@ -918,6 +928,7 @@ export default function ConfigurationPage() {
               Le bilan annuel sera enregistré et
               l’année actuelle deviendra historique.
             </p>
+
 
             <div
               style={{
@@ -940,6 +951,7 @@ export default function ConfigurationPage() {
               sans adhérents ni classes.
             </div>
 
+
             <div
               style={{
                 marginTop: 22,
@@ -949,7 +961,8 @@ export default function ConfigurationPage() {
               <label
                 htmlFor="new-school-year"
                 style={{
-                  display: 'block',
+                  display:
+                    'block',
                   fontSize: 13,
                   fontWeight: 600,
                   marginBottom: 7,
@@ -961,8 +974,12 @@ export default function ConfigurationPage() {
               <input
                 id="new-school-year"
                 type="text"
-                value={newYearLabel}
-                onChange={(event) =>
+                value={
+                  newYearLabel
+                }
+                onChange={(
+                  event
+                ) =>
                   setNewYearLabel(
                     event.target.value
                   )
@@ -974,7 +991,9 @@ export default function ConfigurationPage() {
 
             </div>
 
+
             {error && (
+
               <div
                 style={{
                   marginTop: 14,
@@ -982,13 +1001,16 @@ export default function ConfigurationPage() {
                   borderRadius: 10,
                   background:
                     '#fef2f2',
-                  color: '#b91c1c',
+                  color:
+                    '#b91c1c',
                   fontSize: 13,
                 }}
               >
                 {error}
               </div>
+
             )}
+
 
             <div
               style={{
@@ -1006,10 +1028,13 @@ export default function ConfigurationPage() {
                 onClick={
                   closeClosure
                 }
-                disabled={closing}
+                disabled={
+                  closing
+                }
               >
                 Annuler
               </button>
+
 
               <button
                 type="button"
@@ -1017,7 +1042,9 @@ export default function ConfigurationPage() {
                 onClick={
                   handleClosure
                 }
-                disabled={closing}
+                disabled={
+                  closing
+                }
               >
                 {closing
                   ? 'Clôture en cours…'
@@ -1029,6 +1056,7 @@ export default function ConfigurationPage() {
           </div>
 
         </div>
+
       )}
 
     </>
