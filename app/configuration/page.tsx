@@ -21,6 +21,17 @@ type ClosureResult = {
     count: number;
   }>;
   closedAt: string;
+  type LastImport = {
+  file_name: string;
+  imported_at: string;
+  classes_count: number;
+  students_count: number;
+  teachers_count: number;
+  direction_count: number;
+};
+
+const [lastImport, setLastImport] =
+  useState<LastImport | null>(null);
 };
 
 export default function ConfigurationPage() {
