@@ -70,7 +70,10 @@ export default function ImportCollegePage() {
 <h1>
   Importer le listing collège
 </h1><div className="kicker">Le fichier reçu devient la référence pour l’état courant.</div></div>
-        <div className="topbar-right"><Link className="btn" href="/conseils"><ArrowLeft size={14}/> Conseils</Link></div>
+        <div className="topbar-right"><Link className="btn" href="/configuration">
+  <ArrowLeft size={14}/>
+  Configuration
+</Link></div>
       </div>
 
       <section className="card section-card">
