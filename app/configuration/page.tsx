@@ -21,7 +21,9 @@ type ClosureResult = {
     count: number;
   }>;
   closedAt: string;
-  type LastImport = {
+};
+
+type LastImport = {
   file_name: string;
   imported_at: string;
   classes_count: number;
@@ -30,37 +32,52 @@ type ClosureResult = {
   direction_count: number;
 };
 
-const [lastImport, setLastImport] =
-  useState<LastImport | null>(null);
-};
-
 export default function ConfigurationPage() {
-  const [schoolYear, setSchoolYear] = useState<string | null>(null);
+  const [schoolYear, setSchoolYear] =
+    useState<string | null>(null);
 
-  const [showClosure, setShowClosure] = useState(false);
-  const [newYearLabel, setNewYearLabel] = useState('');
-  const [closing, setClosing] = useState(false);
+  const [lastImport, setLastImport] =
+    useState<LastImport | null>(null);
+
+  const [showClosure, setShowClosure] =
+    useState(false);
+
+  const [newYearLabel, setNewYearLabel] =
+    useState('');
+
+  const [closing, setClosing] =
+    useState(false);
 
   const [closureResult, setClosureResult] =
     useState<ClosureResult | null>(null);
 
-  const [error, setError] = useState('');
+  const [error, setError] =
+    useState('');
 
   useEffect(() => {
     async function loadYear() {
       try {
-        const response = await fetch('/api/configuration', {
-          cache: 'no-store',
-        });
+        const response = await fetch(
+          '/api/configuration',
+          {
+            cache: 'no-store',
+          }
+        );
 
         const data = await response.json();
 
         if (response.ok) {
-  setSchoolYear(data.schoolYear || null);
-  setLastImport(data.lastImport || null);
-}
+          setSchoolYear(
+            data.schoolYear || null
+          );
+
+          setLastImport(
+            data.lastImport || null
+          );
+        }
       } catch {
-        // Rien à afficher ici : les autres sections restent utilisables.
+        // Rien à afficher ici :
+        // les autres sections restent utilisables.
       }
     }
 
