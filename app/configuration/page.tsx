@@ -561,6 +561,7 @@ export default function ConfigurationPage() {
           <div
   style={{
     marginTop: 20,
+    width: '100%',
     height: 86,
     minHeight: 86,
     maxHeight: 86,
@@ -570,36 +571,37 @@ export default function ConfigurationPage() {
     borderRadius: 10,
     background: '#fffaf3',
     overflow: 'hidden',
-    display: 'flex',
-    flexDirection: 'column',
+    display: 'grid',
+    gridTemplateRows: '14px 20px 17px',
+    rowGap: 3,
   }}
 >
   {lastImport ? (
     <>
-      {/* Ligne 1 */}
+      {/* TITRE */}
       <div
         style={{
-          height: 14,
-          lineHeight: '14px',
-          flexShrink: 0,
+          minWidth: 0,
+          width: '100%',
           fontSize: 10,
+          lineHeight: '14px',
           textTransform: 'uppercase',
           letterSpacing: '.08em',
           fontWeight: 700,
           color: '#756a67',
+          overflow: 'hidden',
         }}
       >
         Dernier import
       </div>
 
-      {/* Ligne 2 : nom du fichier */}
+      {/* NOM DU FICHIER */}
       <div
         style={{
-          height: 20,
-          lineHeight: '20px',
-          flexShrink: 0,
-          marginTop: 3,
+          minWidth: 0,
+          width: '100%',
           fontSize: 13,
+          lineHeight: '20px',
           fontWeight: 700,
           overflow: 'hidden',
           textOverflow: 'ellipsis',
@@ -610,14 +612,13 @@ export default function ConfigurationPage() {
         {lastImport.file_name}
       </div>
 
-      {/* Ligne 3 : informations */}
+      {/* INFORMATIONS */}
       <div
         style={{
-          height: 17,
-          lineHeight: '17px',
-          flexShrink: 0,
-          marginTop: 3,
+          minWidth: 0,
+          width: '100%',
           fontSize: 11,
+          lineHeight: '17px',
           color: '#64748b',
           overflow: 'hidden',
           textOverflow: 'ellipsis',
@@ -652,7 +653,8 @@ export default function ConfigurationPage() {
   ) : (
     <div
       style={{
-        height: '100%',
+        gridRow: '1 / span 3',
+        minWidth: 0,
         display: 'flex',
         alignItems: 'center',
         gap: 9,
