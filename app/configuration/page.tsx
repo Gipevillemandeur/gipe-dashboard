@@ -559,112 +559,90 @@ export default function ConfigurationPage() {
 
 
           <div
-            style={{
-              marginTop: 20,
-              padding:
-                '14px 16px',
-              border:
-                '1px solid #eee2d7',
-              borderRadius: 10,
-              background:
-                '#fffaf3',
-              minHeight: 86,
-            }}
-          >
+  style={{
+    marginTop: 20,
+    padding: '14px 16px',
+    border: '1px solid #eee2d7',
+    borderRadius: 10,
+    background: '#fffaf3',
+    height: 88,
+    boxSizing: 'border-box',
+    overflow: 'hidden',
+  }}
+>
+  {lastImport ? (
+    <>
+      <div
+        style={{
+          fontSize: 10,
+          textTransform: 'uppercase',
+          letterSpacing: '.08em',
+          fontWeight: 700,
+          color: '#756a67',
+        }}
+      >
+        Dernier import
+      </div>
 
-            {lastImport ? (
+      <div
+        style={{
+          marginTop: 5,
+          fontSize: 13,
+          fontWeight: 700,
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap',
+        }}
+        title={lastImport.file_name}
+      >
+        {lastImport.file_name}
+      </div>
 
-              <>
+      <div
+        style={{
+          marginTop: 4,
+          fontSize: 11,
+          color: '#64748b',
+          whiteSpace: 'nowrap',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+        }}
+      >
+        {new Date(
+          lastImport.imported_at
+        ).toLocaleString('fr-FR')}
 
-                <div
-                  style={{
-                    fontSize: 10,
-                    textTransform:
-                      'uppercase',
-                    letterSpacing:
-                      '.08em',
-                    fontWeight: 700,
-                    color: '#756a67',
-                  }}
-                >
-                  Dernier import
-                </div>
+        {' · '}
 
-                <div
-                  style={{
-                    marginTop: 5,
-                    fontSize: 13,
-                    fontWeight: 700,
-                    overflow:
-                      'hidden',
-                    textOverflow:
-                      'ellipsis',
-                    whiteSpace:
-                      'nowrap',
-                  }}
-                  title={
-                    lastImport.file_name
-                  }
-                >
-                  {lastImport.file_name}
-                </div>
+        {lastImport.classes_count}
+        {' classes · '}
 
-                <div
-                  style={{
-                    marginTop: 4,
-                    fontSize: 11,
-                    color: '#64748b',
-                  }}
-                >
-                  {new Date(
-                    lastImport.imported_at
-                  ).toLocaleString(
-                    'fr-FR'
-                  )}
+        {lastImport.students_count}
+        {' élèves · '}
 
-                  {' · '}
+        {lastImport.teachers_count}
+        {' enseignants'}
+      </div>
+    </>
+  ) : (
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        height: '100%',
+        gap: 9,
+        color: '#64748b',
+        fontSize: 12,
+      }}
+    >
+      <FileSpreadsheet size={16} />
 
-                  {lastImport.classes_count}
-                  {' classes · '}
-
-                  {lastImport.students_count}
-                  {' élèves · '}
-
-                  {lastImport.teachers_count}
-                  {' enseignants'}
-                </div>
-
-              </>
-
-            ) : (
-
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems:
-                    'center',
-                  height: '100%',
-                  minHeight: 58,
-                  gap: 9,
-                  color: '#64748b',
-                  fontSize: 12,
-                }}
-              >
-
-                <FileSpreadsheet
-                  size={16}
-                />
-
-                <span>
-                  Aucun listing importé pour
-                  cette année.
-                </span>
-
-              </div>
-
-            )}
-
-          </div>
+      <span>
+        Aucun listing importé pour cette année.
+      </span>
+    </div>
+  )}
+</div>
 
 
           <div
