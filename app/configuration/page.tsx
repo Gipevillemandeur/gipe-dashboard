@@ -561,19 +561,27 @@ export default function ConfigurationPage() {
           <div
   style={{
     marginTop: 20,
-    padding: '14px 16px',
+    height: 86,
+    minHeight: 86,
+    maxHeight: 86,
+    boxSizing: 'border-box',
+    padding: '13px 16px',
     border: '1px solid #eee2d7',
     borderRadius: 10,
     background: '#fffaf3',
-    height: 88,
-    boxSizing: 'border-box',
     overflow: 'hidden',
+    display: 'flex',
+    flexDirection: 'column',
   }}
 >
   {lastImport ? (
     <>
+      {/* Ligne 1 */}
       <div
         style={{
+          height: 14,
+          lineHeight: '14px',
+          flexShrink: 0,
           fontSize: 10,
           textTransform: 'uppercase',
           letterSpacing: '.08em',
@@ -584,9 +592,13 @@ export default function ConfigurationPage() {
         Dernier import
       </div>
 
+      {/* Ligne 2 : nom du fichier */}
       <div
         style={{
-          marginTop: 5,
+          height: 20,
+          lineHeight: '20px',
+          flexShrink: 0,
+          marginTop: 3,
           fontSize: 13,
           fontWeight: 700,
           overflow: 'hidden',
@@ -598,15 +610,28 @@ export default function ConfigurationPage() {
         {lastImport.file_name}
       </div>
 
+      {/* Ligne 3 : informations */}
       <div
         style={{
-          marginTop: 4,
+          height: 17,
+          lineHeight: '17px',
+          flexShrink: 0,
+          marginTop: 3,
           fontSize: 11,
           color: '#64748b',
-          whiteSpace: 'nowrap',
           overflow: 'hidden',
           textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap',
         }}
+        title={`${new Date(
+          lastImport.imported_at
+        ).toLocaleString('fr-FR')} · ${
+          lastImport.classes_count
+        } classes · ${
+          lastImport.students_count
+        } élèves · ${
+          lastImport.teachers_count
+        } enseignants`}
       >
         {new Date(
           lastImport.imported_at
@@ -627,9 +652,9 @@ export default function ConfigurationPage() {
   ) : (
     <div
       style={{
+        height: '100%',
         display: 'flex',
         alignItems: 'center',
-        height: '100%',
         gap: 9,
         color: '#64748b',
         fontSize: 12,
