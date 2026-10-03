@@ -822,21 +822,43 @@ export default function SiteAgendaPage() {
                   </div>
 
                   <div>
-                    <label className="label">
-                      Catégorie
-                    </label>
+  <label className="label">
+    Catégorie
+  </label>
 
-                    <input
-                      className="input"
-                      value={category}
-                      onChange={(e) =>
-                        setCategory(
-                          e.target.value
-                        )
-                      }
-                      placeholder="Ex. Réunion, Sortie, GIPE..."
-                    />
-                  </div>
+  <select
+    className="input"
+    value={category}
+    onChange={(e) =>
+      setCategory(e.target.value)
+    }
+  >
+    <option value="">
+      Sans catégorie
+    </option>
+
+    {Array.from(
+      new Set(
+        events
+          .map((item) =>
+            (item.category || '').trim()
+          )
+          .filter(Boolean)
+      )
+    )
+      .sort((a, b) =>
+        a.localeCompare(b, 'fr')
+      )
+      .map((item) => (
+        <option
+          key={item}
+          value={item}
+        >
+          {item}
+        </option>
+      ))}
+  </select>
+</div>
                 </div>
 
                 <div>
