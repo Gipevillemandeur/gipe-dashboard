@@ -807,3 +807,101 @@ h1 {
     font-size: 28px;
   }
 }
+/* =========================================================
+   GESTION DU SITE
+   ========================================================= */
+
+.site-menu-grid {
+  display: grid;
+  grid-template-columns:
+    repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 20px;
+}
+
+.site-menu-link {
+  display: block;
+  min-width: 0;
+  color: inherit;
+  text-decoration: none;
+}
+
+.site-menu-card {
+  height: 100%;
+  box-sizing: border-box;
+  padding: 20px;
+  border: 1px solid var(--gipe-line);
+  cursor: pointer;
+}
+
+.site-menu-card-inner {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.site-menu-icon {
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.site-menu-content {
+  min-width: 0;
+  flex: 1;
+}
+
+.site-menu-content h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 750;
+}
+
+.site-menu-content p {
+  margin: 7px 0 0;
+  color: var(--gipe-muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.site-menu-link:hover .site-menu-card {
+  transform: translateY(-2px);
+  box-shadow:
+    0 8px 24px rgba(0, 0, 0, 0.08);
+}
+
+/* Téléphone */
+@media (max-width: 760px) {
+  .site-menu-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+    margin-top: 16px;
+  }
+
+  .site-menu-card {
+    padding: 16px;
+  }
+
+  .site-menu-card-inner {
+    align-items: center;
+    gap: 14px;
+  }
+
+  .site-menu-icon {
+    width: 42px;
+    height: 42px;
+    min-width: 42px;
+  }
+
+  .site-menu-content h3 {
+    font-size: 17px;
+  }
+
+  .site-menu-content p {
+    font-size: 13px;
+  }
+}
