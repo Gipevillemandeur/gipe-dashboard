@@ -1325,6 +1325,14 @@ export default function SiteActualitesPage() {
             max-width: 100%;
             box-sizing: border-box;
           }
+
+          .actualites-modal-card input[type='date'] {
+            width: 100% !important;
+            max-width: 100% !important;
+            min-width: 0 !important;
+            box-sizing: border-box !important;
+            display: block;
+          }
         }
 
         @media (max-width: 480px) {
