@@ -127,12 +127,22 @@ export async function GET() {
     });
 
     const text = await response.text();
-    let result: any;
-    try {
-      result = JSON.parse(text);
-    } catch {
-      throw new Error(`Réponse Apps Script inattendue (HTTP ${response.status}).`);
-    }
+
+let result: any;
+
+try {
+  result = JSON.parse(text);
+} catch {
+  throw new Error(
+    [
+      `Réponse Apps Script inattendue.`,
+      `HTTP : ${response.status}`,
+      `Content-Type : ${response.headers.get('content-type') || 'inconnu'}`,
+      `Location : ${response.headers.get('location') || 'aucune'}`,
+      `Réponse : ${text.slice(0, 1000)}`,
+    ].join('\n')
+  );
+}
 
     if (!response.ok || !result?.ok) {
       throw new Error(result?.error || `Apps Script a répondu HTTP ${response.status}.`);
