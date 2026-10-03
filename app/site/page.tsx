@@ -85,15 +85,7 @@ export default function SitePage() {
           </div>
         </div>
 
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns:
-              'repeat(2, minmax(0, 1fr))',
-            gap: 16,
-            marginTop: 20,
-          }}
-        >
+        <div className="site-menu-grid">
           {menu.map((item) => {
             const Icon = item.icon;
 
@@ -101,69 +93,20 @@ export default function SitePage() {
               <Link
                 key={item.href}
                 href={item.href}
-                style={{
-                  textDecoration: 'none',
-                  color: 'inherit',
-                  display: 'block',
-                }}
+                className="site-menu-link"
               >
-                <div
-                  className="card"
-                  style={{
-                    height: '100%',
-                    padding: 20,
-                    border:
-                      '1px solid var(--gipe-line)',
-                    boxSizing: 'border-box',
-                    cursor: 'pointer',
-                  }}
-                >
-                  <div
-                    style={{
-                      display: 'flex',
-                      alignItems: 'flex-start',
-                      gap: 16,
-                    }}
-                  >
-                    <div
-                      className="stat-icon"
-                      style={{
-                        width: 44,
-                        height: 44,
-                        minWidth: 44,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                      }}
-                    >
+                <div className="card site-menu-card">
+                  <div className="site-menu-card-inner">
+                    <div className="site-menu-icon stat-icon">
                       <Icon size={21} />
                     </div>
 
-                    <div
-                      style={{
-                        flex: 1,
-                      }}
-                    >
-                      <h3
-                        style={{
-                          margin: 0,
-                          fontSize: 18,
-                          fontWeight: 750,
-                        }}
-                      >
+                    <div className="site-menu-content">
+                      <h3>
                         {item.title}
                       </h3>
 
-                      <p
-                        style={{
-                          margin:
-                            '7px 0 0',
-                          color:
-                            'var(--gipe-muted)',
-                          fontSize: 13,
-                          lineHeight: 1.5,
-                        }}
-                      >
+                      <p>
                         {item.description}
                       </p>
                     </div>
