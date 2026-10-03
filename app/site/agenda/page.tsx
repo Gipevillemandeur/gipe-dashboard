@@ -664,14 +664,15 @@ export default function SiteAgendaPage() {
           }}
         >
           <div
-            className="card"
-            style={{
-              width: 'min(760px, 100%)',
-              maxHeight:
-                'calc(100vh - 40px)',
-              overflowY: 'auto',
-            }}
-          >
+  className="card"
+  style={{
+    width: 'min(760px, 100%)',
+    maxHeight:
+      'calc(100vh - 40px)',
+    overflowY: 'auto',
+    padding: 24,
+  }}
+>
             <div
               className="section-head"
               style={{
