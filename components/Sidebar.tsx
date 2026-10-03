@@ -11,41 +11,19 @@ import {
   BookOpen,
   UserRoundPlus,
   Settings,
+  WalletCards,
 } from 'lucide-react';
 
 import LogoutButton from '@/components/LogoutButton';
 
 const items = [
-  {
-    href: '/',
-    label: 'Tableau de bord',
-    icon: Home,
-  },
-  {
-    href: '/conseils',
-    label: 'Conseils de classe',
-    icon: Users,
-  },
-  {
-    href: '/adherents',
-    label: 'Adhérents',
-    icon: UserRoundPlus,
-  },
-  {
-    href: '#',
-    label: 'Site internet',
-    icon: Globe2,
-  },
-  {
-    href: '#',
-    label: 'Agenda',
-    icon: CalendarDays,
-  },
-  {
-    href: '#',
-    label: 'Documents',
-    icon: FileText,
-  },
+  { href: '/', label: 'Tableau de bord', icon: Home },
+  { href: '/conseils', label: 'Conseils de classe', icon: Users },
+  { href: '/adherents', label: 'Adhérents', icon: UserRoundPlus },
+  { href: '/tresorerie', label: 'Trésorerie', icon: WalletCards },
+  { href: '#', label: 'Site internet', icon: Globe2 },
+  { href: '#', label: 'Agenda', icon: CalendarDays },
+  { href: '#', label: 'Documents', icon: FileText },
 ];
 
 export default function Sidebar() {
@@ -53,42 +31,26 @@ export default function Sidebar() {
 
   return (
     <aside className="sidebar">
-
       <div className="brand">
-        <div className="brand-mark">
-          G
-        </div>
+        <div className="brand-mark">G</div>
 
         <div className="brand-text">
-          <strong>
-            GIPE Villemandeur
-          </strong>
-
-          <span>
-            Centre de gestion
-          </span>
+          <strong>GIPE Villemandeur</strong>
+          <span>Centre de gestion</span>
         </div>
       </div>
 
       <nav className="nav">
-
         {items.map((item) => {
           const Icon = item.icon;
-
           const active =
             item.href !== '#' &&
-            (
-              pathname === item.href ||
-              pathname.startsWith(
-                `${item.href}/`
-              )
-            );
+            (pathname === item.href ||
+              pathname.startsWith(`${item.href}/`));
 
           return (
             <Link
-              className={
-                active ? 'active' : ''
-              }
+              className={active ? 'active' : ''}
               href={item.href}
               key={item.label}
             >
@@ -100,14 +62,10 @@ export default function Sidebar() {
 
         <div className="nav-sep" />
 
-        {/* CONFIGURATION */}
-
         <Link
           className={
             pathname === '/configuration' ||
-            pathname.startsWith(
-              '/configuration/'
-            ) ||
+            pathname.startsWith('/configuration/') ||
             pathname === '/import-college'
               ? 'active'
               : ''
@@ -118,19 +76,14 @@ export default function Sidebar() {
           Configuration
         </Link>
 
-        {/* GUIDE */}
-
         <Link href="#">
           <BookOpen size={16} />
           Guide de passation
         </Link>
 
         <div className="nav-sep" />
-
         <LogoutButton />
-
       </nav>
-
     </aside>
   );
 }
