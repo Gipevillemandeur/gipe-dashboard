@@ -104,6 +104,7 @@ export default function SitePage() {
                 style={{
                   textDecoration: 'none',
                   color: 'inherit',
+                  display: 'block',
                 }}
               >
                 <div
@@ -113,10 +114,8 @@ export default function SitePage() {
                     padding: 20,
                     border:
                       '1px solid var(--gipe-line)',
-                    transition:
-                      'transform 0.15s ease, box-shadow 0.15s ease',
-                    cursor: 'pointer',
                     boxSizing: 'border-box',
+                    cursor: 'pointer',
                   }}
                 >
                   <div
@@ -176,25 +175,19 @@ export default function SitePage() {
         </div>
       </section>
 
-      <div className="footer-note">
+      <div
+        className="footer-note"
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
+        }}
+      >
         <Globe2 size={14} />
+
         Les modifications effectuées ici sont
         publiées sur le site public du GIPE.
       </div>
-
-      <style jsx>{`
-        @media (max-width: 760px) {
-          .card.section-card > div:nth-child(2) {
-            grid-template-columns: 1fr !important;
-          }
-        }
-
-        a > div.card:hover {
-          transform: translateY(-2px);
-          box-shadow:
-            0 8px 24px rgba(0, 0, 0, 0.08);
-        }
-      `}</style>
     </>
   );
 }
