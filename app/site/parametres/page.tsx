@@ -415,29 +415,7 @@ export default function ParametresPage() {
         </div>
       </section>
 
-      {/* Information */}
-      <section
-        className="card section-card"
-        style={{
-          marginTop: 18,
-        }}
-      >
-        <div className="section-head">
-          <div>
-            <h2 className="section-title">
-              À propos des paramètres
-            </h2>
-
-            <p className="section-sub">
-              Les paramètres du bandeau d’alerte
-              sont volontairement séparés et se
-              trouvent dans « Bandeau d’alerte ».
-            </p>
-          </div>
-        </div>
-      </section>
-
-      <style jsx>{`
+       <style jsx>{`
         @media (max-width: 760px) {
           section.card > div:nth-child(2) {
             grid-template-columns: 1fr !important;
