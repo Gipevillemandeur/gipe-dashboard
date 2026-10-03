@@ -826,17 +826,17 @@ export default function SiteAgendaPage() {
     Catégorie
   </label>
 
-  <select
+  <input
     className="input"
+    list="agenda-categories"
     value={category}
     onChange={(e) =>
       setCategory(e.target.value)
     }
-  >
-    <option value="">
-      Sans catégorie
-    </option>
+    placeholder="Ex. Réunion, Sortie, GIPE..."
+  />
 
+  <datalist id="agenda-categories">
     {Array.from(
       new Set(
         events
@@ -853,11 +853,20 @@ export default function SiteAgendaPage() {
         <option
           key={item}
           value={item}
-        >
-          {item}
-        </option>
+        />
       ))}
-  </select>
+  </datalist>
+
+  <div
+    style={{
+      marginTop: 6,
+      fontSize: 12,
+      color: 'var(--gipe-muted)',
+    }}
+  >
+    Tu peux choisir une catégorie existante
+    ou en saisir une nouvelle.
+  </div>
 </div>
                 </div>
 
