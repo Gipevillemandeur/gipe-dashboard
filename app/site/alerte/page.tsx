@@ -1,6 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import {
+  useEffect,
+  useState,
+} from 'react';
 
 type AlertType = 'info' | 'urgent';
 
@@ -10,36 +13,102 @@ interface AlertSettings {
   type: AlertType;
 }
 
-export default function AlertePage() {
-  const [settings, setSettings] = useState<AlertSettings>({
-    enabled: false,
-    message: '',
-    type: 'info',
-  });
+const smileys = [
+  '😊',
+  '😃',
+  '😄',
+  '😁',
+  '😂',
+  '🤣',
+  '😍',
+  '🥳',
+  '🤩',
+  '👍',
+  '👏',
+  '❤️',
+  '🙏',
+];
 
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState('');
-  const [error, setError] = useState('');
+const symbols = [
+  '⚠️',
+  '🚨',
+  '✅',
+  '❌',
+  '📢',
+  '📣',
+  '🔔',
+  '📅',
+  '📌',
+  '❗',
+  '⭐',
+  '💡',
+  '🎉',
+  '🎊',
+  '🎓',
+  '📚',
+  '🏫',
+];
+
+export default function AlertePage() {
+  const [settings, setSettings] =
+    useState<AlertSettings>({
+      enabled: false,
+      message: '',
+      type: 'info',
+    });
+
+  const [loading, setLoading] =
+    useState(true);
+
+  const [saving, setSaving] =
+    useState(false);
+
+  const [message, setMessage] =
+    useState('');
+
+  const [error, setError] =
+    useState('');
+
+  const [showSmileys, setShowSmileys] =
+    useState(false);
+
+  const [showSymbols, setShowSymbols] =
+    useState(false);
 
   useEffect(() => {
     async function loadAlert() {
-      try {
-        setLoading(true);
-        setError('');
+      setLoading(true);
+      setError('');
 
-        const response = await fetch('/api/site/alerte');
+      try {
+        const response =
+          await fetch(
+            '/api/site/alerte',
+            {
+              cache: 'no-store',
+            }
+          );
+
+        const data =
+          await response.json();
 
         if (!response.ok) {
-          throw new Error('Impossible de charger le bandeau d’alerte.');
+          throw new Error(
+            data?.error ||
+              'Impossible de charger le bandeau d’alerte.'
+          );
         }
 
-        const data = await response.json();
-
         setSettings({
-          enabled: Boolean(data.enabled),
-          message: data.message ?? '',
-          type: data.type === 'urgent' ? 'urgent' : 'info',
+          enabled: Boolean(
+            data.enabled
+          ),
+          message:
+            data.message ?? '',
+          type:
+            data.type === 'urgent'
+              ? 'urgent'
+              : 'info',
         });
       } catch (err) {
         setError(
@@ -52,32 +121,55 @@ export default function AlertePage() {
       }
     }
 
-    loadAlert();
+    void loadAlert();
   }, []);
 
+  function insertText(
+    value: string
+  ) {
+    setSettings(
+      (current) => ({
+        ...current,
+        message:
+          `${current.message}${value}`,
+      })
+    );
+  }
+
   async function handleSave() {
+    setSaving(true);
+    setMessage('');
+    setError('');
+
     try {
-      setSaving(true);
-      setMessage('');
-      setError('');
+      const response =
+        await fetch(
+          '/api/site/alerte',
+          {
+            method: 'PUT',
+            headers: {
+              'Content-Type':
+                'application/json',
+            },
+            body: JSON.stringify(
+              settings
+            ),
+          }
+        );
 
-      const response = await fetch('/api/site/alerte', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(settings),
-      });
-
-      const data = await response.json();
+      const data =
+        await response.json();
 
       if (!response.ok) {
         throw new Error(
-          data?.error || 'Impossible d’enregistrer le bandeau.'
+          data?.error ||
+            'Impossible d’enregistrer le bandeau.'
         );
       }
 
-      setMessage('Bandeau d’alerte enregistré avec succès.');
+      setMessage(
+        'Bandeau d’alerte enregistré avec succès.'
+      );
     } catch (err) {
       setError(
         err instanceof Error
@@ -91,78 +183,94 @@ export default function AlertePage() {
 
   if (loading) {
     return (
-      <main
-        style={{
-          minHeight: '100vh',
-          background: '#f7f7f7',
-          padding: '40px 24px',
-        }}
-      >
-        <div
-          style={{
-            maxWidth: 1000,
-            margin: '0 auto',
-            background: '#fff',
-            borderRadius: 16,
-            padding: 24,
-            boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
-          }}
-        >
-          Chargement du bandeau d’alerte…
+      <div className="topbar">
+        <div>
+          <div className="eyebrow">
+            Site internet
+          </div>
+
+          <h1>
+            Bandeau d’alerte
+          </h1>
+
+          <div className="kicker">
+            Chargement…
+          </div>
         </div>
-      </main>
+      </div>
     );
   }
 
   return (
-    <main
-      style={{
-        minHeight: '100vh',
-        background: '#f7f7f7',
-        padding: '40px 24px',
-      }}
-    >
-      <div
-        style={{
-          maxWidth: 1000,
-          margin: '0 auto',
-        }}
-      >
-        {/* En-tête */}
-        <div
-          style={{
-            marginBottom: 24,
-          }}
-        >
-          <h1
-            style={{
-              fontSize: 30,
-              fontWeight: 800,
-              margin: 0,
-              color: '#5b0f1b',
-            }}
-          >
+    <>
+      <div className="topbar">
+        <div>
+          <div className="eyebrow">
+            Site internet
+          </div>
+
+          <h1>
             Bandeau d’alerte
           </h1>
 
-          <p
-            style={{
-              marginTop: 8,
-              color: '#666',
-              fontSize: 15,
-            }}
-          >
-            Gérez le message qui apparaît en haut du site public.
-          </p>
+          <div className="kicker">
+            Gestion du message affiché
+            sur le site public.
+          </div>
+        </div>
+      </div>
+
+      {error && (
+        <div
+          className="notice notice-error"
+          style={{
+            marginBottom: 18,
+          }}
+        >
+          {error}
+        </div>
+      )}
+
+      {message && (
+        <div
+          className="notice"
+          style={{
+            marginBottom: 18,
+            background: '#e9f7ef',
+            borderColor: '#b7dfc6',
+            color: '#176b35',
+          }}
+        >
+          {message}
+        </div>
+      )}
+
+      <section
+        className="card section-card"
+      >
+        <div
+          className="section-head"
+          style={{
+            marginBottom: 20,
+          }}
+        >
+          <div>
+            <h2 className="section-title">
+              Configuration du bandeau
+            </h2>
+
+            <p className="section-sub">
+              Activez le bandeau et
+              définissez le message qui
+              sera visible sur le site.
+            </p>
+          </div>
         </div>
 
-        {/* Carte principale */}
-        <section
+        <div
           style={{
-            background: '#fff',
-            borderRadius: 16,
-            padding: 24,
-            boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
+            display: 'grid',
+            gap: 18,
           }}
         >
           {/* Activation */}
@@ -170,255 +278,325 @@ export default function AlertePage() {
             style={{
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'space-between',
+              justifyContent:
+                'space-between',
               gap: 20,
-              paddingBottom: 24,
-              borderBottom: '1px solid #eee',
+              padding: 14,
+              border:
+                '1px solid var(--gipe-line)',
+              borderRadius: 12,
+              background:
+                '#fffdf9',
             }}
           >
             <div>
-              <div
-                style={{
-                  fontSize: 17,
-                  fontWeight: 700,
-                  color: '#222',
-                }}
-              >
+              <strong>
                 Afficher le bandeau
-              </div>
+              </strong>
 
               <div
                 style={{
-                  marginTop: 5,
-                  fontSize: 14,
-                  color: '#777',
+                  marginTop: 4,
+                  fontSize: 12,
+                  color:
+                    'var(--gipe-muted)',
                 }}
               >
-                Le bandeau sera visible immédiatement sur le site public.
+                Le bandeau sera visible
+                sur le site public.
               </div>
             </div>
 
             <button
+              className="btn"
               type="button"
               onClick={() =>
-                setSettings((current) => ({
-                  ...current,
-                  enabled: !current.enabled,
-                }))
+                setSettings(
+                  (current) => ({
+                    ...current,
+                    enabled:
+                      !current.enabled,
+                  })
+                )
               }
               style={{
-                border: 'none',
-                cursor: 'pointer',
-                borderRadius: 999,
-                padding: '8px 18px',
-                fontWeight: 700,
-                fontSize: 14,
-                background: settings.enabled ? '#198754' : '#777',
-                color: '#fff',
                 minWidth: 110,
+                fontWeight: 700,
+                color:
+                  settings.enabled
+                    ? '#176b35'
+                    : '#777',
+                borderColor:
+                  settings.enabled
+                    ? '#b7dfc6'
+                    : 'var(--gipe-line)',
+                background:
+                  settings.enabled
+                    ? '#e9f7ef'
+                    : '#fff',
               }}
             >
-              {settings.enabled ? 'ACTIVÉ' : 'DÉSACTIVÉ'}
+              {settings.enabled
+                ? 'ACTIVÉ'
+                : 'DÉSACTIVÉ'}
             </button>
           </div>
 
           {/* Type */}
-          <div
+          <label
             style={{
-              marginTop: 24,
+              display: 'grid',
+              gap: 7,
+              fontSize: 12,
+              fontWeight: 700,
             }}
           >
-            <label
-              htmlFor="alert-type"
-              style={{
-                display: 'block',
-                fontWeight: 700,
-                marginBottom: 8,
-                color: '#222',
-              }}
-            >
-              Type de bandeau
-            </label>
+            Type de bandeau
 
             <select
-              id="alert-type"
+              className="select"
               value={settings.type}
-              onChange={(event) =>
-                setSettings((current) => ({
-                  ...current,
-                  type:
-                    event.target.value === 'urgent'
-                      ? 'urgent'
-                      : 'info',
-                }))
+              onChange={(e) =>
+                setSettings(
+                  (current) => ({
+                    ...current,
+                    type:
+                      e.target.value ===
+                      'urgent'
+                        ? 'urgent'
+                        : 'info',
+                  })
+                )
               }
-              style={{
-                width: '100%',
-                maxWidth: 400,
-                padding: '11px 12px',
-                border: '1px solid #ccc',
-                borderRadius: 8,
-                fontSize: 15,
-                background: '#fff',
-              }}
             >
-              <option value="info">ℹ️ Information</option>
-              <option value="urgent">⚠️ Urgent</option>
+              <option value="info">
+                ℹ️ Information
+              </option>
+
+              <option value="urgent">
+                ⚠️ Urgent
+              </option>
             </select>
-          </div>
+          </label>
 
           {/* Message */}
-          <div
+          <label
             style={{
-              marginTop: 24,
+              display: 'grid',
+              gap: 7,
+              fontSize: 12,
+              fontWeight: 700,
             }}
           >
-            <label
-              htmlFor="alert-message"
-              style={{
-                display: 'block',
-                fontWeight: 700,
-                marginBottom: 8,
-                color: '#222',
-              }}
-            >
-              Message
-            </label>
+            Message
 
             <textarea
-              id="alert-message"
+              className="input"
               value={settings.message}
-              onChange={(event) =>
-                setSettings((current) => ({
-                  ...current,
-                  message: event.target.value,
-                }))
+              onChange={(e) =>
+                setSettings(
+                  (current) => ({
+                    ...current,
+                    message:
+                      e.target.value,
+                  })
+                )
               }
-              placeholder="Exemple : Les inscriptions au bal de fin d’année sont ouvertes."
-              rows={5}
+              rows={6}
+              placeholder="Écris ici le message du bandeau..."
               style={{
-                width: '100%',
-                padding: 12,
-                border: '1px solid #ccc',
-                borderRadius: 8,
-                fontSize: 15,
                 resize: 'vertical',
-                fontFamily: 'inherit',
-                boxSizing: 'border-box',
+                lineHeight: 1.5,
               }}
             />
+          </label>
 
+          {/* Emojis */}
+          <div>
             <div
+              className="btn-row"
               style={{
-                marginTop: 6,
-                fontSize: 13,
-                color: '#777',
+                marginBottom: 8,
               }}
             >
-              Les liens commençant par http:// ou https:// seront
-              automatiquement cliquables sur le site public.
+              <button
+                className="btn"
+                type="button"
+                onClick={() =>
+                  setShowSmileys(
+                    (value) => !value
+                  )
+                }
+              >
+                😊 Smileys
+              </button>
+
+              <button
+                className="btn"
+                type="button"
+                onClick={() =>
+                  setShowSymbols(
+                    (value) => !value
+                  )
+                }
+              >
+                ⭐ Symboles
+              </button>
             </div>
+
+            {showSmileys && (
+              <div
+                style={{
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  gap: 6,
+                  padding: 10,
+                  border:
+                    '1px solid var(--gipe-line)',
+                  borderRadius: 10,
+                  background:
+                    '#fffdf9',
+                  marginBottom: 8,
+                }}
+              >
+                {smileys.map(
+                  (item) => (
+                    <button
+                      key={item}
+                      type="button"
+                      className="btn"
+                      onClick={() =>
+                        insertText(
+                          item
+                        )
+                      }
+                      style={{
+                        padding:
+                          '6px 8px',
+                        fontSize: 18,
+                      }}
+                    >
+                      {item}
+                    </button>
+                  )
+                )}
+              </div>
+            )}
+
+            {showSymbols && (
+              <div
+                style={{
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  gap: 6,
+                  padding: 10,
+                  border:
+                    '1px solid var(--gipe-line)',
+                  borderRadius: 10,
+                  background:
+                    '#fffdf9',
+                }}
+              >
+                {symbols.map(
+                  (item) => (
+                    <button
+                      key={item}
+                      type="button"
+                      className="btn"
+                      onClick={() =>
+                        insertText(
+                          item
+                        )
+                      }
+                      style={{
+                        padding:
+                          '6px 8px',
+                        fontSize: 17,
+                      }}
+                    >
+                      {item}
+                    </button>
+                  )
+                )}
+              </div>
+            )}
           </div>
 
           {/* Aperçu */}
           <div
             style={{
-              marginTop: 28,
+              border:
+                '1px solid var(--gipe-line)',
+              borderRadius: 14,
+              padding: 14,
+              background:
+                '#fffdf9',
             }}
           >
             <div
               style={{
+                fontSize: 12,
                 fontWeight: 700,
                 marginBottom: 10,
-                color: '#222',
               }}
             >
-              Aperçu
+              Aperçu du bandeau
             </div>
 
             <div
               style={{
-                overflow: 'hidden',
                 borderRadius: 8,
+                padding:
+                  '10px 16px',
                 background:
-                  settings.type === 'urgent'
+                  settings.type ===
+                  'urgent'
                     ? '#dc3545'
                     : '#f4c542',
                 color:
-                  settings.type === 'urgent'
+                  settings.type ===
+                  'urgent'
                     ? '#fff'
                     : '#000',
-                padding: '10px 16px',
-                fontSize: 15,
+                fontSize: 14,
                 fontWeight: 600,
-                minHeight: 22,
+                minHeight: 20,
               }}
             >
-              {settings.type === 'urgent' ? '⚠️ ' : 'ℹ️ '}
+              {settings.type ===
+              'urgent'
+                ? '⚠️ '
+                : 'ℹ️ '}
 
-              {settings.message.trim() || 'Votre message apparaîtra ici.'}
+              {settings.message
+                .trim() ||
+                'Votre message apparaîtra ici.'}
             </div>
           </div>
 
-          {/* Messages système */}
-          {message && (
-            <div
-              style={{
-                marginTop: 20,
-                padding: '12px 14px',
-                borderRadius: 8,
-                background: '#d1e7dd',
-                color: '#0f5132',
-                fontWeight: 600,
-              }}
-            >
-              {message}
-            </div>
-          )}
-
-          {error && (
-            <div
-              style={{
-                marginTop: 20,
-                padding: '12px 14px',
-                borderRadius: 8,
-                background: '#f8d7da',
-                color: '#842029',
-                fontWeight: 600,
-              }}
-            >
-              {error}
-            </div>
-          )}
-
-          {/* Bouton */}
+          {/* Boutons */}
           <div
+            className="btn-row"
             style={{
-              display: 'flex',
-              justifyContent: 'flex-end',
-              marginTop: 28,
+              justifyContent:
+                'flex-end',
             }}
           >
             <button
+              className="btn btn-primary"
               type="button"
-              onClick={handleSave}
+              onClick={() =>
+                void handleSave()
+              }
               disabled={saving}
-              style={{
-                border: 'none',
-                cursor: saving ? 'not-allowed' : 'pointer',
-                borderRadius: 8,
-                padding: '12px 24px',
-                fontWeight: 700,
-                fontSize: 15,
-                background: saving ? '#999' : '#5b0f1b',
-                color: '#fff',
-              }}
             >
-              {saving ? 'Enregistrement…' : 'Enregistrer'}
+              {saving
+                ? 'Enregistrement…'
+                : 'Enregistrer'}
             </button>
           </div>
-        </section>
-      </div>
-    </main>
+        </div>
+      </section>
+    </>
   );
 }
