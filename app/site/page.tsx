@@ -422,8 +422,8 @@ export default async function SitePage() {
                     <strong>{key}</strong>
 
                     <span>
-                      {value || 'Valeur vide'}
-                    </span>
+  {String(value || 'Valeur vide')}
+</span>
                   </div>
 
                   <span className="badge badge-ok">
