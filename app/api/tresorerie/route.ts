@@ -437,3 +437,68 @@ export async function PUT(request: Request) {
     );
   }
 }
+
+
+export async function DELETE(request: Request) {
+  const auth = await requireAdmin();
+
+  if ('error' in auth) {
+    return auth.error;
+  }
+
+  const { admin } = auth;
+
+  try {
+    const body = await request.json().catch(
+      () => null
+    ) as Record<string, unknown> | null;
+
+    const id = cleanString(body?.id);
+
+    if (!id) {
+      return NextResponse.json(
+        { error: 'Opération introuvable.' },
+        { status: 400 }
+      );
+    }
+
+    const year = await getActiveYear(admin);
+
+    const { data, error } = await admin
+      .from('gipe_transactions')
+      .delete()
+      .eq('id', id)
+      .eq('school_year_id', year.id)
+      .select('id')
+      .maybeSingle();
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    if (!data) {
+      return NextResponse.json(
+        {
+          error:
+            'Opération introuvable pour l’année active.',
+        },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json({
+      ok: true,
+      id: data.id,
+    });
+  } catch (error) {
+    return NextResponse.json(
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : 'Impossible de supprimer l’opération.',
+      },
+      { status: 400 }
+    );
+  }
+}

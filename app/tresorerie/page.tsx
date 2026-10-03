@@ -7,6 +7,7 @@ import {
   CreditCard,
   Pencil,
   Plus,
+  Trash2,
   WalletCards,
   X,
 } from 'lucide-react';
@@ -93,6 +94,7 @@ export default function TresoreriePage() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
   const [showForm, setShowForm] = useState(false);
@@ -207,6 +209,47 @@ export default function TresoreriePage() {
       type,
       category: '',
     }));
+  }
+
+  async function deleteTransaction(item: Transaction) {
+    if (deletingId) return;
+
+    const confirmed = window.confirm(
+      `Supprimer l’opération « ${item.label} » de ${formatMoney(item.amount)} ?\n\nCette opération sera définitivement supprimée.`
+    );
+
+    if (!confirmed) return;
+
+    setDeletingId(item.id);
+    setError('');
+
+    try {
+      const response = await fetch('/api/tresorerie', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ id: item.id }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.error || 'Impossible de supprimer l’opération.'
+        );
+      }
+
+      await load();
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'Impossible de supprimer l’opération.'
+      );
+    } finally {
+      setDeletingId(null);
+    }
   }
 
   async function save(event: FormEvent) {
@@ -503,14 +546,37 @@ export default function TresoreriePage() {
                     </td>
 
                     <td style={{ textAlign: 'right' }}>
-                      <button
-                        type="button"
-                        className="btn"
-                        onClick={() => openEdit(item)}
-                        title="Modifier"
+                      <div
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 6,
+                        }}
                       >
-                        <Pencil size={14} />
-                      </button>
+                        <button
+                          type="button"
+                          className="btn"
+                          onClick={() => openEdit(item)}
+                          disabled={!!deletingId}
+                          title="Modifier"
+                        >
+                          <Pencil size={14} />
+                        </button>
+
+                        <button
+                          type="button"
+                          className="btn"
+                          onClick={() => void deleteTransaction(item)}
+                          disabled={deletingId === item.id}
+                          title="Supprimer"
+                          aria-label={`Supprimer ${item.label}`}
+                          style={{
+                            color: '#b91c1c',
+                          }}
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -589,7 +655,7 @@ export default function TresoreriePage() {
               >
                 <div>
                   <label
-                    style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 7 }}
+                    className="form-label"
                     htmlFor="transaction-date"
                   >
                     Date
@@ -610,7 +676,7 @@ export default function TresoreriePage() {
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 7 }}>
+                  <label className="form-label">
                     Type
                   </label>
                   <div
@@ -648,7 +714,7 @@ export default function TresoreriePage() {
 
                 <div>
                   <label
-                    style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 7 }}
+                    className="form-label"
                     htmlFor="transaction-category"
                   >
                     Catégorie
@@ -678,7 +744,7 @@ export default function TresoreriePage() {
 
                 <div>
                   <label
-                    style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 7 }}
+                    className="form-label"
                     htmlFor="transaction-amount"
                   >
                     Montant
@@ -701,7 +767,7 @@ export default function TresoreriePage() {
 
                 <div style={{ gridColumn: '1 / -1' }}>
                   <label
-                    style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 7 }}
+                    className="form-label"
                     htmlFor="transaction-label"
                   >
                     Libellé
@@ -723,7 +789,7 @@ export default function TresoreriePage() {
 
                 <div>
                   <label
-                    style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 7 }}
+                    className="form-label"
                     htmlFor="transaction-payment"
                   >
                     Mode de paiement
@@ -755,7 +821,7 @@ export default function TresoreriePage() {
 
                 <div>
                   <label
-                    style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 7 }}
+                    className="form-label"
                     htmlFor="transaction-note"
                   >
                     Note

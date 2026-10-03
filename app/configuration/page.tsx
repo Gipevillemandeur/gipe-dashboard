@@ -313,12 +313,11 @@ export default function ConfigurationPage() {
           </div>
 
           <h1>
-            Configuration des conseils
+            Configuration du tableau de bord
           </h1>
 
           <div className="kicker">
-            Gère les classes, la direction,
-            l’année scolaire et le listing du collège.
+            Gère les différents paramètres du tableau de bord.
           </div>
 
         </div>
