@@ -625,3 +625,185 @@ h1 {
   border-color: #efc8c4;
   color: #8a2b22;
 }
+/* =========================================================
+   MOBILE DASHBOARD
+   ========================================================= */
+
+.mobile-header {
+  display: none;
+}
+
+.mobile-overlay {
+  display: none;
+}
+
+.mobile-close-button {
+  display: none;
+}
+
+@media (max-width: 760px) {
+  .mobile-header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 64px;
+    z-index: 30;
+
+    display: flex;
+    align-items: center;
+    gap: 12px;
+
+    padding: 10px 14px;
+
+    background: #2b2321;
+    color: white;
+
+    box-shadow:
+      0 2px 12px rgba(0, 0, 0, 0.18);
+  }
+
+  .mobile-menu-button {
+    width: 42px;
+    height: 42px;
+
+    border: 0;
+    border-radius: 10px;
+
+    display: grid;
+    place-items: center;
+
+    background: #463a37;
+    color: white;
+
+    cursor: pointer;
+  }
+
+  .mobile-brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+  }
+
+  .mobile-brand-mark {
+    width: 36px;
+    height: 36px;
+
+    border-radius: 10px;
+
+    display: grid;
+    place-items: center;
+
+    background: #f59e0b;
+    color: #2b2321;
+
+    font-weight: 900;
+    flex-shrink: 0;
+  }
+
+  .mobile-brand strong {
+    display: block;
+    font-size: 14px;
+    line-height: 1.2;
+  }
+
+  .mobile-brand span {
+    display: block;
+    margin-top: 2px;
+
+    color: #d9ceca;
+    font-size: 10px;
+  }
+
+  .sidebar {
+    position: fixed;
+
+    top: 0;
+    left: 0;
+    bottom: 0;
+
+    width: min(310px, 88vw);
+
+    min-height: 100vh;
+
+    z-index: 40;
+
+    overflow-y: auto;
+
+    transform: translateX(-105%);
+    transition:
+      transform 0.22s ease;
+
+    box-shadow:
+      8px 0 30px rgba(0, 0, 0, 0.25);
+  }
+
+  .sidebar.sidebar-mobile-open {
+    transform: translateX(0);
+  }
+
+  .sidebar .brand {
+    padding-top: 22px;
+    padding-right: 54px;
+  }
+
+  .mobile-close-button {
+    display: grid;
+
+    place-items: center;
+
+    position: absolute;
+    top: 20px;
+    right: 16px;
+
+    width: 38px;
+    height: 38px;
+
+    border: 0;
+    border-radius: 10px;
+
+    background: #463a37;
+    color: white;
+
+    cursor: pointer;
+  }
+
+  .mobile-overlay {
+    display: block;
+
+    position: fixed;
+
+    inset: 0;
+
+    z-index: 35;
+
+    width: 100%;
+    height: 100%;
+
+    border: 0;
+
+    background:
+      rgba(0, 0, 0, 0.52);
+
+    cursor: pointer;
+  }
+
+  .content {
+    margin-left: 0;
+    width: 100%;
+
+    padding:
+      84px
+      16px
+      32px;
+  }
+
+  .topbar {
+    margin-bottom: 20px;
+  }
+
+  h1 {
+    font-size: 28px;
+  }
+}
