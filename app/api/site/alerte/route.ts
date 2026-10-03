@@ -10,8 +10,7 @@ async function requireAdmin() {
   const { data: authData } =
     await supabase.auth.getClaims();
 
-  const userId =
-    authData?.claims?.sub;
+  const userId = authData?.claims?.sub;
 
   if (!userId) {
     return {
@@ -71,7 +70,6 @@ async function requireAdmin() {
 
 /* =========================================================
    GET
-   Lecture du bandeau d'alerte
    ========================================================= */
 
 export async function GET() {
@@ -131,7 +129,6 @@ export async function GET() {
 
 /* =========================================================
    PUT
-   Modification du bandeau d'alerte
    ========================================================= */
 
 export async function PUT(
@@ -178,48 +175,100 @@ export async function PUT(
       ? 'urgent'
       : 'info';
 
+  const values = [
+    {
+      key: 'alert_enabled',
+      value: enabled
+        ? 'true'
+        : 'false',
+    },
+    {
+      key: 'alert_message',
+      value: message,
+    },
+    {
+      key: 'alert_type',
+      value: type,
+    },
+  ];
+
   /*
-   * On utilise upsert afin de fonctionner
-   * aussi bien si les paramètres existent
-   * déjà que s'ils doivent être créés.
+   * La table settings n'a pas de contrainte UNIQUE
+   * sur la colonne key.
+   *
+   * On met donc à jour les paramètres existants
+   * directement par leur clé.
+   *
+   * S'ils n'existent pas encore, on les crée.
    */
 
-  const {
-    error,
-  } = await admin
-    .from('settings')
-    .upsert(
-      [
-        {
-          key: 'alert_enabled',
-          value: enabled
-            ? 'true'
-            : 'false',
-        },
-        {
-          key: 'alert_message',
-          value: message,
-        },
-        {
-          key: 'alert_type',
-          value: type,
-        },
-      ],
-      {
-        onConflict: 'key',
-      }
-    );
+  for (const item of values) {
+    const {
+      data: existingRows,
+      error: selectError,
+    } = await admin
+      .from('settings')
+      .select('key')
+      .eq('key', item.key);
 
-  if (error) {
-    return NextResponse.json(
-      {
-        error:
-          `Impossible d’enregistrer le bandeau : ${error.message}`,
-      },
-      {
-        status: 500,
+    if (selectError) {
+      return NextResponse.json(
+        {
+          error:
+            `Impossible de lire le paramètre ${item.key} : ${selectError.message}`,
+        },
+        {
+          status: 500,
+        }
+      );
+    }
+
+    if (
+      existingRows &&
+      existingRows.length > 0
+    ) {
+      const {
+        error: updateError,
+      } = await admin
+        .from('settings')
+        .update({
+          value: item.value,
+        })
+        .eq('key', item.key);
+
+      if (updateError) {
+        return NextResponse.json(
+          {
+            error:
+              `Impossible de modifier le paramètre ${item.key} : ${updateError.message}`,
+          },
+          {
+            status: 500,
+          }
+        );
       }
-    );
+    } else {
+      const {
+        error: insertError,
+      } = await admin
+        .from('settings')
+        .insert({
+          key: item.key,
+          value: item.value,
+        });
+
+      if (insertError) {
+        return NextResponse.json(
+          {
+            error:
+              `Impossible de créer le paramètre ${item.key} : ${insertError.message}`,
+          },
+          {
+            status: 500,
+          }
+        );
+      }
+    }
   }
 
   return NextResponse.json({
