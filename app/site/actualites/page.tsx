@@ -486,8 +486,8 @@ export default function SiteActualitesPage() {
         </div>
       )}
 
-      <section className="card section-card">
-        <div className="section-head">
+      <section className="card section-card actualites-card">
+        <div className="section-head actualites-section-head">
           <div>
             <h2 className="section-title">
               Actualités publiées
@@ -587,6 +587,7 @@ export default function SiteActualitesPage() {
                   }}
                 >
                   <div
+                    className="actualites-item-main"
                     style={{
                       display: 'flex',
                       gap: 14,
@@ -695,7 +696,7 @@ export default function SiteActualitesPage() {
                   </div>
 
                   <div
-                    className="btn-row"
+                    className="btn-row actualites-item-actions"
                     style={{
                       flexShrink: 0,
                     }}
@@ -752,6 +753,7 @@ export default function SiteActualitesPage() {
 
       {showForm && (
         <div
+          className="actualites-modal-backdrop"
           role="dialog"
           aria-modal="true"
           style={{
@@ -765,7 +767,7 @@ export default function SiteActualitesPage() {
           }}
         >
           <div
-            className="card"
+            className="card actualites-modal-card"
             style={{
               width:
                 'min(760px, 100%)',
@@ -838,6 +840,7 @@ export default function SiteActualitesPage() {
               </label>
 
               <div
+                className="actualites-two-columns"
                 style={{
                   display: 'grid',
                   gridTemplateColumns:
@@ -1188,7 +1191,7 @@ export default function SiteActualitesPage() {
               )}
 
               <div
-                className="btn-row"
+                className="btn-row actualites-form-actions"
                 style={{
                   justifyContent:
                     'flex-end',
@@ -1221,6 +1224,129 @@ export default function SiteActualitesPage() {
           </div>
         </div>
       )}
+
+
+      <style jsx>{`
+        .actualites-card {
+          min-width: 0;
+        }
+
+        .actualites-section-head {
+          gap: 18px;
+        }
+
+        .actualites-list-item {
+          gap: 18px;
+        }
+
+        .actualites-item-main {
+          min-width: 0;
+        }
+
+        .actualites-item-actions {
+          flex-wrap: wrap;
+          justify-content: flex-end;
+        }
+
+        .actualites-modal-backdrop {
+          box-sizing: border-box;
+        }
+
+        .actualites-modal-card {
+          box-sizing: border-box;
+        }
+
+        @media (max-width: 700px) {
+          .actualites-section-head {
+            align-items: stretch !important;
+            flex-direction: column !important;
+          }
+
+          .actualites-section-head > div:last-child {
+            width: 100% !important;
+          }
+
+          .actualites-list-item {
+            flex-direction: column !important;
+            align-items: stretch !important;
+            gap: 14px !important;
+          }
+
+          .actualites-item-main {
+            width: 100%;
+          }
+
+          .actualites-item-actions {
+            width: 100%;
+            justify-content: stretch !important;
+          }
+
+          .actualites-item-actions .btn {
+            flex: 1 1 0;
+            justify-content: center;
+          }
+
+          .actualites-modal-backdrop {
+            padding: 10px !important;
+          }
+
+          .actualites-modal-card {
+            width: 100% !important;
+            margin: 10px auto !important;
+            padding: 16px !important;
+            border-radius: 14px !important;
+          }
+
+          .actualites-modal-card .section-head {
+            align-items: flex-start !important;
+            gap: 12px !important;
+          }
+
+          .actualites-modal-card .section-head .btn {
+            flex-shrink: 0;
+          }
+
+          .actualites-two-columns {
+            grid-template-columns: 1fr !important;
+          }
+
+          .actualites-form-actions {
+            flex-direction: column-reverse !important;
+            align-items: stretch !important;
+          }
+
+          .actualites-form-actions .btn {
+            width: 100%;
+            justify-content: center;
+          }
+
+          .actualites-modal-card input[type='file'] {
+            width: 100%;
+            max-width: 100%;
+            box-sizing: border-box;
+          }
+        }
+
+        @media (max-width: 480px) {
+          .actualites-item-main {
+            gap: 10px !important;
+          }
+
+          .actualites-item-main > img,
+          .actualites-item-main > div:first-child {
+            width: 58px !important;
+            height: 58px !important;
+          }
+
+          .actualites-modal-card {
+            padding: 14px !important;
+          }
+
+          .actualites-modal-card .section-title {
+            font-size: 19px !important;
+          }
+        }
+      `}</style>
     </>
   );
 }
