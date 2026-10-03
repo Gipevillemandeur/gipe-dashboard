@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
-  ArrowLeft,
   GraduationCap,
   Users,
   CalendarDays,
@@ -322,17 +321,6 @@ export default function ConfigurationPage() {
 
         </div>
 
-        <div className="topbar-right">
-
-          <Link
-            className="btn"
-            href="/conseils"
-          >
-            <ArrowLeft size={14} />
-            Conseils de classe
-          </Link>
-
-        </div>
 
       </div>
 
