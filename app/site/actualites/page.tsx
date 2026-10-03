@@ -858,9 +858,15 @@ export default function SiteActualitesPage() {
                 >
                   Date
                   <input
-                    className="input"
+                    className="input actualites-date-input"
                     type="date"
                     value={date}
+                    style={{
+                      width: '100%',
+                      minWidth: 0,
+                      maxWidth: '100%',
+                      boxSizing: 'border-box',
+                    }}
                     onChange={(e) =>
                       setDate(
                         e.target.value
@@ -1254,6 +1260,14 @@ export default function SiteActualitesPage() {
 
         .actualites-modal-card {
           box-sizing: border-box;
+        }
+
+        .actualites-date-input {
+          width: 100% !important;
+          min-width: 0 !important;
+          max-width: 100% !important;
+          box-sizing: border-box !important;
+          display: block !important;
         }
 
         @media (max-width: 700px) {
