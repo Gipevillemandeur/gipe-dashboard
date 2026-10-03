@@ -21,7 +21,7 @@ const items = [
   { href: '/conseils', label: 'Conseils de classe', icon: Users },
   { href: '/adherents', label: 'Adhérents', icon: UserRoundPlus },
   { href: '/tresorerie', label: 'Trésorerie', icon: WalletCards },
-  { href: '#', label: 'Site internet', icon: Globe2 },
+  { href: '/site', label: 'Site internet', icon: Globe2 },
   { href: '#', label: 'Agenda', icon: CalendarDays },
   { href: '#', label: 'Documents', icon: FileText },
 ];
