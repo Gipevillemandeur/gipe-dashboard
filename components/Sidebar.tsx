@@ -12,78 +12,208 @@ import {
   UserRoundPlus,
   Settings,
   WalletCards,
+  Menu,
+  X,
 } from 'lucide-react';
+import { useEffect, useState } from 'react';
 
 import LogoutButton from '@/components/LogoutButton';
 
 const items = [
-  { href: '/', label: 'Tableau de bord', icon: Home },
-  { href: '/conseils', label: 'Conseils de classe', icon: Users },
-  { href: '/adherents', label: 'Adhérents', icon: UserRoundPlus },
-  { href: '/tresorerie', label: 'Trésorerie', icon: WalletCards },
-  { href: '/site', label: 'Site internet', icon: Globe2 },
-  { href: '#', label: 'Agenda', icon: CalendarDays },
-  { href: '#', label: 'Documents', icon: FileText },
+  {
+    href: '/',
+    label: 'Tableau de bord',
+    icon: Home,
+  },
+  {
+    href: '/conseils',
+    label: 'Conseils de classe',
+    icon: Users,
+  },
+  {
+    href: '/adherents',
+    label: 'Adhérents',
+    icon: UserRoundPlus,
+  },
+  {
+    href: '/tresorerie',
+    label: 'Trésorerie',
+    icon: WalletCards,
+  },
+  {
+    href: '/site',
+    label: 'Site internet',
+    icon: Globe2,
+  },
+  {
+    href: '#',
+    label: 'Agenda',
+    icon: CalendarDays,
+  },
+  {
+    href: '#',
+    label: 'Documents',
+    icon: FileText,
+  },
 ];
 
 export default function Sidebar() {
   const pathname = usePathname();
 
+  const [mobileOpen, setMobileOpen] =
+    useState(false);
+
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [pathname]);
+
+  useEffect(() => {
+    if (!mobileOpen) {
+      document.body.style.overflow = '';
+      return;
+    }
+
+    document.body.style.overflow = 'hidden';
+
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [mobileOpen]);
+
   return (
-    <aside className="sidebar">
-      <div className="brand">
-        <div className="brand-mark">G</div>
-
-        <div className="brand-text">
-          <strong>GIPE Villemandeur</strong>
-          <span>Centre de gestion</span>
-        </div>
-      </div>
-
-      <nav className="nav">
-        {items.map((item) => {
-          const Icon = item.icon;
-          const active =
-            item.href !== '#' &&
-            (pathname === item.href ||
-              pathname.startsWith(`${item.href}/`));
-
-          return (
-            <Link
-              className={active ? 'active' : ''}
-              href={item.href}
-              key={item.label}
-            >
-              <Icon size={16} />
-              {item.label}
-            </Link>
-          );
-        })}
-
-        <div className="nav-sep" />
-
-        <Link
-          className={
-            pathname === '/configuration' ||
-            pathname.startsWith('/configuration/') ||
-            pathname === '/import-college'
-              ? 'active'
-              : ''
+    <>
+      {/* Barre mobile */}
+      <header className="mobile-header">
+        <button
+          type="button"
+          className="mobile-menu-button"
+          onClick={() =>
+            setMobileOpen(true)
           }
-          href="/configuration"
+          aria-label="Ouvrir le menu"
         >
-          <Settings size={16} />
-          Configuration
-        </Link>
+          <Menu size={22} />
+        </button>
 
-        <Link href="#">
-          <BookOpen size={16} />
-          Guide de passation
-        </Link>
+        <div className="mobile-brand">
+          <div className="mobile-brand-mark">
+            G
+          </div>
 
-        <div className="nav-sep" />
-        <LogoutButton />
-      </nav>
-    </aside>
+          <div>
+            <strong>
+              GIPE Villemandeur
+            </strong>
+
+            <span>
+              Centre de gestion
+            </span>
+          </div>
+        </div>
+      </header>
+
+      {/* Fond derrière le menu */}
+      {mobileOpen && (
+        <button
+          type="button"
+          className="mobile-overlay"
+          onClick={() =>
+            setMobileOpen(false)
+          }
+          aria-label="Fermer le menu"
+        />
+      )}
+
+      {/* Menu */}
+      <aside
+        className={`sidebar ${
+          mobileOpen
+            ? 'sidebar-mobile-open'
+            : ''
+        }`}
+      >
+        <div className="brand">
+          <div className="brand-mark">
+            G
+          </div>
+
+          <div className="brand-text">
+            <strong>
+              GIPE Villemandeur
+            </strong>
+
+            <span>
+              Centre de gestion
+            </span>
+          </div>
+
+          <button
+            type="button"
+            className="mobile-close-button"
+            onClick={() =>
+              setMobileOpen(false)
+            }
+            aria-label="Fermer le menu"
+          >
+            <X size={22} />
+          </button>
+        </div>
+
+        <nav className="nav">
+          {items.map((item) => {
+            const Icon = item.icon;
+
+            const active =
+              item.href !== '#' &&
+              (pathname === item.href ||
+                pathname.startsWith(
+                  `${item.href}/`
+                ));
+
+            return (
+              <Link
+                className={
+                  active ? 'active' : ''
+                }
+                href={item.href}
+                key={item.label}
+              >
+                <Icon size={18} />
+                {item.label}
+              </Link>
+            );
+          })}
+
+          <div className="nav-sep" />
+
+          <Link
+            className={
+              pathname ===
+                '/configuration' ||
+              pathname.startsWith(
+                '/configuration/'
+              ) ||
+              pathname ===
+                '/import-college'
+                ? 'active'
+                : ''
+            }
+            href="/configuration"
+          >
+            <Settings size={18} />
+            Configuration
+          </Link>
+
+          <Link href="#">
+            <BookOpen size={18} />
+            Guide de passation
+          </Link>
+
+          <div className="nav-sep" />
+
+          <LogoutButton />
+        </nav>
+      </aside>
+    </>
   );
 }
