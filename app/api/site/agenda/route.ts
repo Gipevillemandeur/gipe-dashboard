@@ -4,15 +4,6 @@ import { createAdminClient } from '@/lib/supabase/admin';
 
 const MAX_FILE_SIZE = 8 * 1024 * 1024;
 
-const CATEGORIES = [
-  'Réunion',
-  'Événement',
-  'Conseil de classe',
-  'Sortie',
-  'GIPE',
-  'Autre',
-];
-
 async function requireAdmin() {
   const supabase = await createClient();
 
@@ -80,10 +71,6 @@ function validTime(value: string) {
   if (!value) return true;
 
   return /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
-}
-
-function validateCategory(value: string) {
-  return !value || CATEGORIES.includes(value);
 }
 
 function getExtension(fileName: string) {
@@ -298,16 +285,6 @@ export async function POST(
       );
     }
 
-    if (!validateCategory(category)) {
-      return NextResponse.json(
-        {
-          error:
-            'La catégorie est invalide.',
-        },
-        { status: 400 }
-      );
-    }
-
     let imageUrl = '';
 
     if (
@@ -464,16 +441,6 @@ export async function PUT(
         {
           error:
             'L’heure est invalide.',
-        },
-        { status: 400 }
-      );
-    }
-
-    if (!validateCategory(category)) {
-      return NextResponse.json(
-        {
-          error:
-            'La catégorie est invalide.',
         },
         { status: 400 }
       );
