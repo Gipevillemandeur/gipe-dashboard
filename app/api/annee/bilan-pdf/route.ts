@@ -15,7 +15,7 @@ async function requireAdmin() {
   if (!userId) {
     return {
       error: NextResponse.json(
-        { error: 'Non authentifie.' },
+        { error: 'Non authentifié.' },
         { status: 401 }
       ),
     };
@@ -34,7 +34,7 @@ async function requireAdmin() {
       error: NextResponse.json(
         {
           error:
-            'Impossible de verifier les droits administrateur.',
+            'Impossible de vérifier les droits administrateur.',
         },
         { status: 500 }
       ),
@@ -44,7 +44,7 @@ async function requireAdmin() {
   if (!data) {
     return {
       error: NextResponse.json(
-        { error: 'Compte non autorise.' },
+        { error: 'Compte non autorisé.' },
         { status: 403 }
       ),
     };
@@ -67,7 +67,7 @@ async function getAnnualReportData() {
   }
 
   if (!year) {
-    throw new Error('Aucune annee scolaire active.');
+    throw new Error('Aucune année scolaire active.');
   }
 
   const { data: memberships, error: membershipsError } = await admin
@@ -157,9 +157,11 @@ export async function GET() {
     };
 
     const pdf = await buildAnnualReportPdf(report);
-    const body = new Blob([pdf], {
-      type: 'application/pdf',
-    });
+
+    // pdf-lib retourne un Uint8Array dont le type peut être basé
+    // sur ArrayBufferLike. Next/TypeScript attend ici un vrai ArrayBuffer.
+    const body = new ArrayBuffer(pdf.byteLength);
+    new Uint8Array(body).set(pdf);
 
     return new NextResponse(body, {
       status: 200,
@@ -171,14 +173,14 @@ export async function GET() {
       },
     });
   } catch (error) {
-    console.error('Erreur generation bilan PDF:', error);
+    console.error('Erreur génération bilan PDF:', error);
 
     return NextResponse.json(
       {
         error:
           error instanceof Error
             ? error.message
-            : 'Impossible de generer le bilan PDF.',
+            : 'Impossible de générer le bilan PDF.',
       },
       { status: 500 }
     );
