@@ -893,46 +893,62 @@ export default function ConfigurationPage() {
                 style={{
                   display: 'grid',
                   gridTemplateColumns:
-                    'repeat(auto-fill, minmax(150px, 1fr))',
-                  gap: 10,
+                    'repeat(auto-fit, minmax(120px, 1fr))',
+                  gap: 8,
                 }}
               >
 
                 {closureResult
                   .adherentsByClass
-                  .map(
-                    (item) => (
-
-                      <div
-                        key={
-                          item.className
-                        }
+                  .map((item) => (
+                    <div
+                      key={item.className}
+                      style={{
+                        minWidth: 0,
+                        padding: '9px 10px 9px 12px',
+                        border: '1px solid #eee2d7',
+                        borderLeft: '3px solid #7d201a',
+                        borderRadius: 10,
+                        background: '#fffaf3',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: 8,
+                      }}
+                    >
+                      <span
                         style={{
-                          padding:
-                            '12px 14px',
-                          border:
-                            '1px solid #e5e7eb',
-                          borderRadius:
-                            10,
-                          display:
-                            'flex',
-                          justifyContent:
-                            'space-between',
+                          minWidth: 0,
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                          fontSize: 12,
+                          fontWeight: 700,
+                          color: '#334155',
+                        }}
+                        title={item.className}
+                      >
+                        {item.className}
+                      </span>
+
+                      <strong
+                        style={{
+                          flexShrink: 0,
+                          width: 28,
+                          height: 28,
+                          borderRadius: 8,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          background: '#7d201a',
+                          color: '#fff',
+                          fontSize: 12,
                         }}
                       >
-
-                        <span>
-                          {item.className}
-                        </span>
-
-                        <strong>
-                          {item.count}
-                        </strong>
-
-                      </div>
-
-                    )
-                  )}
+                        {item.count}
+                      </strong>
+                    </div>
+                  ))}
 
               </div>
 
@@ -1196,47 +1212,62 @@ export default function ConfigurationPage() {
                         style={{
                           display: 'grid',
                           gridTemplateColumns:
-                            'repeat(auto-fill, minmax(140px, 1fr))',
+                            'repeat(auto-fit, minmax(120px, 1fr))',
                           gap: 8,
                         }}
                       >
 
                         {closurePreview
                           .adherentsByClass
-                          .map(
-                            (item) => (
-
-                              <div
-                                key={
-                                  item.className
-                                }
+                          .map((item) => (
+                            <div
+                              key={item.className}
+                              style={{
+                                minWidth: 0,
+                                padding: '9px 10px 9px 12px',
+                                border: '1px solid #eee2d7',
+                                borderLeft: '3px solid #7d201a',
+                                borderRadius: 10,
+                                background: '#fffaf3',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                gap: 8,
+                              }}
+                            >
+                              <span
                                 style={{
-                                  padding:
-                                    '10px 12px',
-                                  border:
-                                    '1px solid #e5e7eb',
-                                  borderRadius:
-                                    8,
-                                  display:
-                                    'flex',
-                                  justifyContent:
-                                    'space-between',
-                                  fontSize: 13,
+                                  minWidth: 0,
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                  whiteSpace: 'nowrap',
+                                  fontSize: 12,
+                                  fontWeight: 700,
+                                  color: '#334155',
+                                }}
+                                title={item.className}
+                              >
+                                {item.className}
+                              </span>
+
+                              <strong
+                                style={{
+                                  flexShrink: 0,
+                                  width: 28,
+                                  height: 28,
+                                  borderRadius: 8,
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  background: '#7d201a',
+                                  color: '#fff',
+                                  fontSize: 12,
                                 }}
                               >
-
-                                <span>
-                                  {item.className}
-                                </span>
-
-                                <strong>
-                                  {item.count}
-                                </strong>
-
-                              </div>
-
-                            )
-                          )}
+                                {item.count}
+                              </strong>
+                            </div>
+                          ))}
 
                       </div>
 
