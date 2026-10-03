@@ -24,15 +24,6 @@ type ClosureResult = {
   closedAt: string;
 };
 
-type LastImport = {
-  file_name: string;
-  imported_at: string;
-  classes_count: number;
-  students_count: number;
-  teachers_count: number;
-  direction_count: number;
-};
-
 type ClosurePreview = {
   schoolYear: string;
   totalAdherents: number;
@@ -44,6 +35,15 @@ type ClosurePreview = {
   totalDepenses: number | null;
   solde: number | null;
   canClose: boolean;
+};
+
+type LastImport = {
+  file_name: string;
+  imported_at: string;
+  classes_count: number;
+  students_count: number;
+  teachers_count: number;
+  direction_count: number;
 };
 
 export default function ConfigurationPage() {
@@ -893,61 +893,62 @@ export default function ConfigurationPage() {
                 style={{
                   display: 'grid',
                   gridTemplateColumns:
-                    'repeat(auto-fit, minmax(120px, 1fr))',
-                  gap: 8,
+                    'repeat(auto-fit, minmax(145px, 1fr))',
+                  gap: 10,
                 }}
               >
 
                 {closureResult
                   .adherentsByClass
                   .map((item) => (
+
                     <div
                       key={item.className}
                       style={{
-                        minWidth: 0,
-                        padding: '9px 10px 9px 12px',
-                        border: '1px solid #eee2d7',
-                        borderLeft: '3px solid #7d201a',
+                        minHeight: 48,
+                        padding: '8px 14px',
+                        border: '1px solid #eadfd5',
                         borderRadius: 10,
                         background: '#fffaf3',
                         display: 'flex',
                         alignItems: 'center',
-                        justifyContent: 'space-between',
-                        gap: 8,
+                        justifyContent: 'center',
+                        gap: 10,
+                        boxSizing: 'border-box',
                       }}
                     >
                       <span
                         style={{
-                          minWidth: 0,
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap',
-                          fontSize: 12,
-                          fontWeight: 700,
-                          color: '#334155',
+                          fontSize: 13,
+                          fontWeight: 600,
+                          lineHeight: 1.2,
+                          textAlign: 'center',
                         }}
-                        title={item.className}
                       >
                         {item.className}
                       </span>
 
-                      <strong
+                      <span
                         style={{
-                          flexShrink: 0,
-                          width: 28,
+                          minWidth: 28,
                           height: 28,
+                          padding: '0 8px',
                           borderRadius: 8,
+                          background: '#8f241d',
+                          color: '#fff',
                           display: 'inline-flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          background: '#7d201a',
-                          color: '#fff',
                           fontSize: 12,
+                          fontWeight: 800,
+                          lineHeight: 1,
+                          boxSizing: 'border-box',
                         }}
                       >
                         {item.count}
-                      </strong>
+                      </span>
                     </div>
+
                   ))}
 
               </div>
@@ -971,13 +972,10 @@ export default function ConfigurationPage() {
           style={{
             position: 'fixed',
             inset: 0,
-            background:
-              'rgba(15, 23, 42, 0.45)',
+            background: 'rgba(15, 23, 42, 0.45)',
             display: 'flex',
-            alignItems:
-              'center',
-            justifyContent:
-              'center',
+            alignItems: 'center',
+            justifyContent: 'center',
             padding: 20,
             zIndex: 1000,
           }}
@@ -990,17 +988,17 @@ export default function ConfigurationPage() {
               maxWidth: 620,
               maxHeight: '90vh',
               overflowY: 'auto',
+              padding: '18px 20px 20px',
+              boxSizing: 'border-box',
               background: '#fff',
-              boxShadow:
-                '0 20px 50px rgba(15, 23, 42, 0.20)',
+              boxShadow: '0 20px 50px rgba(15, 23, 42, 0.20)',
             }}
           >
 
             <div
               style={{
                 display: 'flex',
-                alignItems:
-                  'center',
+                alignItems: 'center',
                 gap: 10,
               }}
             >
@@ -1009,15 +1007,12 @@ export default function ConfigurationPage() {
 
               <h2
                 className="section-title"
-                style={{
-                  margin: 0,
-                }}
+                style={{ margin: 0 }}
               >
                 Clôturer l’année scolaire
               </h2>
 
             </div>
-
 
             {loadingPreview ? (
 
@@ -1041,10 +1036,8 @@ export default function ConfigurationPage() {
                     marginTop: 18,
                     padding: 12,
                     borderRadius: 10,
-                    background:
-                      '#fef2f2',
-                    color:
-                      '#b91c1c',
+                    background: '#fef2f2',
+                    color: '#b91c1c',
                     fontSize: 13,
                   }}
                 >
@@ -1054,8 +1047,7 @@ export default function ConfigurationPage() {
                 <div
                   style={{
                     display: 'flex',
-                    justifyContent:
-                      'flex-end',
+                    justifyContent: 'flex-end',
                     marginTop: 22,
                   }}
                 >
@@ -1063,9 +1055,7 @@ export default function ConfigurationPage() {
                   <button
                     type="button"
                     className="btn"
-                    onClick={
-                      closeClosure
-                    }
+                    onClick={closeClosure}
                   >
                     Fermer
                   </button>
@@ -1085,33 +1075,23 @@ export default function ConfigurationPage() {
                     lineHeight: 1.6,
                   }}
                 >
-                  Voici l’aperçu du bilan qui sera enregistré
-                  lors de la clôture.
+                  Voici l’aperçu du bilan qui sera enregistré lors de la clôture.
                 </p>
-
-
-                {/* ANNÉE */}
 
                 <div
                   style={{
                     marginTop: 18,
-                    padding:
-                      '14px 16px',
+                    padding: '14px 16px',
                     borderRadius: 10,
-                    background:
-                      '#fffaf3',
-                    border:
-                      '1px solid #eee2d7',
+                    background: '#fffaf3',
+                    border: '1px solid #eee2d7',
                   }}
                 >
-
                   <div
                     style={{
                       fontSize: 10,
-                      textTransform:
-                        'uppercase',
-                      letterSpacing:
-                        '.08em',
+                      textTransform: 'uppercase',
+                      letterSpacing: '.08em',
                       fontWeight: 700,
                       color: '#756a67',
                     }}
@@ -1129,22 +1109,16 @@ export default function ConfigurationPage() {
                   >
                     {closurePreview.schoolYear}
                   </div>
-
                 </div>
-
-
-                {/* ADHÉRENTS */}
 
                 <div
                   style={{
                     marginTop: 14,
                     padding: 16,
                     borderRadius: 10,
-                    border:
-                      '1px solid #e5e7eb',
+                    border: '1px solid #e5e7eb',
                   }}
                 >
-
                   <div className="stat-label">
                     Total des adhérents
                   </div>
@@ -1166,26 +1140,15 @@ export default function ConfigurationPage() {
                       fontSize: 12,
                     }}
                   >
-                    Un adhérent compte une seule fois,
-                    quel que soit le nombre de ses enfants.
+                    Un adhérent compte une seule fois, quel que soit le nombre de ses enfants.
                   </div>
-
                 </div>
 
-
-                {/* RÉPARTITION */}
-
-                <div
-                  style={{
-                    marginTop: 20,
-                  }}
-                >
+                <div style={{ marginTop: 20 }}>
 
                   <div
                     className="stat-label"
-                    style={{
-                      marginBottom: 10,
-                    }}
+                    style={{ marginBottom: 10 }}
                   >
                     Répartition des adhérents par classe
                   </div>
@@ -1197,8 +1160,8 @@ export default function ConfigurationPage() {
                       style={{
                         padding: 14,
                         borderRadius: 10,
-                        background:
-                          '#f8fafc',
+                        background: '#f8fafc',
+                        textAlign: 'center',
                       }}
                     >
                       Aucun adhérent associé à une classe.
@@ -1212,74 +1175,75 @@ export default function ConfigurationPage() {
                         style={{
                           display: 'grid',
                           gridTemplateColumns:
-                            'repeat(auto-fit, minmax(120px, 1fr))',
-                          gap: 8,
+                            'repeat(auto-fit, minmax(145px, 1fr))',
+                          gap: 10,
                         }}
                       >
 
-                        {closurePreview
-                          .adherentsByClass
-                          .map((item) => (
-                            <div
-                              key={item.className}
+                        {closurePreview.adherentsByClass.map((item) => (
+
+                          <div
+                            key={item.className}
+                            style={{
+                              minHeight: 48,
+                              padding: '8px 14px',
+                              border: '1px solid #eadfd5',
+                              borderRadius: 10,
+                              background: '#fffaf3',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: 10,
+                              boxSizing: 'border-box',
+                            }}
+                          >
+                            <span
                               style={{
-                                minWidth: 0,
-                                padding: '9px 10px 9px 12px',
-                                border: '1px solid #eee2d7',
-                                borderLeft: '3px solid #7d201a',
-                                borderRadius: 10,
-                                background: '#fffaf3',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'space-between',
-                                gap: 8,
+                                fontSize: 13,
+                                fontWeight: 600,
+                                lineHeight: 1.2,
+                                textAlign: 'center',
                               }}
                             >
-                              <span
-                                style={{
-                                  minWidth: 0,
-                                  overflow: 'hidden',
-                                  textOverflow: 'ellipsis',
-                                  whiteSpace: 'nowrap',
-                                  fontSize: 12,
-                                  fontWeight: 700,
-                                  color: '#334155',
-                                }}
-                                title={item.className}
-                              >
-                                {item.className}
-                              </span>
+                              {item.className}
+                            </span>
 
-                              <strong
-                                style={{
-                                  flexShrink: 0,
-                                  width: 28,
-                                  height: 28,
-                                  borderRadius: 8,
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  background: '#7d201a',
-                                  color: '#fff',
-                                  fontSize: 12,
-                                }}
-                              >
-                                {item.count}
-                              </strong>
-                            </div>
-                          ))}
+                            <span
+                              style={{
+                                minWidth: 28,
+                                height: 28,
+                                padding: '0 8px',
+                                borderRadius: 8,
+                                background: '#8f241d',
+                                color: '#fff',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontSize: 12,
+                                fontWeight: 800,
+                                lineHeight: 1,
+                                boxSizing: 'border-box',
+                              }}
+                            >
+                              {item.count}
+                            </span>
+                          </div>
+
+                        ))}
 
                       </div>
 
                       <div
                         style={{
                           marginTop: 9,
+                          padding: '0 6px',
                           fontSize: 11,
+                          lineHeight: 1.45,
                           color: '#64748b',
+                          textAlign: 'center',
                         }}
                       >
-                        Un même adhérent peut apparaître dans
-                        plusieurs classes s’il a plusieurs enfants.
+                        Un même adhérent peut apparaître dans plusieurs classes s’il a plusieurs enfants.
                       </div>
 
                     </>
@@ -1288,20 +1252,15 @@ export default function ConfigurationPage() {
 
                 </div>
 
-
-                {/* TRÉSORERIE */}
-
                 <div
                   style={{
                     marginTop: 20,
                     padding: 14,
                     borderRadius: 10,
-                    background:
-                      '#f8fafc',
+                    background: '#f8fafc',
                     fontSize: 12,
                   }}
                 >
-
                   <div
                     style={{
                       fontWeight: 700,
@@ -1314,33 +1273,22 @@ export default function ConfigurationPage() {
                   <div
                     style={{
                       display: 'grid',
-                      gridTemplateColumns:
-                        'repeat(3, 1fr)',
+                      gridTemplateColumns: 'repeat(3, 1fr)',
                       gap: 10,
                     }}
                   >
-
                     <div>
-                      <div className="stat-label">
-                        Recettes
-                      </div>
+                      <div className="stat-label">Recettes</div>
                       <strong>—</strong>
                     </div>
-
                     <div>
-                      <div className="stat-label">
-                        Dépenses
-                      </div>
+                      <div className="stat-label">Dépenses</div>
                       <strong>—</strong>
                     </div>
-
                     <div>
-                      <div className="stat-label">
-                        Solde
-                      </div>
+                      <div className="stat-label">Solde</div>
                       <strong>—</strong>
                     </div>
-
                   </div>
 
                   <div
@@ -1351,23 +1299,14 @@ export default function ConfigurationPage() {
                   >
                     La trésorerie sera intégrée ultérieurement.
                   </div>
-
                 </div>
 
-
-                {/* NOUVELLE ANNÉE */}
-
-                <div
-                  style={{
-                    marginTop: 22,
-                  }}
-                >
+                <div style={{ marginTop: 22 }}>
 
                   <label
                     htmlFor="new-school-year"
                     style={{
-                      display:
-                        'block',
+                      display: 'block',
                       fontSize: 13,
                       fontWeight: 600,
                       marginBottom: 7,
@@ -1379,26 +1318,17 @@ export default function ConfigurationPage() {
                   <input
                     id="new-school-year"
                     type="text"
-                    value={
-                      newYearLabel
-                    }
-                    onChange={(
-                      event
-                    ) =>
-                      setNewYearLabel(
-                        event.target.value
-                      )
+                    value={newYearLabel}
+                    onChange={(event) =>
+                      setNewYearLabel(event.target.value)
                     }
                     placeholder="2027-2028"
                     className="input"
                     autoFocus
-                    disabled={
-                      closing
-                    }
+                    disabled={closing}
                   />
 
                 </div>
-
 
                 {confirmClosure && (
 
@@ -1407,42 +1337,21 @@ export default function ConfigurationPage() {
                       marginTop: 16,
                       padding: 14,
                       borderRadius: 10,
-                      background:
-                        '#fff7ed',
-                      border:
-                        '1px solid #fed7aa',
-                      color:
-                        '#9a3412',
+                      background: '#fff7ed',
+                      border: '1px solid #fed7aa',
+                      color: '#9a3412',
                       fontSize: 13,
                       lineHeight: 1.5,
                     }}
                   >
-
-                    <strong>
-                      Dernière vérification
-                    </strong>
-
+                    <strong>Dernière vérification</strong>
                     <br />
-
-                    Tu vas clôturer{' '}
-                    <strong>
-                      {closurePreview.schoolYear}
-                    </strong>{' '}
-                    et créer l’année{' '}
-                    <strong>
-                      {newYearLabel || '—'}
-                    </strong>.
-
-                    <br />
-                    <br />
-
-                    Le bilan sera enregistré et l’ancienne
-                    année passera dans l’historique.
-
+                    Tu vas clôturer <strong>{closurePreview.schoolYear}</strong> et créer l’année <strong>{newYearLabel || '—'}</strong>.
+                    <br /><br />
+                    Le bilan sera enregistré et l’ancienne année passera dans l’historique.
                   </div>
 
                 )}
-
 
                 {error && (
 
@@ -1451,10 +1360,8 @@ export default function ConfigurationPage() {
                       marginTop: 14,
                       padding: 12,
                       borderRadius: 10,
-                      background:
-                        '#fef2f2',
-                      color:
-                        '#b91c1c',
+                      background: '#fef2f2',
+                      color: '#b91c1c',
                       fontSize: 13,
                     }}
                   >
@@ -1463,26 +1370,19 @@ export default function ConfigurationPage() {
 
                 )}
 
-
                 <div
                   style={{
                     display: 'flex',
-                    justifyContent:
-                      'flex-end',
+                    justifyContent: 'flex-end',
                     gap: 10,
                     marginTop: 24,
                   }}
                 >
-
                   <button
                     type="button"
                     className="btn"
-                    onClick={
-                      closeClosure
-                    }
-                    disabled={
-                      closing
-                    }
+                    onClick={closeClosure}
+                    disabled={closing}
                   >
                     Annuler
                   </button>
@@ -1490,12 +1390,8 @@ export default function ConfigurationPage() {
                   <button
                     type="button"
                     className="btn btn-primary"
-                    onClick={
-                      handleClosure
-                    }
-                    disabled={
-                      closing
-                    }
+                    onClick={handleClosure}
+                    disabled={closing}
                   >
                     {closing
                       ? 'Clôture en cours…'
@@ -1503,7 +1399,6 @@ export default function ConfigurationPage() {
                         ? 'Clôturer définitivement'
                         : 'Continuer vers la confirmation'}
                   </button>
-
                 </div>
 
               </>
@@ -1515,7 +1410,6 @@ export default function ConfigurationPage() {
         </div>
 
       )}
-
 
     </>
   );
