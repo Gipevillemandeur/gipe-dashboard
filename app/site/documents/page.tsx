@@ -351,8 +351,8 @@ export default function SiteDocumentsPage() {
           .documents-search-wrap { width: 100%; }
           .documents-list-item { flex-direction: column !important; align-items: stretch !important; padding: 14px !important; gap: 14px !important; }
           .documents-item-main { width: 100%; }
-          .documents-item-actions { width: 100%; margin-left: 0; gap: 10px; justify-content: center; }
-          .documents-item-actions .btn { flex: 1 1 0; min-width: 0; justify-content: center; }
+          .documents-item-actions { width: auto; margin-left: 0; gap: 10px; justify-content: center; align-self: center; }
+          .documents-item-actions .btn { flex: 0 0 auto; width: auto; min-width: 0; justify-content: center; }
           .documents-modal-backdrop { padding: 10px !important; align-items: flex-start !important; }
           .documents-modal-card { width: 100% !important; max-width: 100% !important; max-height: calc(100vh - 20px) !important; margin: 10px auto !important; padding: 16px !important; border-radius: 14px !important; }
           .documents-modal-head { align-items: flex-start !important; }
@@ -374,7 +374,6 @@ export default function SiteDocumentsPage() {
     </>
   );
 }
-
 
 
 
