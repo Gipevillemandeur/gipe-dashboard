@@ -326,9 +326,21 @@ export default function SiteDocumentsPage() {
         .documents-item-text { min-width: 0; }
         .documents-description { margin-top: 4px; }
         .documents-pdf-link { display: inline-block; margin-top: 6px; font-size: 13px; font-weight: 600; }
-        .documents-item-actions { display: flex; gap: 8px; flex-shrink: 0; margin-left: 12px; }
+        .documents-item-actions { display: flex; gap: 10px; flex-shrink: 0; margin-left: 12px; align-items: center; }
         .documents-delete-button { color: #8a2b22; border-color: #efc8c4; }
-        .documents-item-actions .btn { box-sizing: border-box; line-height: 1.1; }
+        .documents-item-actions .btn {
+          box-sizing: border-box;
+          min-width: 145px;
+          min-height: 40px;
+          height: 40px;
+          padding: 5px 16px;
+          display: inline-flex;
+          flex-direction: row;
+          align-items: center;
+          justify-content: center;
+          gap: 7px;
+          line-height: 1;
+        }
         .documents-modal-backdrop { position: fixed; inset: 0; background: rgba(15,23,42,.45); z-index: 100; display: flex; align-items: center; justify-content: center; padding: 20px; box-sizing: border-box; overflow-y: auto; }
         .documents-modal-card { width: min(760px, 100%); max-height: calc(100vh - 40px); overflow-y: auto; padding: 24px; box-sizing: border-box; }
         .documents-modal-head { margin-bottom: 20px; gap: 14px; }
