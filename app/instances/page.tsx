@@ -1007,6 +1007,7 @@ export default function InstancesPage() {
             padding-left: 12px;
             padding-right: 12px;
             font-size: 16px;
+            text-align: center;
             -webkit-appearance: none;
             appearance: none;
           }
@@ -1083,4 +1084,5 @@ function MeetingCard({
     </article>
   )
 }
+
 
