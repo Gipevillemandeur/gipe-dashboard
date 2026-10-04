@@ -592,6 +592,7 @@ export default function SiteAgendaPage() {
 
         .agenda-search-wrap .input {
           padding-left: 34px;
+          z-index: 1;
         }
 
         .agenda-list-item {
@@ -733,9 +734,9 @@ export default function SiteAgendaPage() {
           transform: translateY(-50%);
           width: 16px;
           height: 16px;
-          color: var(--gipe-muted);
+          color: var(--gipe-ink);
           pointer-events: none;
-          z-index: 2;
+          z-index: 5;
         }
 
         .agenda-location-wrap .input {
@@ -937,6 +938,7 @@ export default function SiteAgendaPage() {
     </>
   );
 }
+
 
 
 
