@@ -10,7 +10,6 @@ import {
 
 import {
   CalendarDays,
-  MapPin,
   Pencil,
   Plus,
   Search,
@@ -449,9 +448,8 @@ export default function SiteAgendaPage() {
                   <label className="label">Lieu</label>
 
                   <div className="agenda-location-wrap">
-                    <MapPin size={15} />
                     <input
-                      className="input"
+                      className="input agenda-location-input"
                       value={location}
                       onChange={(e) => setLocation(e.target.value)}
                       placeholder="Lieu de l’événement"
@@ -727,16 +725,7 @@ export default function SiteAgendaPage() {
         }
 
         .agenda-location-wrap > svg {
-          display: block !important;
-          position: absolute;
-          left: 11px;
-          top: 50%;
-          transform: translateY(-50%);
-          width: 16px;
-          height: 16px;
-          color: var(--gipe-ink);
-          pointer-events: none;
-          z-index: 10;
+          display: none !important;
         }
 
         .agenda-location-wrap .input {
@@ -747,6 +736,14 @@ export default function SiteAgendaPage() {
           height: 42px;
           box-sizing: border-box;
           padding-left: 34px;
+        }
+
+        .agenda-location-input {
+          background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%232b2321' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 10c0 5-8 12-8 12S4 15 4 10a8 8 0 1 1 16 0Z'/%3E%3Ccircle cx='12' cy='10' r='3'/%3E%3C/svg%3E") !important;
+          background-repeat: no-repeat !important;
+          background-position: 10px center !important;
+          background-size: 18px 18px !important;
+          padding-left: 34px !important;
         }
 
         .agenda-location-category-grid > .agenda-form-field > .input {
@@ -882,19 +879,6 @@ export default function SiteAgendaPage() {
             box-sizing: border-box !important;
           }
 
-          .agenda-location-wrap > svg {
-            display: block !important;
-            position: absolute !important;
-            z-index: 10 !important;
-            left: 11px !important;
-            top: 50% !important;
-            transform: translateY(-50%) !important;
-            color: var(--gipe-ink) !important;
-            pointer-events: none !important;
-            width: 16px !important;
-            height: 16px !important;
-          }
-
           .agenda-form-actions {
             flex-direction: column-reverse;
             align-items: stretch;
@@ -946,7 +930,6 @@ export default function SiteAgendaPage() {
     </>
   );
 }
-
 
 
 
