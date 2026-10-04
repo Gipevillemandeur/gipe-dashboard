@@ -434,27 +434,33 @@ export default function InstancesPage() {
                   />
                 </label>
 
-                <label>
-                  <span>Date *</span>
-                  <input
-                    className="instance-native-date"
-                    type="date"
-                    value={meetingDate}
-                    onChange={(event) => setMeetingDate(event.target.value)}
-                    required
-                  />
-                </label>
+                <div className="instance-two-columns">
+                  <div className="instance-form-field">
+                    <label>
+                      <span>Date *</span>
+                      <input
+                        className="instance-native-date"
+                        type="date"
+                        value={meetingDate}
+                        onChange={(event) => setMeetingDate(event.target.value)}
+                        required
+                      />
+                    </label>
+                  </div>
 
-                <label>
-                  <span>Heure *</span>
-                  <input
-                    className="instance-native-time"
-                    type="time"
-                    value={meetingTime}
-                    onChange={(event) => setMeetingTime(event.target.value)}
-                    required
-                  />
-                </label>
+                  <div className="instance-form-field">
+                    <label>
+                      <span>Heure *</span>
+                      <input
+                        className="instance-native-time"
+                        type="time"
+                        value={meetingTime}
+                        onChange={(event) => setMeetingTime(event.target.value)}
+                        required
+                      />
+                    </label>
+                  </div>
+                </div>
 
                 <label className="full">
                   <span>Lieu</span>
@@ -878,6 +884,22 @@ export default function InstancesPage() {
           box-shadow: 0 0 0 3px rgba(143, 33, 28, 0.08);
         }
 
+        .instance-two-columns {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 17px;
+          min-width: 0;
+          grid-column: 1 / -1;
+        }
+
+        .instance-two-columns > div {
+          min-width: 0;
+        }
+
+        .instance-form-field {
+          min-width: 0;
+        }
+
         .instance-native-date,
         .instance-native-time {
           width: 100%;
@@ -994,6 +1016,11 @@ export default function InstancesPage() {
 
           label.full {
             grid-column: auto;
+          }
+
+          .instance-two-columns {
+            grid-template-columns: minmax(0, 1fr);
+            gap: 17px;
           }
 
           .instance-native-date,
