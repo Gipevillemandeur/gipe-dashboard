@@ -1,7 +1,6 @@
 import Link from 'next/link';
 import {
   ArrowLeft,
-  Pencil,
   FlaskConical,
   ShieldCheck,
   GraduationCap,
@@ -162,7 +161,6 @@ export default async function ConseilsPage() {
                 <th>Élèves</th>
                 <th>Équipe</th>
                 <th>Type</th>
-                <th></th>
               </tr>
             </thead>
 
@@ -200,16 +198,6 @@ export default async function ConseilsPage() {
                       </span>
                     )}
                   </td>
-
-                  <td>
-                    <button
-                      className="btn conseils-edit-button"
-                      type="button"
-                    >
-                      <Pencil size={13} />
-                      Modifier
-                    </button>
-                  </td>
                 </tr>
               ))}
             </tbody>
@@ -232,14 +220,6 @@ export default async function ConseilsPage() {
                     {c.level}
                   </span>
                 </div>
-
-                <button
-                  className="btn conseils-edit-button"
-                  type="button"
-                >
-                  <Pencil size={13} />
-                  Modifier
-                </button>
               </div>
 
               <div className="conseils-mobile-details">
@@ -319,10 +299,6 @@ export default async function ConseilsPage() {
 
         .conseils-mobile-list {
           display: none;
-        }
-
-        .conseils-edit-button {
-          white-space: nowrap;
         }
 
         .conseils-mobile-card {
@@ -432,14 +408,6 @@ export default async function ConseilsPage() {
 
           .conseils-mobile-card {
             padding: 12px;
-          }
-
-          .conseils-mobile-card-head {
-            align-items: center;
-          }
-
-          .conseils-mobile-card-head .btn {
-            flex: 0 0 auto;
           }
 
           .conseils-mobile-details {
