@@ -10,6 +10,7 @@ import {
 
 import {
   CalendarDays,
+  MapPin,
   Pencil,
   Plus,
   Search,
@@ -443,13 +444,14 @@ export default function SiteAgendaPage() {
                 </div>
               </div>
 
-              <div className="agenda-two-columns agenda-location-category-grid">
+              <div className="agenda-two-columns">
                 <div className="agenda-form-field">
                   <label className="label">Lieu</label>
 
                   <div className="agenda-location-wrap">
+                    <MapPin size={15} />
                     <input
-                      className="input agenda-location-input"
+                      className="input"
                       value={location}
                       onChange={(e) => setLocation(e.target.value)}
                       placeholder="Lieu de l’événement"
@@ -590,7 +592,6 @@ export default function SiteAgendaPage() {
 
         .agenda-search-wrap .input {
           padding-left: 34px;
-          z-index: 1;
         }
 
         .agenda-list-item {
@@ -635,12 +636,34 @@ export default function SiteAgendaPage() {
           margin-top: 4px;
         }
 
+
         .agenda-item-actions {
           display: flex;
-          gap: 8px;
-          flex-wrap: wrap;
+          gap: 10px;
+          flex-wrap: nowrap;
           flex-shrink: 0;
+          align-items: center;
+          justify-content: center;
         }
+
+        .agenda-item-actions .btn {
+          flex: 0 0 auto !important;
+          width: auto !important;
+          min-width: 145px !important;
+          max-width: none !important;
+          min-height: 40px !important;
+          height: 40px !important;
+          padding: 5px 16px !important;
+          display: inline-flex !important;
+          flex-direction: row !important;
+          align-items: center !important;
+          justify-content: center !important;
+          gap: 7px !important;
+          box-sizing: border-box !important;
+          font-size: 14px !important;
+          line-height: 1 !important;
+        }
+
 
         .agenda-modal-backdrop {
           position: fixed;
@@ -686,73 +709,30 @@ export default function SiteAgendaPage() {
 
         .agenda-native-date,
         .agenda-native-time {
-          width: 0;
-          min-width: 100%;
-          max-width: 100%;
-          min-inline-size: 100%;
-          inline-size: 0;
-          height: 42px !important;
-          min-height: 42px !important;
-          max-height: 42px !important;
-          box-sizing: border-box;
-          display: block;
-          font: inherit;
-          line-height: normal !important;
-          -webkit-appearance: none;
-          appearance: none;
-        }
-
-        .agenda-location-category-grid > .agenda-form-field {
+          width: 100%;
           min-width: 0;
-          display: flex;
-          flex-direction: column;
-        }
-
-        .agenda-location-category-grid > .agenda-form-field > .label {
-          display: block;
-          height: 19px;
-          line-height: 19px;
-          margin: 0 0 7px;
-          flex: 0 0 19px;
+          max-width: 100%;
+          box-sizing: border-box;
         }
 
         .agenda-location-wrap {
           position: relative;
-          width: 100%;
-          height: 42px;
-          min-height: 42px;
           min-width: 0;
         }
 
         .agenda-location-wrap > svg {
-          display: none !important;
+          position: absolute;
+          left: 11px;
+          top: 50%;
+          transform: translateY(-50%);
+          color: var(--gipe-muted);
+          pointer-events: none;
         }
 
         .agenda-location-wrap .input {
-          position: absolute;
-          z-index: 1;
-          inset: 0;
           width: 100%;
-          height: 42px;
           box-sizing: border-box;
           padding-left: 34px;
-        }
-
-        .agenda-location-input {
-          background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%232b2321' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 10c0 5-8 12-8 12S4 15 4 10a8 8 0 1 1 16 0Z'/%3E%3Ccircle cx='12' cy='10' r='3'/%3E%3C/svg%3E") !important;
-          background-repeat: no-repeat !important;
-          background-position: 10px center !important;
-          background-size: 18px 18px !important;
-          padding-left: 34px !important;
-        }
-
-        .agenda-location-category-grid > .agenda-form-field > .input {
-          width: 100%;
-          height: 42px;
-          min-height: 42px;
-          max-height: 42px;
-          box-sizing: border-box;
-          flex: 0 0 42px;
         }
 
         .agenda-help {
@@ -829,11 +809,27 @@ export default function SiteAgendaPage() {
 
           .agenda-item-actions {
             width: 100%;
+            margin-left: 0;
+            justify-content: center !important;
+            gap: 10px !important;
           }
 
           .agenda-item-actions .btn {
-            flex: 1 1 0;
-            justify-content: center;
+            flex: 0 0 auto !important;
+            width: auto !important;
+            min-width: 145px !important;
+            max-width: none !important;
+            min-height: 40px !important;
+            height: 40px !important;
+            padding: 5px 16px !important;
+            display: inline-flex !important;
+            flex-direction: row !important;
+            align-items: center !important;
+            justify-content: center !important;
+            gap: 7px !important;
+            box-sizing: border-box !important;
+            font-size: 14px !important;
+            line-height: 1 !important;
           }
 
           .agenda-modal-backdrop {
@@ -864,21 +860,6 @@ export default function SiteAgendaPage() {
             gap: 16px;
           }
 
-          .agenda-location-category-grid > .agenda-form-field > .label {
-            height: 19px !important;
-            line-height: 19px !important;
-            margin-bottom: 7px !important;
-          }
-
-          .agenda-location-category-grid > .agenda-form-field > .input,
-          .agenda-location-wrap,
-          .agenda-location-wrap .input {
-            height: 42px !important;
-            min-height: 42px !important;
-            max-height: 42px !important;
-            box-sizing: border-box !important;
-          }
-
           .agenda-form-actions {
             flex-direction: column-reverse;
             align-items: stretch;
@@ -894,15 +875,7 @@ export default function SiteAgendaPage() {
             width: 100% !important;
             min-width: 0 !important;
             max-width: 100% !important;
-            min-inline-size: 100% !important;
-            inline-size: 100% !important;
-            height: 42px !important;
-            min-height: 42px !important;
-            line-height: normal !important;
             box-sizing: border-box !important;
-            display: block !important;
-            -webkit-appearance: none !important;
-            appearance: none !important;
           }
         }
 
