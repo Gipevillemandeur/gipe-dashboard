@@ -242,8 +242,8 @@ export default function SiteDocumentsPage() {
                   </div>
                 </div>
                 <div className="documents-item-actions">
-                  <button className="btn" type="button" onClick={() => openEdit(item)}><Pencil size={14} />Modifier</button>
-                  <button className="btn documents-delete-button" type="button" onClick={() => void deleteDocument(item)} disabled={deletingId === item.id}>
+                  <button style={{ width: '145px', flex: '0 0 145px', height: '40px' }} className="btn" type="button" onClick={() => openEdit(item)}><Pencil size={14} />Modifier</button>
+                  <button style={{ width: '145px', flex: '0 0 145px', height: '40px' }} className="btn documents-delete-button" type="button" onClick={() => void deleteDocument(item)} disabled={deletingId === item.id}>
                     <Trash2 size={14} />{deletingId === item.id ? 'Suppression…' : 'Supprimer'}
                   </button>
                 </div>
