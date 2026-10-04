@@ -7,6 +7,7 @@ import {
   Users,
   CalendarDays,
   CheckCircle2,
+  Eye,
 } from 'lucide-react';
 
 import { getDashboardSnapshot } from '@/lib/dashboard-data';
@@ -38,7 +39,7 @@ export default async function ConseilsPage() {
           </div>
 
           <h1>
-            Gestion des classes
+            Vue des classes
           </h1>
 
           <div className="kicker">
@@ -147,7 +148,8 @@ export default async function ConseilsPage() {
 
             <p className="section-sub">
               Les classes réelles proviennent du dernier
-              import du collège. La classe TEST reste disponible.
+              import du collège. Clique sur une classe pour
+              consulter son équipe pédagogique et ses élèves.
             </p>
           </div>
         </div>
@@ -161,12 +163,13 @@ export default async function ConseilsPage() {
                 <th>Élèves</th>
                 <th>Équipe</th>
                 <th>Type</th>
+                <th>Consultation</th>
               </tr>
             </thead>
 
             <tbody>
               {snapshot.classes.map((c) => (
-                <tr key={c.name}>
+                <tr key={c.id || c.name}>
                   <td>
                     <strong>
                       {c.name}
@@ -198,6 +201,22 @@ export default async function ConseilsPage() {
                       </span>
                     )}
                   </td>
+
+                  <td>
+                    {c.id ? (
+                      <Link
+                        className="btn conseils-consult-button"
+                        href={`/conseils/${c.id}`}
+                      >
+                        <Eye size={14} />
+                        Consulter
+                      </Link>
+                    ) : (
+                      <span className="conseils-no-link">
+                        —
+                      </span>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -208,7 +227,7 @@ export default async function ConseilsPage() {
           {snapshot.classes.map((c) => (
             <div
               className="conseils-mobile-card"
-              key={c.name}
+              key={c.id || c.name}
             >
               <div className="conseils-mobile-card-head">
                 <div>
@@ -220,6 +239,18 @@ export default async function ConseilsPage() {
                     {c.level}
                   </span>
                 </div>
+
+                {c.status === 'demo' ? (
+                  <span className="badge badge-info">
+                    <FlaskConical size={12} />
+                    Démonstration
+                  </span>
+                ) : (
+                  <span className="badge badge-ok">
+                    <ShieldCheck size={12} />
+                    Réelle
+                  </span>
+                )}
               </div>
 
               <div className="conseils-mobile-details">
@@ -232,23 +263,21 @@ export default async function ConseilsPage() {
                   <span>Équipe</span>
                   <strong>{c.teachers}</strong>
                 </div>
-
-                <div>
-                  <span>Type</span>
-
-                  {c.status === 'demo' ? (
-                    <span className="badge badge-info">
-                      <FlaskConical size={12} />
-                      Démonstration
-                    </span>
-                  ) : (
-                    <span className="badge badge-ok">
-                      <ShieldCheck size={12} />
-                      Réelle
-                    </span>
-                  )}
-                </div>
               </div>
+
+              {c.id ? (
+                <Link
+                  className="btn conseils-consult-button conseils-mobile-consult-button"
+                  href={`/conseils/${c.id}`}
+                >
+                  <Eye size={14} />
+                  Consulter la classe
+                </Link>
+              ) : (
+                <span className="conseils-no-link">
+                  Consultation indisponible
+                </span>
+              )}
             </div>
           ))}
         </div>
@@ -334,7 +363,7 @@ export default async function ConseilsPage() {
 
         .conseils-mobile-details {
           display: grid;
-          grid-template-columns: repeat(3, minmax(0, 1fr));
+          grid-template-columns: repeat(2, minmax(0, 1fr));
           gap: 8px;
         }
 
@@ -344,12 +373,30 @@ export default async function ConseilsPage() {
           gap: 4px;
         }
 
-        .conseils-mobile-details > div > span:first-child {
+        .conseils-mobile-details > div > span {
           font-size: 10px;
           text-transform: uppercase;
           letter-spacing: 0.04em;
           color: #756a67;
           font-weight: 700;
+        }
+
+        .conseils-consult-button {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 7px;
+          white-space: nowrap;
+          text-decoration: none;
+        }
+
+        .conseils-mobile-consult-button {
+          width: 100%;
+        }
+
+        .conseils-no-link {
+          color: #8a7d77;
+          font-size: 13px;
         }
 
         @media (max-width: 760px) {
@@ -391,14 +438,6 @@ export default async function ConseilsPage() {
             grid-template-columns: 1fr;
             margin-top: 14px;
           }
-
-          .conseils-mobile-details {
-            grid-template-columns: 1fr 1fr;
-          }
-
-          .conseils-mobile-details > div:last-child {
-            grid-column: 1 / -1;
-          }
         }
 
         @media (max-width: 480px) {
@@ -408,10 +447,6 @@ export default async function ConseilsPage() {
 
           .conseils-mobile-card {
             padding: 12px;
-          }
-
-          .conseils-mobile-details {
-            grid-template-columns: 1fr 1fr;
           }
         }
       `}</style>
