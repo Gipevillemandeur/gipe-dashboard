@@ -789,13 +789,16 @@ export default function InstancesPage() {
           align-items: center;
           justify-content: center;
           padding: 20px;
+          box-sizing: border-box;
+          overflow-y: auto;
           background: rgba(15, 23, 42, 0.45);
         }
 
         .modal {
-          width: min(620px, 100%);
+          width: min(760px, 100%);
           max-height: calc(100vh - 40px);
           overflow-y: auto;
+          box-sizing: border-box;
           border-radius: 18px;
           background: #fff;
           box-shadow: 0 20px 60px rgba(15, 23, 42, 0.2);
@@ -994,16 +997,16 @@ export default function InstancesPage() {
           }
 
           .modal-backdrop {
-            align-items: center;
+            align-items: flex-start;
             padding: 10px;
-            box-sizing: border-box;
           }
 
           .modal {
-            width: calc(100% - 0px);
-            max-width: 620px;
+            width: 100%;
+            max-width: 100%;
             max-height: calc(100vh - 20px);
-            border-radius: 18px;
+            margin: 0 auto;
+            border-radius: 14px;
           }
 
           .modal-head,
