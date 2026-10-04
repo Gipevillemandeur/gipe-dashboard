@@ -665,6 +665,11 @@ export default function SiteAgendaPage() {
         }
 
 
+        .agenda-item-actions .btn:last-child {
+          color: #8a2b22 !important;
+          border-color: #efc8c4 !important;
+        }
+
         .agenda-modal-backdrop {
           position: fixed;
           inset: 0;
@@ -903,6 +908,7 @@ export default function SiteAgendaPage() {
     </>
   );
 }
+
 
 
 
