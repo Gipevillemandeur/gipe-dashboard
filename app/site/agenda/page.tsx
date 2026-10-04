@@ -444,7 +444,7 @@ export default function SiteAgendaPage() {
                 </div>
               </div>
 
-              <div className="agenda-two-columns">
+              <div className="agenda-two-columns agenda-location-category-grid">
                 <div className="agenda-form-field">
                   <label className="label">Lieu</label>
 
@@ -703,14 +703,30 @@ export default function SiteAgendaPage() {
           appearance: none;
         }
 
+        .agenda-location-category-grid > .agenda-form-field {
+          min-width: 0;
+          display: flex;
+          flex-direction: column;
+        }
+
+        .agenda-location-category-grid > .agenda-form-field > .label {
+          display: block;
+          height: 19px;
+          line-height: 19px;
+          margin: 0 0 7px;
+          flex: 0 0 19px;
+        }
+
         .agenda-location-wrap {
           position: relative;
           width: 100%;
           height: 42px;
+          min-height: 42px;
           min-width: 0;
         }
 
         .agenda-location-wrap > svg {
+          display: block !important;
           position: absolute;
           left: 11px;
           top: 50%;
@@ -729,6 +745,15 @@ export default function SiteAgendaPage() {
           height: 42px;
           box-sizing: border-box;
           padding-left: 34px;
+        }
+
+        .agenda-location-category-grid > .agenda-form-field > .input {
+          width: 100%;
+          height: 42px;
+          min-height: 42px;
+          max-height: 42px;
+          box-sizing: border-box;
+          flex: 0 0 42px;
         }
 
         .agenda-help {
@@ -838,6 +863,27 @@ export default function SiteAgendaPage() {
           .agenda-two-columns {
             grid-template-columns: minmax(0, 1fr);
             gap: 16px;
+          }
+
+          .agenda-location-category-grid > .agenda-form-field > .label {
+            height: 19px !important;
+            line-height: 19px !important;
+            margin-bottom: 7px !important;
+          }
+
+          .agenda-location-category-grid > .agenda-form-field > .input,
+          .agenda-location-wrap,
+          .agenda-location-wrap .input {
+            height: 42px !important;
+            min-height: 42px !important;
+            max-height: 42px !important;
+            box-sizing: border-box !important;
+          }
+
+          .agenda-location-wrap > svg {
+            display: block !important;
+            width: 16px !important;
+            height: 16px !important;
           }
 
           .agenda-form-actions {
