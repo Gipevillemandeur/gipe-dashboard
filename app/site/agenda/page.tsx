@@ -736,11 +736,12 @@ export default function SiteAgendaPage() {
           height: 16px;
           color: var(--gipe-ink);
           pointer-events: none;
-          z-index: 5;
+          z-index: 10;
         }
 
         .agenda-location-wrap .input {
           position: absolute;
+          z-index: 1;
           inset: 0;
           width: 100%;
           height: 42px;
@@ -883,6 +884,13 @@ export default function SiteAgendaPage() {
 
           .agenda-location-wrap > svg {
             display: block !important;
+            position: absolute !important;
+            z-index: 10 !important;
+            left: 11px !important;
+            top: 50% !important;
+            transform: translateY(-50%) !important;
+            color: var(--gipe-ink) !important;
+            pointer-events: none !important;
             width: 16px !important;
             height: 16px !important;
           }
