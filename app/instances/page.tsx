@@ -1003,7 +1003,12 @@ export default function InstancesPage() {
             min-width: 0;
             max-width: 100%;
             box-sizing: border-box;
+            min-inline-size: 0;
+            padding-left: 12px;
+            padding-right: 12px;
             font-size: 16px;
+            -webkit-appearance: none;
+            appearance: none;
           }
 
           label.full {
