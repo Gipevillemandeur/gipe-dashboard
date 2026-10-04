@@ -692,9 +692,13 @@ export default function SiteAgendaPage() {
           max-width: 100%;
           min-inline-size: 100%;
           inline-size: 0;
+          height: 42px !important;
+          min-height: 42px !important;
+          max-height: 42px !important;
           box-sizing: border-box;
           display: block;
           font: inherit;
+          line-height: normal !important;
           -webkit-appearance: none;
           appearance: none;
         }
@@ -845,8 +849,9 @@ export default function SiteAgendaPage() {
             max-width: 100% !important;
             min-inline-size: 100% !important;
             inline-size: 100% !important;
-            height: 98px !important;
-            min-height: 98px !important;
+            height: 42px !important;
+            min-height: 42px !important;
+            line-height: normal !important;
             box-sizing: border-box !important;
             display: block !important;
             -webkit-appearance: none !important;
@@ -878,4 +883,5 @@ export default function SiteAgendaPage() {
     </>
   );
 }
+
 
