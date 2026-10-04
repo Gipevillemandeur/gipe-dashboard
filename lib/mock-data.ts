@@ -1,4 +1,11 @@
-export type ClassRow = { name: string; level: string; students: number; teachers: number; status: 'active' | 'demo' };
+export type ClassRow = {
+  id?: string;
+  name: string;
+  level: string;
+  students: number;
+  teachers: number;
+  status: 'active' | 'demo';
+};
 
 export const classes: ClassRow[] = [
   { name: '3A', level: '3e', students: 26, teachers: 18, status: 'active' },
