@@ -1306,9 +1306,32 @@ export default function SiteActualitesPage() {
 
           .actualites-modal-card {
             width: 100% !important;
+            min-width: 0 !important;
+            max-width: 100% !important;
             margin: 10px auto !important;
             padding: 16px !important;
             border-radius: 14px !important;
+            box-sizing: border-box !important;
+            overflow: hidden !important;
+          }
+
+          .actualites-modal-card form,
+          .actualites-two-columns,
+          .actualites-two-columns > label {
+            width: 100% !important;
+            min-width: 0 !important;
+            max-width: 100% !important;
+            box-sizing: border-box !important;
+          }
+
+          .actualites-date-input {
+            display: block !important;
+            width: 100% !important;
+            min-width: 0 !important;
+            max-width: 100% !important;
+            box-sizing: border-box !important;
+            -webkit-appearance: none !important;
+            appearance: none !important;
           }
 
           .actualites-modal-card .section-head {
@@ -1372,3 +1395,4 @@ export default function SiteActualitesPage() {
     </>
   );
 }
+
