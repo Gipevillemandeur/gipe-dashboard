@@ -54,7 +54,6 @@ export default function SiteAgendaPage() {
   const [search, setSearch] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | number | null>(null);
-
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [date, setDate] = useState(today());
@@ -63,28 +62,20 @@ export default function SiteAgendaPage() {
   const [category, setCategory] = useState('');
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [currentImage, setCurrentImage] = useState<string | null>(null);
-
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   async function loadEvents() {
     setLoading(true);
     setError('');
-
     try {
       const response = await fetch('/api/site/agenda', { cache: 'no-store' });
       const data = await response.json();
-
       if (!response.ok) {
         throw new Error(data?.error || 'Impossible de charger l’agenda.');
       }
-
       setEvents(data.events || []);
     } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : 'Impossible de charger l’agenda.'
-      );
+      setError(err instanceof Error ? err.message : 'Impossible de charger l’agenda.');
     } finally {
       setLoading(false);
     }
@@ -97,7 +88,6 @@ export default function SiteAgendaPage() {
   const filteredEvents = useMemo(() => {
     const value = search.trim().toLowerCase();
     if (!value) return events;
-
     return events.filter((item) =>
       [
         item.title || '',
@@ -106,10 +96,7 @@ export default function SiteAgendaPage() {
         item.category || '',
         item.date || '',
         item.time || '',
-      ]
-        .join(' ')
-        .toLowerCase()
-        .includes(value)
+      ].join(' ').toLowerCase().includes(value)
     );
   }, [events, search]);
 
@@ -123,10 +110,7 @@ export default function SiteAgendaPage() {
     setCategory('');
     setImageFile(null);
     setCurrentImage(null);
-
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
+    if (fileInputRef.current) fileInputRef.current.value = '';
   }
 
   function openNew() {
@@ -159,7 +143,6 @@ export default function SiteAgendaPage() {
     event.preventDefault();
     setSaving(true);
     setError('');
-
     try {
       const formData = new FormData();
       formData.set('title', title);
@@ -168,45 +151,27 @@ export default function SiteAgendaPage() {
       formData.set('time', time);
       formData.set('location', location);
       formData.set('category', category);
-
-      if (imageFile) {
-        formData.set('imageFile', imageFile);
-      }
+      if (imageFile) formData.set('imageFile', imageFile);
 
       let response: Response;
-
       if (editingId !== null) {
         formData.set('id', String(editingId));
         formData.set('keepImage', imageFile ? 'false' : 'true');
-
-        response = await fetch('/api/site/agenda', {
-          method: 'PUT',
-          body: formData,
-        });
+        response = await fetch('/api/site/agenda', { method: 'PUT', body: formData });
       } else {
-        response = await fetch('/api/site/agenda', {
-          method: 'POST',
-          body: formData,
-        });
+        response = await fetch('/api/site/agenda', { method: 'POST', body: formData });
       }
 
       const data = await response.json();
-
       if (!response.ok) {
-        throw new Error(
-          data?.error || 'Impossible d’enregistrer l’événement.'
-        );
+        throw new Error(data?.error || 'Impossible d’enregistrer l’événement.');
       }
 
       await loadEvents();
       setShowForm(false);
       resetForm();
     } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : 'Impossible d’enregistrer l’événement.'
-      );
+      setError(err instanceof Error ? err.message : 'Impossible d’enregistrer l’événement.');
     } finally {
       setSaving(false);
     }
@@ -214,38 +179,26 @@ export default function SiteAgendaPage() {
 
   async function deleteEvent(item: EventItem) {
     if (deletingId !== null) return;
-
     const confirmed = window.confirm(
       `Supprimer l’événement « ${item.title || 'Sans titre'} » ?\n\nCette action est irréversible.`
     );
-
     if (!confirmed) return;
 
     setDeletingId(item.id);
     setError('');
-
     try {
       const response = await fetch('/api/site/agenda', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: String(item.id) }),
       });
-
       const data = await response.json();
-
       if (!response.ok) {
-        throw new Error(
-          data?.error || 'Impossible de supprimer l’événement.'
-        );
+        throw new Error(data?.error || 'Impossible de supprimer l’événement.');
       }
-
       await loadEvents();
     } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : 'Impossible de supprimer l’événement.'
-      );
+      setError(err instanceof Error ? err.message : 'Impossible de supprimer l’événement.');
     } finally {
       setDeletingId(null);
     }
@@ -257,11 +210,8 @@ export default function SiteAgendaPage() {
         <div>
           <div className="eyebrow">Site internet</div>
           <h1>Agenda</h1>
-          <div className="kicker">
-            Gestion des événements publiés sur gipevillemandeur.com.
-          </div>
+          <div className="kicker">Gestion des événements publiés sur gipevillemandeur.com.</div>
         </div>
-
         <div className="topbar-right">
           <button className="btn btn-primary" type="button" onClick={openNew}>
             <Plus size={15} />
@@ -270,22 +220,16 @@ export default function SiteAgendaPage() {
         </div>
       </div>
 
-      {error && (
-        <div className="notice notice-error agenda-error">
-          {error}
-        </div>
-      )}
+      {error && <div className="notice notice-error agenda-error">{error}</div>}
 
       <section className="card section-card agenda-card">
         <div className="section-head agenda-section-head">
           <div>
             <h2 className="section-title">Événements</h2>
             <p className="section-sub">
-              {events.length} événement{events.length > 1 ? 's' : ''}{' '}
-              actuellement enregistré{events.length > 1 ? 's' : ''}.
+              {events.length} événement{events.length > 1 ? 's' : ''} actuellement enregistré{events.length > 1 ? 's' : ''}.
             </p>
           </div>
-
           <div className="agenda-search">
             <div className="agenda-search-wrap">
               <Search size={15} />
@@ -310,64 +254,37 @@ export default function SiteAgendaPage() {
           <div className="list-item">
             <div className="item-main">
               <strong>Aucun événement trouvé.</strong>
-              <span>
-                {search
-                  ? 'Essaie une autre recherche.'
-                  : 'Aucun événement n’est encore enregistré.'}
-              </span>
+              <span>{search ? 'Essaie une autre recherche.' : 'Aucun événement n’est encore enregistré.'}</span>
             </div>
           </div>
         ) : (
           <div className="list">
             {filteredEvents.map((item) => (
-              <div
-                className="list-item agenda-list-item"
-                key={String(item.id)}
-              >
+              <div className="list-item agenda-list-item" key={String(item.id)}>
                 <div className="agenda-event-main">
                   {item.image_url ? (
-                    <img
-                      src={item.image_url}
-                      alt={item.title || 'Événement'}
-                      className="agenda-event-image"
-                    />
+                    <img src={item.image_url} alt={item.title || 'Événement'} className="agenda-event-image" />
                   ) : (
                     <div className="agenda-event-placeholder">
                       <CalendarDays size={25} />
                     </div>
                   )}
-
                   <div className="item-main agenda-event-text">
                     <strong>{item.title || 'Sans titre'}</strong>
-
                     <span>
                       {formatDate(item.date)}
                       {item.time ? ` · ${item.time}` : ''}
                       {item.location ? ` · ${item.location}` : ''}
                     </span>
-
-                    {item.category && (
-                      <span>Catégorie : {item.category}</span>
-                    )}
-
-                    {item.description && (
-                      <span className="agenda-excerpt">
-                        {excerpt(item.description)}
-                      </span>
-                    )}
+                    {item.category && <span>Catégorie : {item.category}</span>}
+                    {item.description && <span className="agenda-excerpt">{excerpt(item.description)}</span>}
                   </div>
                 </div>
-
                 <div className="agenda-item-actions">
-                  <button
-                    className="btn"
-                    type="button"
-                    onClick={() => openEdit(item)}
-                  >
+                  <button className="btn" type="button" onClick={() => openEdit(item)}>
                     <Pencil size={14} />
                     Modifier
                   </button>
-
                   <button
                     className="btn"
                     type="button"
@@ -391,18 +308,10 @@ export default function SiteAgendaPage() {
               <div>
                 <div className="eyebrow">Site internet</div>
                 <h2 className="section-title">
-                  {editingId !== null
-                    ? 'Modifier l’événement'
-                    : 'Nouvel événement'}
+                  {editingId !== null ? 'Modifier l’événement' : 'Nouvel événement'}
                 </h2>
               </div>
-
-              <button
-                className="btn"
-                type="button"
-                onClick={closeForm}
-                disabled={saving}
-              >
+              <button className="btn" type="button" onClick={closeForm} disabled={saving}>
                 <X size={15} />
                 Fermer
               </button>
@@ -425,18 +334,17 @@ export default function SiteAgendaPage() {
                 <div className="agenda-form-field">
                   <label className="label">Date</label>
                   <input
-                    className="input agenda-native-date"
+                    className="input agenda-date-input"
                     type="date"
                     value={date}
                     onChange={(e) => setDate(e.target.value)}
                     required
                   />
                 </div>
-
                 <div className="agenda-form-field">
                   <label className="label">Heure</label>
                   <input
-                    className="input agenda-native-time"
+                    className="input agenda-time-input"
                     type="time"
                     value={time}
                     onChange={(e) => setTime(e.target.value)}
@@ -447,7 +355,6 @@ export default function SiteAgendaPage() {
               <div className="agenda-two-columns">
                 <div className="agenda-form-field">
                   <label className="label">Lieu</label>
-
                   <div className="agenda-location-wrap">
                     <MapPin size={15} />
                     <input
@@ -461,7 +368,6 @@ export default function SiteAgendaPage() {
 
                 <div className="agenda-form-field">
                   <label className="label">Catégorie</label>
-
                   <input
                     className="input"
                     list="agenda-categories"
@@ -469,24 +375,15 @@ export default function SiteAgendaPage() {
                     onChange={(e) => setCategory(e.target.value)}
                     placeholder="Ex. Réunion, Sortie, GIPE..."
                   />
-
                   <datalist id="agenda-categories">
                     {Array.from(
-                      new Set(
-                        events
-                          .map((item) => (item.category || '').trim())
-                          .filter(Boolean)
-                      )
+                      new Set(events.map((item) => (item.category || '').trim()).filter(Boolean))
                     )
                       .sort((a, b) => a.localeCompare(b, 'fr'))
-                      .map((item) => (
-                        <option key={item} value={item} />
-                      ))}
+                      .map((item) => <option key={item} value={item} />)}
                   </datalist>
-
                   <div className="agenda-help">
-                    Tu peux choisir une catégorie existante ou en saisir une
-                    nouvelle.
+                    Tu peux choisir une catégorie existante ou en saisir une nouvelle.
                   </div>
                 </div>
               </div>
@@ -505,28 +402,20 @@ export default function SiteAgendaPage() {
 
               <div>
                 <label className="label">Image</label>
-
                 {currentImage && (
                   <div className="agenda-current-image">
-                    <img
-                      src={currentImage}
-                      alt="Image actuelle"
-                    />
+                    <img src={currentImage} alt="Image actuelle" />
                   </div>
                 )}
-
                 <div className="agenda-file-row">
                   <input
                     ref={fileInputRef}
                     type="file"
                     accept="image/*"
-                    onChange={(e) =>
-                      setImageFile(e.target.files?.[0] || null)
-                    }
+                    onChange={(e) => setImageFile(e.target.files?.[0] || null)}
                   />
                   <span>Image de 8 Mo maximum.</span>
                 </div>
-
                 {imageFile && (
                   <div className="agenda-file-name">
                     Nouvelle image : <strong>{imageFile.name}</strong>
@@ -534,27 +423,13 @@ export default function SiteAgendaPage() {
                 )}
               </div>
 
-              {error && (
-                <div className="notice notice-error agenda-form-error">
-                  {error}
-                </div>
-              )}
+              {error && <div className="notice notice-error agenda-form-error">{error}</div>}
 
               <div className="agenda-form-actions">
-                <button
-                  className="btn"
-                  type="button"
-                  onClick={closeForm}
-                  disabled={saving}
-                >
+                <button className="btn" type="button" onClick={closeForm} disabled={saving}>
                   Annuler
                 </button>
-
-                <button
-                  className="btn btn-primary"
-                  type="submit"
-                  disabled={saving}
-                >
+                <button className="btn btn-primary" type="submit" disabled={saving}>
                   {saving
                     ? 'Enregistrement…'
                     : editingId !== null
@@ -568,341 +443,135 @@ export default function SiteAgendaPage() {
       )}
 
       <style jsx>{`
-        .agenda-card {
-          min-width: 0;
-        }
-
-        .agenda-search {
-          width: 280px;
-          max-width: 100%;
-        }
-
-        .agenda-search-wrap {
-          position: relative;
-        }
-
+        .agenda-card { min-width: 0; }
+        .agenda-search { width: 280px; max-width: 100%; }
+        .agenda-search-wrap { position: relative; }
         .agenda-search-wrap > svg {
-          position: absolute;
-          left: 11px;
-          top: 50%;
-          transform: translateY(-50%);
-          color: var(--gipe-muted);
-          pointer-events: none;
+          position: absolute; left: 11px; top: 50%; transform: translateY(-50%);
+          color: var(--gipe-muted); pointer-events: none;
         }
-
-        .agenda-search-wrap .input {
-          padding-left: 34px;
+        .agenda-search-wrap .input { padding-left: 34px; }
+        .agenda-list-item { align-items: flex-start !important; gap: 18px; }
+        .agenda-event-main { display: flex; gap: 14px; min-width: 0; flex: 1; }
+        .agenda-event-image, .agenda-event-placeholder {
+          width: 74px; height: 74px; flex: 0 0 74px; border-radius: 10px; box-sizing: border-box;
         }
-
-        .agenda-list-item {
-          align-items: flex-start !important;
-          gap: 18px;
-        }
-
-        .agenda-event-main {
-          display: flex;
-          gap: 14px;
-          min-width: 0;
-          flex: 1;
-        }
-
-        .agenda-event-image,
+        .agenda-event-image { object-fit: cover; border: 1px solid var(--gipe-line); }
         .agenda-event-placeholder {
-          width: 74px;
-          height: 74px;
-          flex: 0 0 74px;
-          border-radius: 10px;
-          box-sizing: border-box;
+          border: 1px solid var(--gipe-line); display: flex; align-items: center;
+          justify-content: center; color: var(--gipe-muted);
         }
-
-        .agenda-event-image {
-          object-fit: cover;
-          border: 1px solid var(--gipe-line);
-        }
-
-        .agenda-event-placeholder {
-          border: 1px solid var(--gipe-line);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          color: var(--gipe-muted);
-        }
-
-        .agenda-event-text {
-          min-width: 0;
-        }
-
-        .agenda-excerpt {
-          margin-top: 4px;
-        }
-
-
+        .agenda-event-text { min-width: 0; }
+        .agenda-excerpt { margin-top: 4px; }
         .agenda-item-actions {
-          display: flex;
-          gap: 10px;
-          flex-wrap: nowrap;
-          flex-shrink: 0;
-          align-items: center;
-          justify-content: center;
+          display: flex; gap: 10px; flex-wrap: nowrap; flex-shrink: 0;
+          align-items: center; justify-content: center;
         }
-
         .agenda-item-actions .btn {
-          flex: 0 0 auto !important;
-          width: auto !important;
-          min-width: 145px !important;
-          max-width: none !important;
-          min-height: 40px !important;
-          height: 40px !important;
-          padding: 5px 16px !important;
-          display: inline-flex !important;
-          flex-direction: row !important;
-          align-items: center !important;
-          justify-content: center !important;
-          gap: 7px !important;
-          box-sizing: border-box !important;
-          font-size: 14px !important;
-          line-height: 1 !important;
+          flex: 0 0 auto !important; width: auto !important; min-width: 145px !important;
+          max-width: none !important; min-height: 40px !important; height: 40px !important;
+          padding: 5px 16px !important; display: inline-flex !important; flex-direction: row !important;
+          align-items: center !important; justify-content: center !important; gap: 7px !important;
+          box-sizing: border-box !important; font-size: 14px !important; line-height: 1 !important;
         }
-
-
-        .agenda-item-actions .btn:last-child {
-          color: #8a2b22 !important;
-          border-color: #efc8c4 !important;
-        }
+        .agenda-item-actions .btn:last-child { color: #8a2b22 !important; border-color: #efc8c4 !important; }
 
         .agenda-modal-backdrop {
-          position: fixed;
-          inset: 0;
-          z-index: 100;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          padding: 20px;
-          box-sizing: border-box;
-          overflow-y: auto;
+          position: fixed; inset: 0; z-index: 100; display: flex; align-items: center;
+          justify-content: center; padding: 20px; box-sizing: border-box; overflow-y: auto;
           background: rgba(15, 23, 42, 0.45);
         }
-
         .agenda-modal-card {
-          width: min(760px, 100%);
-          max-height: calc(100vh - 40px);
-          overflow-y: auto;
-          box-sizing: border-box;
-          padding: 24px;
+          width: min(760px, 100%); max-height: calc(100vh - 40px); overflow-y: auto;
+          box-sizing: border-box; padding: 24px;
         }
-
-        .agenda-form {
-          display: grid;
-          gap: 16px;
-          min-width: 0;
-        }
-
-        .agenda-form-field {
-          min-width: 0;
-        }
-
+        .agenda-form { display: grid; gap: 16px; min-width: 0; }
+        .agenda-form-field { min-width: 0; }
         .agenda-two-columns {
-          display: grid;
-          grid-template-columns: repeat(2, minmax(0, 1fr));
-          gap: 16px;
-          min-width: 0;
+          display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 16px; min-width: 0;
+        }
+        .agenda-two-columns > div { min-width: 0; }
+
+        /* Même méthode que Documents pour les champs date/heure. */
+        .agenda-date-input,
+        .agenda-time-input {
+          width: 100% !important;
+          min-width: 0 !important;
+          max-width: 100% !important;
+          box-sizing: border-box !important;
         }
 
-        .agenda-two-columns > div {
-          min-width: 0;
-        }
-
-        .agenda-native-date,
-        .agenda-native-time {
-          width: 100%;
-          min-width: 0;
-          max-width: 100%;
-          box-sizing: border-box;
-        }
-
-        .agenda-location-wrap {
-          position: relative;
-          min-width: 0;
-        }
-
+        .agenda-location-wrap { position: relative; min-width: 0; }
         .agenda-location-wrap > svg {
-          position: absolute;
-          left: 11px;
-          top: 50%;
-          transform: translateY(-50%);
-          color: var(--gipe-muted);
-          pointer-events: none;
+          position: absolute; left: 11px; top: 50%; transform: translateY(-50%);
+          color: var(--gipe-muted); pointer-events: none;
         }
-
         .agenda-location-wrap .input {
-          width: 100%;
-          box-sizing: border-box;
-          padding-left: 34px;
+          width: 100%; box-sizing: border-box; padding-left: 34px;
         }
-
-        .agenda-help {
-          margin-top: 6px;
-          font-size: 12px;
-          color: var(--gipe-muted);
-        }
-
-        .agenda-current-image {
-          margin-bottom: 12px;
-        }
-
+        .agenda-help { margin-top: 6px; font-size: 12px; color: var(--gipe-muted); }
+        .agenda-current-image { margin-bottom: 12px; }
         .agenda-current-image img {
-          width: 180px;
-          height: 120px;
-          max-width: 100%;
-          object-fit: cover;
-          border-radius: 10px;
-          border: 1px solid var(--gipe-line);
+          width: 180px; height: 120px; max-width: 100%; object-fit: cover;
+          border-radius: 10px; border: 1px solid var(--gipe-line);
         }
-
-        .agenda-file-row {
-          display: flex;
-          gap: 10px;
-          align-items: center;
-          flex-wrap: wrap;
-        }
-
-        .agenda-file-row input[type='file'] {
-          max-width: 100%;
-          box-sizing: border-box;
-        }
-
-        .agenda-file-row span,
-        .agenda-file-name {
-          color: var(--gipe-muted);
-          font-size: 13px;
-        }
-
-        .agenda-file-name {
-          margin-top: 8px;
-        }
-
-        .agenda-form-error {
-          margin-top: 2px;
-        }
-
+        .agenda-file-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+        .agenda-file-row input[type='file'] { max-width: 100%; box-sizing: border-box; }
+        .agenda-file-row span, .agenda-file-name { color: var(--gipe-muted); font-size: 13px; }
+        .agenda-file-name { margin-top: 8px; }
+        .agenda-form-error { margin-top: 2px; }
         .agenda-form-actions {
-          display: flex;
-          justify-content: flex-end;
-          gap: 10px;
-          margin-top: 8px;
+          display: flex; justify-content: flex-end; gap: 10px; margin-top: 8px;
         }
 
         @media (max-width: 700px) {
-          .agenda-section-head {
-            align-items: stretch !important;
-            flex-direction: column !important;
-          }
-
-          .agenda-search {
-            width: 100%;
-          }
-
+          .agenda-section-head { align-items: stretch !important; flex-direction: column !important; }
+          .agenda-search { width: 100%; }
           .agenda-list-item {
-            flex-direction: column !important;
-            align-items: stretch !important;
-            gap: 14px;
+            flex-direction: column !important; align-items: stretch !important; gap: 14px;
           }
-
-          .agenda-event-main {
-            width: 100%;
-          }
-
+          .agenda-event-main { width: 100%; }
           .agenda-item-actions {
-            width: 100%;
-            margin-left: 0;
-            justify-content: center !important;
-            gap: 10px !important;
+            width: 100%; margin-left: 0; justify-content: center !important; gap: 10px !important;
           }
-
           .agenda-item-actions .btn {
-            flex: 0 0 auto !important;
-            width: auto !important;
-            min-width: 145px !important;
-            max-width: none !important;
-            min-height: 40px !important;
-            height: 40px !important;
-            padding: 5px 16px !important;
-            display: inline-flex !important;
-            flex-direction: row !important;
-            align-items: center !important;
-            justify-content: center !important;
-            gap: 7px !important;
-            box-sizing: border-box !important;
-            font-size: 14px !important;
-            line-height: 1 !important;
+            flex: 0 0 auto !important; width: auto !important; min-width: 145px !important;
+            max-width: none !important; min-height: 40px !important; height: 40px !important;
+            padding: 5px 16px !important; display: inline-flex !important; flex-direction: row !important;
+            align-items: center !important; justify-content: center !important; gap: 7px !important;
+            box-sizing: border-box !important; font-size: 14px !important; line-height: 1 !important;
           }
-
-          .agenda-modal-backdrop {
-            align-items: flex-start;
-            padding: 10px;
-          }
-
+          .agenda-modal-backdrop { align-items: flex-start; padding: 10px; }
           .agenda-modal-card {
-            width: 100%;
-            max-width: 100%;
-            max-height: calc(100vh - 20px);
-            margin: 0 auto;
-            padding: 16px;
-            border-radius: 14px;
+            width: 100%; max-width: 100%; max-height: calc(100vh - 20px);
+            margin: 0 auto; padding: 16px; border-radius: 14px;
           }
+          .agenda-modal-head { align-items: flex-start !important; gap: 12px; }
+          .agenda-modal-head .btn { flex-shrink: 0; }
+          .agenda-two-columns { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+          .agenda-form-actions { flex-direction: column-reverse; align-items: stretch; }
+          .agenda-form-actions .btn { width: 100%; justify-content: center; }
 
-          .agenda-modal-head {
-            align-items: flex-start !important;
-            gap: 12px;
-          }
-
-          .agenda-modal-head .btn {
-            flex-shrink: 0;
-          }
-
-          .agenda-two-columns {
-            grid-template-columns: minmax(0, 1fr);
-            gap: 16px;
-          }
-
-          .agenda-form-actions {
-            flex-direction: column-reverse;
-            align-items: stretch;
-          }
-
-          .agenda-form-actions .btn {
-            width: 100%;
-            justify-content: center;
-          }
-
-          .agenda-native-date,
-          .agenda-native-time {
+          .agenda-date-input,
+          .agenda-time-input {
             width: 100% !important;
             min-width: 0 !important;
             max-width: 100% !important;
             box-sizing: border-box !important;
+            display: block !important;
+            -webkit-appearance: none !important;
+            appearance: none !important;
           }
         }
 
         @media (max-width: 480px) {
-          .agenda-event-main {
-            gap: 10px;
+          .agenda-event-main { gap: 10px; }
+          .agenda-event-image, .agenda-event-placeholder {
+            width: 58px; height: 58px; flex-basis: 58px;
           }
-
-          .agenda-event-image,
-          .agenda-event-placeholder {
-            width: 58px;
-            height: 58px;
-            flex-basis: 58px;
-          }
-
-          .agenda-modal-card {
-            padding: 14px;
-          }
-
-          .agenda-modal-card .section-title {
-            font-size: 19px;
-          }
+          .agenda-modal-card { padding: 14px; }
+          .agenda-modal-card .section-title { font-size: 19px; }
         }
       `}</style>
     </>
