@@ -242,8 +242,8 @@ export default function SiteDocumentsPage() {
                   </div>
                 </div>
                 <div className="documents-item-actions">
-                  <button style={{ width: '145px', flex: '0 0 145px', height: '40px' }} className="btn" type="button" onClick={() => openEdit(item)}><Pencil size={14} />Modifier</button>
-                  <button style={{ width: '145px', flex: '0 0 145px', height: '40px' }} className="btn documents-delete-button" type="button" onClick={() => void deleteDocument(item)} disabled={deletingId === item.id}>
+                  <button className="btn" type="button" onClick={() => openEdit(item)}><Pencil size={14} />Modifier</button>
+                  <button className="btn documents-delete-button" type="button" onClick={() => void deleteDocument(item)} disabled={deletingId === item.id}>
                     <Trash2 size={14} />{deletingId === item.id ? 'Suppression…' : 'Supprimer'}
                   </button>
                 </div>
@@ -328,7 +328,7 @@ export default function SiteDocumentsPage() {
         .documents-pdf-link { display: inline-block; margin-top: 6px; font-size: 13px; font-weight: 600; }
         .documents-item-actions { display: flex; gap: 8px; flex-shrink: 0; margin-left: 12px; }
         .documents-delete-button { color: #8a2b22; border-color: #efc8c4; }
-        .documents-item-actions .btn { box-sizing: border-box; line-height: 1.1; }
+        .documents-item-actions .btn { box-sizing: border-box; line-height: 1.1; width: 155px; flex: 0 0 155px; }
         .documents-modal-backdrop { position: fixed; inset: 0; background: rgba(15,23,42,.45); z-index: 100; display: flex; align-items: center; justify-content: center; padding: 20px; box-sizing: border-box; overflow-y: auto; }
         .documents-modal-card { width: min(760px, 100%); max-height: calc(100vh - 40px); overflow-y: auto; padding: 24px; box-sizing: border-box; }
         .documents-modal-head { margin-bottom: 20px; gap: 14px; }
@@ -352,7 +352,7 @@ export default function SiteDocumentsPage() {
           .documents-list-item { flex-direction: column !important; align-items: stretch !important; padding: 14px !important; gap: 14px !important; }
           .documents-item-main { width: 100%; }
           .documents-item-actions { width: 100%; margin-left: 0; gap: 10px; justify-content: center; }
-          .documents-item-actions .btn { flex: 0 0 145px; width: 145px; min-height: 40px; height: 40px; padding: 5px 8px; justify-content: center; font-size: 14px; }
+          .documents-item-actions .btn { flex: 0 0 145px !important; width: 145px !important; max-width: 145px !important; min-width: 145px !important; min-height: 40px !important; height: 40px !important; padding: 5px 8px !important; justify-content: center !important; font-size: 14px !important; box-sizing: border-box !important; }
           .documents-modal-backdrop { padding: 10px !important; align-items: flex-start !important; }
           .documents-modal-card { width: 100% !important; max-width: 100% !important; max-height: calc(100vh - 20px) !important; margin: 10px auto !important; padding: 16px !important; border-radius: 14px !important; }
           .documents-modal-head { align-items: flex-start !important; }
