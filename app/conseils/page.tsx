@@ -300,7 +300,7 @@ export default async function ConseilsPage() {
         </div>
       </section>
 
-      <style jsx>{`
+      <style>{`
         .conseils-classes-section {
           margin-top: 18px;
         }
@@ -450,3 +450,4 @@ export default async function ConseilsPage() {
     </>
   );
 }
+
