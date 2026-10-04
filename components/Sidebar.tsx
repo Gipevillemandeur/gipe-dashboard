@@ -27,7 +27,7 @@ const items = [
   },
   {
     href: '/conseils',
-    label: 'Conseils de classe',
+    label: 'Scolarité',
     icon: Users,
   },
   {
