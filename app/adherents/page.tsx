@@ -1224,12 +1224,13 @@ export default function AdherentsPage() {
           }
 
           .adherents-topbar-action {
-            width: 100%;
+            width: auto;
           }
 
           .adherents-topbar-action .btn {
-            width: 100%;
+            width: auto;
             justify-content: center;
+            white-space: nowrap;
           }
 
           .adherents-summary {
@@ -1358,3 +1359,4 @@ export default function AdherentsPage() {
     </>
   );
 }
+
