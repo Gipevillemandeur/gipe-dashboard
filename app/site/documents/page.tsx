@@ -349,7 +349,7 @@ export default function SiteDocumentsPage() {
         @media (max-width: 700px) {
           .documents-topbar { align-items: stretch !important; flex-direction: column !important; gap: 14px !important; }
           .documents-topbar .topbar-right { width: auto !important; align-self: flex-start !important; flex: 0 0 auto !important; }
-          .documents-new-button { width: 274px !important; min-width: 274px !important; max-width: 274px !important; flex: 0 0 274px !important; align-self: flex-start !important; box-sizing: border-box; justify-content: center; }
+          .documents-new-button { width: 145px !important; min-width: 145px !important; max-width: 145px !important; flex: 0 0 145px !important; align-self: flex-start !important; box-sizing: border-box; justify-content: center; padding-left: 10px !important; padding-right: 10px !important; font-size: 14px !important; gap: 7px !important; }
           .documents-section-head { align-items: stretch !important; flex-direction: column !important; }
           .documents-search-wrap { width: 100%; }
           .documents-list-item { flex-direction: column !important; align-items: stretch !important; padding: 14px !important; gap: 14px !important; }
@@ -377,4 +377,5 @@ export default function SiteDocumentsPage() {
     </>
   );
 }
+
 
