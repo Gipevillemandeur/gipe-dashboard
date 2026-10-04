@@ -840,11 +840,13 @@ export default function SiteAgendaPage() {
 
           .agenda-native-date,
           .agenda-native-time {
-            width: 0 !important;
-            min-width: 100% !important;
+            width: 100% !important;
+            min-width: 0 !important;
             max-width: 100% !important;
             min-inline-size: 100% !important;
-            inline-size: 0 !important;
+            inline-size: 100% !important;
+            height: 98px !important;
+            min-height: 98px !important;
             box-sizing: border-box !important;
             display: block !important;
             -webkit-appearance: none !important;
@@ -876,5 +878,4 @@ export default function SiteAgendaPage() {
     </>
   );
 }
-
 
