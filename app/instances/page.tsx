@@ -843,6 +843,7 @@ export default function InstancesPage() {
 
         label {
           display: grid;
+          min-width: 0;
           gap: 7px;
         }
 
@@ -979,7 +980,30 @@ export default function InstancesPage() {
           }
 
           .form-grid {
-            grid-template-columns: 1fr;
+            grid-template-columns: minmax(0, 1fr);
+          }
+
+          .form-grid > label {
+            width: 100%;
+            min-width: 0;
+          }
+
+          .form-grid input,
+          .form-grid select {
+            width: 100%;
+            min-width: 0;
+            max-width: 100%;
+            box-sizing: border-box;
+          }
+
+          .form-grid input[type='date'],
+          .form-grid input[type='time'] {
+            display: block;
+            width: 100%;
+            min-width: 0;
+            max-width: 100%;
+            box-sizing: border-box;
+            font-size: 16px;
           }
 
           label.full {
