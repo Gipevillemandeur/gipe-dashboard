@@ -134,8 +134,8 @@ export default function ScolaritePage() {
           width: 64px;
           height: 64px;
           border-radius: 16px;
-          background: #f1f5f9;
-          color: #334155;
+          background: #fff0d9;
+          color: #302b27;
         }
 
         .choice-content {
