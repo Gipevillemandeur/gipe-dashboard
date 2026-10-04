@@ -844,7 +844,7 @@ export default function SiteActualitesPage() {
                 style={{
                   display: 'grid',
                   gridTemplateColumns:
-                    'minmax(0, 1fr) minmax(0, 1fr)',
+                    '1fr 1fr',
                   gap: 12,
                 }}
               >
@@ -1249,10 +1249,34 @@ export default function SiteActualitesPage() {
           min-width: 0;
         }
 
+        
         .actualites-item-actions {
-          flex-wrap: wrap;
-          justify-content: flex-end;
+          display: flex;
+          gap: 10px;
+          flex-wrap: nowrap;
+          flex-shrink: 0;
+          align-items: center;
+          justify-content: center;
         }
+
+        .actualites-item-actions .btn {
+          flex: 0 0 auto !important;
+          width: auto !important;
+          min-width: 145px !important;
+          max-width: none !important;
+          min-height: 40px !important;
+          height: 40px !important;
+          padding: 5px 16px !important;
+          display: inline-flex !important;
+          flex-direction: row !important;
+          align-items: center !important;
+          justify-content: center !important;
+          gap: 7px !important;
+          box-sizing: border-box !important;
+          font-size: 14px !important;
+          line-height: 1 !important;
+        }
+
 
         .actualites-modal-backdrop {
           box-sizing: border-box;
@@ -1266,23 +1290,8 @@ export default function SiteActualitesPage() {
           width: 100% !important;
           min-width: 0 !important;
           max-width: 100% !important;
-          inline-size: 100% !important;
-          min-inline-size: 0 !important;
-          max-inline-size: 100% !important;
           box-sizing: border-box !important;
           display: block !important;
-          -webkit-appearance: none !important;
-          appearance: none !important;
-        }
-
-        .actualites-two-columns {
-          min-width: 0;
-        }
-
-        .actualites-two-columns > label {
-          min-width: 0;
-          width: 100%;
-          box-sizing: border-box;
         }
 
         @media (max-width: 700px) {
@@ -1307,12 +1316,27 @@ export default function SiteActualitesPage() {
 
           .actualites-item-actions {
             width: 100%;
-            justify-content: stretch !important;
+            margin-left: 0;
+            justify-content: center !important;
+            gap: 10px !important;
           }
 
           .actualites-item-actions .btn {
-            flex: 1 1 0;
-            justify-content: center;
+            flex: 0 0 auto !important;
+            width: auto !important;
+            min-width: 145px !important;
+            max-width: none !important;
+            min-height: 40px !important;
+            height: 40px !important;
+            padding: 5px 16px !important;
+            display: inline-flex !important;
+            flex-direction: row !important;
+            align-items: center !important;
+            justify-content: center !important;
+            gap: 7px !important;
+            box-sizing: border-box !important;
+            font-size: 14px !important;
+            line-height: 1 !important;
           }
 
           .actualites-modal-backdrop {
