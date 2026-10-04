@@ -579,7 +579,7 @@ export default function SiteActualitesPage() {
             {filteredNews.map(
               (item) => (
                 <div
-                  className="list-item"
+                  className="list-item actualites-list-item"
                   key={item.id}
                   style={{
                     alignItems:
