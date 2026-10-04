@@ -436,29 +436,25 @@ export default function InstancesPage() {
 
                 <div className="instance-two-columns">
                   <div className="instance-form-field">
-                    <label>
-                      <span>Date *</span>
-                      <input
-                        className="instance-native-date"
-                        type="date"
-                        value={meetingDate}
-                        onChange={(event) => setMeetingDate(event.target.value)}
-                        required
-                      />
-                    </label>
+                    <label className="instance-label">Date *</label>
+                    <input
+                      className="input instance-native-date"
+                      type="date"
+                      value={meetingDate}
+                      onChange={(event) => setMeetingDate(event.target.value)}
+                      required
+                    />
                   </div>
 
                   <div className="instance-form-field">
-                    <label>
-                      <span>Heure *</span>
-                      <input
-                        className="instance-native-time"
-                        type="time"
-                        value={meetingTime}
-                        onChange={(event) => setMeetingTime(event.target.value)}
-                        required
-                      />
-                    </label>
+                    <label className="instance-label">Heure *</label>
+                    <input
+                      className="input instance-native-time"
+                      type="time"
+                      value={meetingTime}
+                      onChange={(event) => setMeetingTime(event.target.value)}
+                      required
+                    />
                   </div>
                 </div>
 
@@ -789,16 +785,13 @@ export default function InstancesPage() {
           align-items: center;
           justify-content: center;
           padding: 20px;
-          box-sizing: border-box;
-          overflow-y: auto;
           background: rgba(15, 23, 42, 0.45);
         }
 
         .modal {
-          width: min(760px, 100%);
+          width: min(620px, 100%);
           max-height: calc(100vh - 40px);
           overflow-y: auto;
-          box-sizing: border-box;
           border-radius: 18px;
           background: #fff;
           box-shadow: 0 20px 60px rgba(15, 23, 42, 0.2);
@@ -903,6 +896,21 @@ export default function InstancesPage() {
           min-width: 0;
         }
 
+        .instance-label {
+          display: block;
+          margin-bottom: 7px;
+          color: #334155;
+          font-size: 13px;
+          font-weight: 700;
+        }
+
+        .instance-form-field .input {
+          width: 100%;
+          min-width: 0;
+          max-width: 100%;
+          box-sizing: border-box;
+        }
+
         .instance-native-date,
         .instance-native-time {
           width: 100%;
@@ -997,16 +1005,14 @@ export default function InstancesPage() {
           }
 
           .modal-backdrop {
-            align-items: flex-start;
-            padding: 10px;
+            align-items: flex-end;
+            padding: 0;
           }
 
           .modal {
             width: 100%;
-            max-width: 100%;
-            max-height: calc(100vh - 20px);
-            margin: 0 auto;
-            border-radius: 14px;
+            max-height: 92vh;
+            border-radius: 18px 18px 0 0;
           }
 
           .modal-head,
