@@ -283,8 +283,8 @@ export default async function ClassesPage() {
           width: 42px;
           height: 42px;
           border-radius: 12px;
-          background: #f1f5f9;
-          color: #334155;
+          background: #fff0d9;
+          color: #302b27;
         }
 
         .stat-card strong {
