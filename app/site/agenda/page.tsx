@@ -494,15 +494,23 @@ export default function SiteAgendaPage() {
         .agenda-two-columns > div { min-width: 0; }
 
         /* Même méthode que Documents pour les champs date/heure. */
-        .agenda-date-input,
-        .agenda-time-input {
+        .agenda-date-input {
           width: 100% !important;
           min-width: 0 !important;
           max-width: 100% !important;
           box-sizing: border-box !important;
         }
 
-        .agenda-location-wrap { position: relative; min-width: 0; width: 100%; height: 44px; }
+        .agenda-time-input {
+          width: 100% !important;
+          min-width: 48px !important;
+          max-width: 100% !important;
+          height: 48px !important;
+          min-height: 48px !important;
+          box-sizing: border-box !important;
+        }
+
+        .agenda-location-wrap { position: relative; min-width: 0; width: 100%; height: 48px; }
         .agenda-location-wrap > svg {
           position: absolute; left: 11px; top: 50%; transform: translateY(-50%);
           width: 15px; height: 15px; display: block;
@@ -555,11 +563,22 @@ export default function SiteAgendaPage() {
           .agenda-form-actions { flex-direction: column-reverse; align-items: stretch; }
           .agenda-form-actions .btn { width: 100%; justify-content: center; }
 
-          .agenda-date-input,
-          .agenda-time-input {
+          .agenda-date-input {
             width: 100% !important;
             min-width: 0 !important;
             max-width: 100% !important;
+            box-sizing: border-box !important;
+            display: block !important;
+            -webkit-appearance: none !important;
+            appearance: none !important;
+          }
+
+          .agenda-time-input {
+            width: 100% !important;
+            min-width: 48px !important;
+            max-width: 100% !important;
+            height: 48px !important;
+            min-height: 48px !important;
             box-sizing: border-box !important;
             display: block !important;
             -webkit-appearance: none !important;
@@ -579,6 +598,5 @@ export default function SiteAgendaPage() {
     </>
   );
 }
-
 
 
