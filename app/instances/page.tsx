@@ -1,1264 +1,891 @@
-'use client';
+'use client'
 
+import Link from 'next/link'
+import { useEffect, useMemo, useState } from 'react'
 import {
-  FormEvent,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
-
-import {
-  ImagePlus,
-  Newspaper,
+  ArrowLeft,
+  CalendarDays,
+  Clock3,
+  MapPin,
   Pencil,
   Plus,
-  Search,
   Trash2,
   X,
-} from 'lucide-react';
+} from 'lucide-react'
 
-type NewsItem = {
-  id: string;
-  title: string | null;
-  content: string | null;
-  category: string | null;
-  image_url: string | null;
-  date: string | null;
-  author: string | null;
-};
-
-const categories = [
-  'Information',
-  'GIPE',
-  'Portes Ouvertes',
-];
-
-const smileys = [
-  '😊',
-  '😃',
-  '😄',
-  '😁',
-  '😂',
-  '🤣',
-  '😍',
-  '🥳',
-  '🤩',
-  '👍',
-  '👏',
-  '❤️',
-  '🙏',
-];
-
-const symbols = [
-  '⚠️',
-  '🚨',
-  '✅',
-  '❌',
-  '📢',
-  '📣',
-  '🔔',
-  '📅',
-  '📌',
-  '❗',
-  '⭐',
-  '💡',
-  '🎉',
-  '🎊',
-  '🎓',
-  '📚',
-  '🏫',
-];
-
-function today() {
-  return new Date()
-    .toISOString()
-    .slice(0, 10);
+type Meeting = {
+  id: string
+  type: string
+  subject: string
+  meeting_date: string
+  meeting_time: string | null
+  location: string | null
+  school_year_id: string
 }
 
-function formatDate(
-  value: string | null
-) {
-  if (!value) return '—';
-
-  const date = new Date(
-    `${value}T00:00:00`
-  );
-
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-
-  return date.toLocaleDateString(
-    'fr-FR'
-  );
+type SchoolYear = {
+  id: string
+  label: string
 }
 
-function excerpt(
-  value: string | null
-) {
-  const text = value || '';
+const MEETING_TYPES = [
+  'Réunion GIPE',
+  'Conseil de classe',
+  'Conseil de discipline',
+  "Conseil d'administration",
+  'Autre',
+]
 
-  if (text.length <= 120) {
-    return text;
-  }
-
-  return `${text.slice(0, 120)}…`;
+function formatDate(value: string) {
+  const date = new Date(`${value}T00:00:00`)
+  return new Intl.DateTimeFormat('fr-FR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  }).format(date)
 }
 
-export default function SiteActualitesPage() {
-  const [news, setNews] =
-    useState<NewsItem[]>([]);
+function isPastMeeting(meeting: Meeting) {
+  const meetingDateTime = new Date(
+    `${meeting.meeting_date}T${meeting.meeting_time || '23:59'}`
+  )
 
-  const [loading, setLoading] =
-    useState(true);
+  return meetingDateTime.getTime() < Date.now()
+}
 
-  const [saving, setSaving] =
-    useState(false);
+export default function InstancesPage() {
+  const [meetings, setMeetings] = useState<Meeting[]>([])
+  const [schoolYear, setSchoolYear] = useState<SchoolYear | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [error, setError] = useState('')
+  const [modalMode, setModalMode] = useState<'create' | 'edit' | null>(null)
+  const [selectedMeeting, setSelectedMeeting] = useState<Meeting | null>(null)
 
-  const [deletingId, setDeletingId] =
-    useState<string | null>(null);
+  const [type, setType] = useState('Réunion GIPE')
+  const [subject, setSubject] = useState('')
+  const [meetingDate, setMeetingDate] = useState('')
+  const [meetingTime, setMeetingTime] = useState('')
+  const [location, setLocation] = useState('')
 
-  const [error, setError] =
-    useState('');
-
-  const [search, setSearch] =
-    useState('');
-
-  const [showForm, setShowForm] =
-    useState(false);
-
-  const [editingId, setEditingId] =
-    useState<string | null>(null);
-
-  const [title, setTitle] =
-    useState('');
-
-  const [content, setContent] =
-    useState('');
-
-  const [category, setCategory] =
-    useState('');
-
-  const [date, setDate] =
-    useState(today());
-
-  const [author, setAuthor] =
-    useState('GIPE');
-
-  const [imageFile, setImageFile] =
-    useState<File | null>(null);
-
-  const [currentImage, setCurrentImage] =
-    useState<string | null>(null);
-
-  const fileInputRef =
-    useRef<HTMLInputElement>(null);
-
-  const [showSmileys, setShowSmileys] =
-    useState(false);
-
-  const [showSymbols, setShowSymbols] =
-    useState(false);
-
-  async function loadNews() {
-    setLoading(true);
-    setError('');
-
+  async function loadMeetings() {
     try {
-      const response =
-        await fetch(
-          '/api/site/actualites',
-          {
-            cache: 'no-store',
-          }
-        );
+      setLoading(true)
+      setError('')
 
-      const data =
-        await response.json();
+      const response = await fetch('/api/instances', {
+        cache: 'no-store',
+      })
+
+      const data = await response.json()
 
       if (!response.ok) {
-        throw new Error(
-          data?.error ||
-            'Impossible de charger les actualités.'
-        );
+        throw new Error(data.error || 'Impossible de charger les réunions.')
       }
 
-      setNews(
-        data.news || []
-      );
+      setMeetings(data.meetings || [])
+      setSchoolYear(data.schoolYear || null)
     } catch (err) {
       setError(
         err instanceof Error
           ? err.message
-          : 'Impossible de charger les actualités.'
-      );
+          : 'Impossible de charger les réunions.'
+      )
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
   }
 
   useEffect(() => {
-    void loadNews();
-  }, []);
-
-  const filteredNews =
-    useMemo(() => {
-      const value =
-        search.trim().toLowerCase();
-
-      if (!value) {
-        return news;
-      }
-
-      return news.filter(
-        (item) =>
-          [
-            item.title || '',
-            item.content || '',
-            item.category || '',
-            item.author || '',
-          ]
-            .join(' ')
-            .toLowerCase()
-            .includes(value)
-      );
-    }, [news, search]);
+    loadMeetings()
+  }, [])
 
   function resetForm() {
-    setEditingId(null);
-    setTitle('');
-    setContent('');
-    setCategory('');
-    setDate(today());
-    setAuthor('GIPE');
-    setImageFile(null);
-    setCurrentImage(null);
-    setShowSmileys(false);
-    setShowSymbols(false);
-
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
+    setType('Réunion GIPE')
+    setSubject('')
+    setMeetingDate('')
+    setMeetingTime('')
+    setLocation('')
   }
 
-  function openNew() {
-    resetForm();
-    setError('');
-    setShowForm(true);
+  function openCreate() {
+    setError('')
+    resetForm()
+    setSelectedMeeting(null)
+    setModalMode('create')
   }
 
-  function openEdit(
-    item: NewsItem
-  ) {
-    setEditingId(item.id);
-    setTitle(item.title || '');
-    setContent(item.content || '');
-    setCategory(item.category || '');
-    setDate(
-      item.date
-        ? item.date.slice(0, 10)
-        : today()
-    );
-    setAuthor(
-      item.author || 'GIPE'
-    );
-    setImageFile(null);
-    setCurrentImage(
-      item.image_url || null
-    );
-    setShowSmileys(false);
-    setShowSymbols(false);
-    setError('');
-    setShowForm(true);
+  function openEdit(meeting: Meeting) {
+    setError('')
+    setSelectedMeeting(meeting)
+    setType(meeting.type)
+    setSubject(meeting.subject)
+    setMeetingDate(meeting.meeting_date)
+    setMeetingTime(meeting.meeting_time?.slice(0, 5) || '')
+    setLocation(meeting.location || '')
+    setModalMode('edit')
   }
 
-  function closeForm() {
-    if (saving) return;
-
-    setShowForm(false);
-    resetForm();
+  function closeModal() {
+    if (saving || deleting) return
+    setModalMode(null)
+    setSelectedMeeting(null)
   }
 
-  function insertText(
-    value: string
-  ) {
-    setContent(
-      (current) =>
-        `${current}${value}`
-    );
-  }
-
-  async function submit(
-    event: FormEvent<HTMLFormElement>
-  ) {
-    event.preventDefault();
-
-    setSaving(true);
-    setError('');
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault()
 
     try {
-      const formData =
-        new FormData();
+      setSaving(true)
+      setError('')
 
-      formData.set(
-        'title',
-        title
-      );
+      const response = await fetch('/api/instances', {
+        method: modalMode === 'edit' ? 'PUT' : 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          ...(modalMode === 'edit'
+            ? { id: selectedMeeting?.id }
+            : {}),
+          type,
+          subject,
+          meetingDate,
+          meetingTime,
+          location,
+        }),
+      })
 
-      formData.set(
-        'content',
-        content
-      );
-
-      formData.set(
-        'category',
-        category
-      );
-
-      formData.set(
-        'date',
-        date
-      );
-
-      formData.set(
-        'author',
-        author
-      );
-
-      if (imageFile) {
-        formData.set(
-          'imageFile',
-          imageFile
-        );
-      }
-
-      let response: Response;
-
-      if (editingId) {
-        formData.set(
-          'id',
-          editingId
-        );
-
-        formData.set(
-          'keepImage',
-          imageFile
-            ? 'false'
-            : 'true'
-        );
-
-        response =
-          await fetch(
-            '/api/site/actualites',
-            {
-              method: 'PUT',
-              body: formData,
-            }
-          );
-      } else {
-        response =
-          await fetch(
-            '/api/site/actualites',
-            {
-              method: 'POST',
-              body: formData,
-            }
-          );
-      }
-
-      const data =
-        await response.json();
+      const data = await response.json()
 
       if (!response.ok) {
         throw new Error(
-          data?.error ||
-            'Impossible d’enregistrer l’actualité.'
-        );
+          data.error ||
+            (modalMode === 'edit'
+              ? 'Impossible de modifier la réunion.'
+              : "Impossible d'ajouter la réunion.")
+        )
       }
 
-      await loadNews();
+      setMeetings((current) => {
+        const next =
+          modalMode === 'edit'
+            ? current.map((meeting) =>
+                meeting.id === data.meeting.id
+                  ? data.meeting
+                  : meeting
+              )
+            : [...current, data.meeting]
 
-      setShowForm(false);
-      resetForm();
+        return [...next].sort((a, b) => {
+          const aKey = `${a.meeting_date}T${a.meeting_time || '23:59'}`
+          const bKey = `${b.meeting_date}T${b.meeting_time || '23:59'}`
+          return aKey.localeCompare(bKey)
+        })
+      })
+
+      setModalMode(null)
+      setSelectedMeeting(null)
+      resetForm()
     } catch (err) {
       setError(
         err instanceof Error
           ? err.message
-          : 'Impossible d’enregistrer l’actualité.'
-      );
+          : modalMode === 'edit'
+            ? 'Impossible de modifier la réunion.'
+            : "Impossible d'ajouter la réunion."
+      )
     } finally {
-      setSaving(false);
+      setSaving(false)
     }
   }
 
-  async function deleteNews(
-    item: NewsItem
-  ) {
-    if (deletingId) return;
+  async function handleDelete() {
+    if (!selectedMeeting) return
 
-    const confirmed =
-      window.confirm(
-        `Supprimer l’actualité « ${item.title || 'Sans titre'} » ?\n\nCette action est irréversible.`
-      );
+    const confirmed = window.confirm(
+      `Supprimer la réunion « ${selectedMeeting.subject} » ?\n\nCette action est définitive.`
+    )
 
-    if (!confirmed) return;
-
-    setDeletingId(item.id);
-    setError('');
+    if (!confirmed) return
 
     try {
-      const response =
-        await fetch(
-          '/api/site/actualites',
-          {
-            method: 'DELETE',
-            headers: {
-              'Content-Type':
-                'application/json',
-            },
-            body: JSON.stringify({
-              id: item.id,
-            }),
-          }
-        );
+      setDeleting(true)
+      setError('')
 
-      const data =
-        await response.json();
+      const response = await fetch('/api/instances', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          id: selectedMeeting.id,
+        }),
+      })
+
+      const data = await response.json()
 
       if (!response.ok) {
         throw new Error(
-          data?.error ||
-            'Impossible de supprimer l’actualité.'
-        );
+          data.error || 'Impossible de supprimer la réunion.'
+        )
       }
 
-      await loadNews();
+      setMeetings((current) =>
+        current.filter(
+          (meeting) => meeting.id !== selectedMeeting.id
+        )
+      )
+
+      setModalMode(null)
+      setSelectedMeeting(null)
+      resetForm()
     } catch (err) {
       setError(
         err instanceof Error
           ? err.message
-          : 'Impossible de supprimer l’actualité.'
-      );
+          : 'Impossible de supprimer la réunion.'
+      )
     } finally {
-      setDeletingId(null);
+      setDeleting(false)
     }
   }
+
+  const upcomingMeetings = useMemo(
+    () => meetings.filter((meeting) => !isPastMeeting(meeting)),
+    [meetings]
+  )
+
+  const pastMeetings = useMemo(
+    () => [...meetings.filter(isPastMeeting)].reverse(),
+    [meetings]
+  )
 
   return (
-    <>
-      <div className="topbar">
+    <main className="page">
+      <section className="hero">
         <div>
           <div className="eyebrow">
-            Site internet
+            <CalendarDays size={16} />
+            Scolarité
           </div>
 
-          <h1>
-            Actualités
-          </h1>
+          <h1>Instances</h1>
 
-          <div className="kicker">
-            Gestion des actualités publiées
-            sur gipevillemandeur.com.
-          </div>
+          <p>
+            Gérez les réunions et instances de l&apos;établissement, leurs
+            informations et les documents associés.
+          </p>
         </div>
 
-        <div className="topbar-right">
-          <button
-            className="btn btn-primary"
-            type="button"
-            onClick={openNew}
-          >
-            <Plus size={15} />
-            Nouvelle actualité
-          </button>
-        </div>
-      </div>
+        <Link href="/conseils" className="back-link">
+          <ArrowLeft size={16} />
+          Scolarité
+        </Link>
+      </section>
 
-      {error && (
-        <div
-          className="notice notice-error"
-          style={{
-            marginBottom: 18,
-          }}
-        >
+      <section className="toolbar">
+        <div>
+          <h2>Réunions</h2>
+          <p>
+            {schoolYear
+              ? `Année scolaire ${schoolYear.label}`
+              : 'Les réunions à venir et passées seront regroupées ici.'}
+          </p>
+        </div>
+
+        <button type="button" className="add-button" onClick={openCreate}>
+          <Plus size={18} />
+          Ajouter une réunion
+        </button>
+      </section>
+
+      {error && !modalMode && (
+        <div className="page-error" role="alert">
           {error}
         </div>
       )}
 
-      <section className="card section-card actualites-card">
-        <div className="section-head actualites-section-head">
-          <div>
-            <h2 className="section-title">
-              Actualités publiées
-            </h2>
-
-            <p className="section-sub">
-              {news.length}{' '}
-              actualité
-              {news.length > 1
-                ? 's'
-                : ''}
-              actuellement enregistrée
-              {news.length > 1
-                ? 's'
-                : ''}.
-            </p>
+      {loading ? (
+        <section className="empty-card">
+          <div className="empty-icon">
+            <CalendarDays size={30} />
+          </div>
+          <h2>Chargement des réunions…</h2>
+        </section>
+      ) : meetings.length === 0 ? (
+        <section className="empty-card">
+          <div className="empty-icon">
+            <CalendarDays size={30} />
           </div>
 
+          <h2>Aucune réunion enregistrée</h2>
+
+          <p>
+            Commencez par ajouter votre première réunion. Vous pourrez ensuite
+            y associer un résumé, un compte rendu et plusieurs documents.
+          </p>
+        </section>
+      ) : (
+        <section className="meeting-sections">
+          {upcomingMeetings.length > 0 && (
+            <div className="meeting-group">
+              <div className="group-title">
+                <h2>À venir</h2>
+                <span>{upcomingMeetings.length}</span>
+              </div>
+
+              <div className="meeting-list">
+                {upcomingMeetings.map((meeting) => (
+                  <MeetingCard
+                    key={meeting.id}
+                    meeting={meeting}
+                    onOpen={() => openEdit(meeting)}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {pastMeetings.length > 0 && (
+            <div className="meeting-group">
+              <div className="group-title">
+                <h2>Passées</h2>
+                <span>{pastMeetings.length}</span>
+              </div>
+
+              <div className="meeting-list">
+                {pastMeetings.map((meeting) => (
+                  <MeetingCard
+                    key={meeting.id}
+                    meeting={meeting}
+                    onOpen={() => openEdit(meeting)}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+        </section>
+      )}
+
+      {modalMode && (
+        <div className="modal-backdrop" onMouseDown={closeModal}>
           <div
-            style={{
-              width: 280,
-              maxWidth: '100%',
-            }}
+            className="modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="meeting-modal-title"
+            onMouseDown={(event) => event.stopPropagation()}
           >
-            <div
-              style={{
-                position: 'relative',
-              }}
-            >
-              <Search
-                size={15}
-                style={{
-                  position:
-                    'absolute',
-                  left: 11,
-                  top: '50%',
-                  transform:
-                    'translateY(-50%)',
-                  color:
-                    'var(--gipe-muted)',
-                }}
-              />
-
-              <input
-                className="input"
-                style={{
-                  paddingLeft: 34,
-                }}
-                value={search}
-                onChange={(e) =>
-                  setSearch(
-                    e.target.value
-                  )
-                }
-                placeholder="Rechercher une actualité..."
-              />
-            </div>
-          </div>
-        </div>
-
-        {loading ? (
-          <div className="list-item">
-            <div className="item-main">
-              <strong>
-                Chargement…
-              </strong>
-
-              <span>
-                Récupération des actualités.
-              </span>
-            </div>
-          </div>
-        ) : filteredNews.length === 0 ? (
-          <div className="list-item">
-            <div className="item-main">
-              <strong>
-                Aucune actualité trouvée.
-              </strong>
-
-              <span>
-                {search
-                  ? 'Essaie une autre recherche.'
-                  : 'Aucune actualité n’est encore enregistrée.'}
-              </span>
-            </div>
-          </div>
-        ) : (
-          <div className="list">
-            {filteredNews.map(
-              (item) => (
-                <div
-                  className="list-item actualites-list-item"
-                  key={item.id}
-                  style={{
-                    alignItems:
-                      'flex-start',
-                  }}
-                >
-                  <div
-                    className="actualites-item-main"
-                    style={{
-                      display: 'flex',
-                      gap: 14,
-                      minWidth: 0,
-                      flex: 1,
-                    }}
-                  >
-                    {item.image_url ? (
-                      <img
-                        src={
-                          item.image_url
-                        }
-                        alt={
-                          item.title ||
-                          'Actualité'
-                        }
-                        style={{
-                          width: 74,
-                          height: 74,
-                          objectFit:
-                            'cover',
-                          borderRadius: 10,
-                          border:
-                            '1px solid var(--gipe-line)',
-                          flexShrink: 0,
-                        }}
-                      />
-                    ) : (
-                      <div
-                        style={{
-                          width: 74,
-                          height: 74,
-                          borderRadius: 10,
-                          background:
-                            '#fff1dc',
-                          display:
-                            'grid',
-                          placeItems:
-                            'center',
-                          flexShrink: 0,
-                        }}
-                      >
-                        <Newspaper
-                          size={26}
-                        />
-                      </div>
-                    )}
-
-                    <div
-                      style={{
-                        minWidth: 0,
-                      }}
-                    >
-                      <strong
-                        style={{
-                          display:
-                            'block',
-                          fontSize:
-                            14,
-                        }}
-                      >
-                        {item.title ||
-                          'Sans titre'}
-                      </strong>
-
-                      <div
-                        style={{
-                          display:
-                            'flex',
-                          flexWrap:
-                            'wrap',
-                          gap: 7,
-                          marginTop: 5,
-                        }}
-                      >
-                        {item.category && (
-                          <span className="badge badge-info">
-                            {
-                              item.category
-                            }
-                          </span>
-                        )}
-
-                        <span className="badge badge-ok">
-                          {formatDate(
-                            item.date
-                          )}
-                        </span>
-                      </div>
-
-                      <p
-                        style={{
-                          margin:
-                            '8px 0 0',
-                          fontSize:
-                            12,
-                          color:
-                            'var(--gipe-muted)',
-                        }}
-                      >
-                        {excerpt(
-                          item.content
-                        )}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div
-                    className="btn-row actualites-item-actions"
-                    style={{
-                      flexShrink: 0,
-                    }}
-                  >
-                    <button
-                      className="btn"
-                      type="button"
-                      onClick={() =>
-                        openEdit(
-                          item
-                        )
-                      }
-                    >
-                      <Pencil
-                        size={13}
-                      />
-                      Modifier
-                    </button>
-
-                    <button
-                      className="btn"
-                      type="button"
-                      disabled={
-                        deletingId ===
-                        item.id
-                      }
-                      onClick={() =>
-                        void deleteNews(
-                          item
-                        )
-                      }
-                      style={{
-                        color:
-                          '#8a2b22',
-                        borderColor:
-                          '#efc8c4',
-                      }}
-                    >
-                      <Trash2
-                        size={13}
-                      />
-                      {deletingId ===
-                      item.id
-                        ? 'Suppression…'
-                        : 'Supprimer'}
-                    </button>
-                  </div>
-                </div>
-              )
-            )}
-          </div>
-        )}
-      </section>
-
-      {showForm && (
-        <div
-          className="actualites-modal-backdrop"
-          role="dialog"
-          aria-modal="true"
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background:
-              'rgba(43,35,33,.38)',
-            zIndex: 100,
-            padding: 24,
-            overflowY: 'auto',
-          }}
-        >
-          <div
-            className="card actualites-modal-card"
-            style={{
-              width:
-                'min(760px, 100%)',
-              margin:
-                '40px auto',
-              padding: 24,
-            }}
-          >
-            <div
-              className="section-head"
-              style={{
-                marginBottom: 20,
-              }}
-            >
+            <div className="modal-head">
               <div>
-                <div className="eyebrow">
-                  Site internet
-                </div>
-
-                <h2
-                  className="section-title"
-                  style={{
-                    marginTop: 4,
-                    fontSize: 22,
-                  }}
-                >
-                  {editingId
-                    ? 'Modifier l’actualité'
-                    : 'Nouvelle actualité'}
+                <span>INSTANCE</span>
+                <h2 id="meeting-modal-title">
+                  {modalMode === 'edit'
+                    ? 'Modifier la réunion'
+                    : 'Ajouter une réunion'}
                 </h2>
               </div>
 
               <button
-                className="btn"
                 type="button"
-                onClick={closeForm}
+                className="close-button"
+                onClick={closeModal}
+                disabled={saving || deleting}
+                aria-label="Fermer"
               >
-                <X size={15} />
-                Fermer
+                <X size={20} />
               </button>
             </div>
 
-            <form
-              onSubmit={submit}
-              style={{
-                display: 'grid',
-                gap: 16,
-              }}
-            >
-              <label
-                style={{
-                  display: 'grid',
-                  gap: 7,
-                  fontSize: 12,
-                  fontWeight: 700,
-                }}
-              >
-                Titre
-                <input
-                  className="input"
-                  value={title}
-                  onChange={(e) =>
-                    setTitle(
-                      e.target.value
-                    )
-                  }
-                  placeholder="Titre de l’actualité"
-                  required
-                />
-              </label>
-
-              <div className="actualites-two-columns">
-                <label className="actualites-field">
-                  Date
-                  <input
-                    className="input actualites-date-input"
-                    type="date"
-                    value={date}
-                    onChange={(e) =>
-                      setDate(
-                        e.target.value
-                      )
-                    }
-                    required
-                  />
-                </label>
-
-                <label className="actualites-field">
-                  Auteur
-                  <input
-                    className="input"
-                    value={author}
-                    onChange={(e) =>
-                      setAuthor(
-                        e.target.value
-                      )
-                    }
-                  />
-                </label>
-              </div>
-
-              <label
-                style={{
-                  display: 'grid',
-                  gap: 7,
-                  fontSize: 12,
-                  fontWeight: 700,
-                }}
-              >
-                Catégorie
-                <select
-                  className="select"
-                  value={category}
-                  onChange={(e) =>
-                    setCategory(
-                      e.target.value
-                    )
-                  }
-                >
-                  <option value="">
-                    Sans catégorie
-                  </option>
-
-                  {categories.map(
-                    (item) => (
-                      <option
-                        key={item}
-                        value={item}
-                      >
-                        {item}
-                      </option>
-                    )
-                  )}
-                </select>
-              </label>
-
-              <label
-                style={{
-                  display: 'grid',
-                  gap: 7,
-                  fontSize: 12,
-                  fontWeight: 700,
-                }}
-              >
-                Contenu
-
-                <textarea
-                  className="input"
-                  value={content}
-                  onChange={(e) =>
-                    setContent(
-                      e.target.value
-                    )
-                  }
-                  rows={9}
-                  placeholder="Écris ici le contenu de l’actualité..."
-                  required
-                  style={{
-                    resize:
-                      'vertical',
-                    lineHeight: 1.5,
-                  }}
-                />
-              </label>
-
-              <div>
-                <div
-                  className="btn-row"
-                  style={{
-                    marginBottom: 8,
-                  }}
-                >
-                  <button
-                    className="btn"
-                    type="button"
-                    onClick={() =>
-                      setShowSmileys(
-                        (value) =>
-                          !value
-                      )
-                    }
-                  >
-                    😊 Smileys
-                  </button>
-
-                  <button
-                    className="btn"
-                    type="button"
-                    onClick={() =>
-                      setShowSymbols(
-                        (value) =>
-                          !value
-                      )
-                    }
-                  >
-                    ⭐ Symboles
-                  </button>
-                </div>
-
-                {showSmileys && (
-                  <div
-                    style={{
-                      display:
-                        'flex',
-                      flexWrap:
-                        'wrap',
-                      gap: 6,
-                      padding: 10,
-                      border:
-                        '1px solid var(--gipe-line)',
-                      borderRadius: 10,
-                      background:
-                        '#fffdf9',
-                      marginBottom: 8,
-                    }}
-                  >
-                    {smileys.map(
-                      (item) => (
-                        <button
-                          key={item}
-                          type="button"
-                          className="btn"
-                          onClick={() =>
-                            insertText(
-                              item
-                            )
-                          }
-                          style={{
-                            padding:
-                              '6px 8px',
-                            fontSize:
-                              18,
-                          }}
-                        >
-                          {item}
-                        </button>
-                      )
-                    )}
-                  </div>
-                )}
-
-                {showSymbols && (
-                  <div
-                    style={{
-                      display:
-                        'flex',
-                      flexWrap:
-                        'wrap',
-                      gap: 6,
-                      padding: 10,
-                      border:
-                        '1px solid var(--gipe-line)',
-                      borderRadius: 10,
-                      background:
-                        '#fffdf9',
-                    }}
-                  >
-                    {symbols.map(
-                      (item) => (
-                        <button
-                          key={item}
-                          type="button"
-                          className="btn"
-                          onClick={() =>
-                            insertText(
-                              item
-                            )
-                          }
-                          style={{
-                            padding:
-                              '6px 8px',
-                            fontSize:
-                              17,
-                          }}
-                        >
-                          {item}
-                        </button>
-                      )
-                    )}
-                  </div>
-                )}
-              </div>
-
-              <div
-                style={{
-                  border:
-                    '1px solid var(--gipe-line)',
-                  borderRadius: 14,
-                  padding: 14,
-                  background:
-                    '#fffdf9',
-                }}
-              >
-                <div
-                  style={{
-                    display:
-                      'flex',
-                    alignItems:
-                      'center',
-                    gap: 8,
-                    fontSize: 12,
-                    fontWeight: 700,
-                    marginBottom: 10,
-                  }}
-                >
-                  <ImagePlus
-                    size={16}
-                  />
-                  Image
-                </div>
-
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) =>
-                    setImageFile(
-                      e.target.files?.[0] ||
-                        null
-                    )
-                  }
-                />
-
-                <p
-                  style={{
-                    margin:
-                      '8px 0 0',
-                    color:
-                      'var(--gipe-muted)',
-                    fontSize: 11,
-                  }}
-                >
-                  Image uniquement,
-                  8 Mo maximum.
-                </p>
-
-                {currentImage &&
-                  !imageFile && (
-                    <div
-                      style={{
-                        marginTop:
-                          12,
-                        display:
-                          'flex',
-                        gap: 10,
-                        alignItems:
-                          'center',
-                      }}
-                    >
-                      <img
-                        src={
-                          currentImage
-                        }
-                        alt=""
-                        style={{
-                          width: 90,
-                          height: 60,
-                          objectFit:
-                            'cover',
-                          borderRadius: 8,
-                        }}
-                      />
-
-                      <span
-                        style={{
-                          fontSize:
-                            11,
-                          color:
-                            'var(--gipe-muted)',
-                        }}
-                      >
-                        Image actuelle
-                      </span>
-                    </div>
-                  )}
-
-                {imageFile && (
-                  <div
-                    style={{
-                      marginTop:
-                        10,
-                      fontSize: 12,
-                    }}
-                  >
-                    <strong>
-                      Nouvelle image :
-                    </strong>{' '}
-                    {
-                      imageFile.name
-                    }
-                  </div>
-                )}
-              </div>
-
+            <form onSubmit={handleSubmit}>
               {error && (
-                <div className="notice notice-error">
+                <div className="form-error" role="alert">
                   {error}
                 </div>
               )}
 
-              <div
-                className="btn-row actualites-form-actions"
-                style={{
-                  justifyContent:
-                    'flex-end',
-                }}
-              >
-                <button
-                  className="btn"
-                  type="button"
-                  onClick={
-                    closeForm
-                  }
-                  disabled={saving}
-                >
-                  Annuler
-                </button>
+              <div className="form-grid">
+                <label>
+                  <span>Type *</span>
+                  <select
+                    value={type}
+                    onChange={(event) => setType(event.target.value)}
+                    required
+                  >
+                    {MEETING_TYPES.map((item) => (
+                      <option key={item} value={item}>
+                        {item}
+                      </option>
+                    ))}
+                  </select>
+                </label>
 
-                <button
-                  className="btn btn-primary"
-                  type="submit"
-                  disabled={saving}
-                >
-                  {saving
-                    ? 'Enregistrement…'
-                    : editingId
-                      ? 'Enregistrer les modifications'
-                      : 'Publier l’actualité'}
-                </button>
+                <label className="full">
+                  <span>Objet *</span>
+                  <input
+                    type="text"
+                    value={subject}
+                    onChange={(event) => setSubject(event.target.value)}
+                    placeholder="Ex. Préparation du bal de fin d'année"
+                    maxLength={200}
+                    required
+                  />
+                </label>
+
+                <div className="instances-two-columns">
+                  <div className="instances-field">
+                    <label>Date *</label>
+                    <input
+                      className="input instances-date-input"
+                      type="date"
+                      value={meetingDate}
+                      onChange={(event) => setMeetingDate(event.target.value)}
+                      required
+                    />
+                  </div>
+
+                  <div className="instances-field">
+                    <label>Heure *</label>
+                    <input
+                      className="input instances-time-input"
+                      type="time"
+                      value={meetingTime}
+                      onChange={(event) => setMeetingTime(event.target.value)}
+                      required
+                    />
+                  </div>
+                </div>
+
+                <label className="full">
+                  <span>Lieu</span>
+                  <input
+                    type="text"
+                    value={location}
+                    onChange={(event) => setLocation(event.target.value)}
+                    placeholder="Ex. Salle de réunion du collège"
+                    maxLength={200}
+                  />
+                </label>
+              </div>
+
+              <div className="modal-actions">
+                {modalMode === 'edit' && (
+                  <button
+                    type="button"
+                    className="delete-button"
+                    onClick={handleDelete}
+                    disabled={saving || deleting}
+                  >
+                    <Trash2 size={16} />
+                    {deleting ? 'Suppression…' : 'Supprimer'}
+                  </button>
+                )}
+
+                <div className="modal-actions-right">
+                  <button
+                    type="button"
+                    className="secondary-button"
+                    onClick={closeModal}
+                    disabled={saving || deleting}
+                  >
+                    Annuler
+                  </button>
+
+                  <button
+                    type="submit"
+                    className="primary-button"
+                    disabled={saving || deleting}
+                  >
+                    <Pencil size={16} />
+                    {saving
+                      ? 'Enregistrement…'
+                      : modalMode === 'edit'
+                        ? 'Enregistrer'
+                        : 'Enregistrer'}
+                  </button>
+                </div>
               </div>
             </form>
           </div>
         </div>
       )}
 
-
-      <style jsx>{`
-        .actualites-card {
-          min-width: 0;
+      <style>{`
+        .page {
+          display: grid;
+          gap: 24px;
+          padding: 28px;
         }
 
-        .actualites-section-head {
-          gap: 18px;
-        }
-
-        .actualites-list-item {
-          gap: 18px;
-        }
-
-        .actualites-item-main {
-          min-width: 0;
-        }
-
-        
-        .actualites-item-actions {
+        .hero {
           display: flex;
-          gap: 10px;
-          flex-wrap: nowrap;
-          flex-shrink: 0;
+          align-items: flex-start;
+          justify-content: space-between;
+          gap: 24px;
+        }
+
+        .eyebrow {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          margin-bottom: 8px;
+          color: #64748b;
+          font-size: 14px;
+          font-weight: 700;
+        }
+
+        h1 {
+          margin: 0;
+          color: #0f172a;
+          font-size: clamp(28px, 4vw, 38px);
+          line-height: 1.1;
+          letter-spacing: -0.03em;
+        }
+
+        .hero p {
+          max-width: 760px;
+          margin: 10px 0 0;
+          color: #64748b;
+          line-height: 1.6;
+        }
+
+        .back-link {
+          display: inline-flex;
+          align-items: center;
+          gap: 7px;
+          min-height: 44px;
+          padding: 0 14px;
+          border: 1px solid #e2e8f0;
+          border-radius: 12px;
+          background: #fff;
+          color: #475569;
+          font-size: 14px;
+          font-weight: 700;
+          text-decoration: none;
+          white-space: nowrap;
+        }
+
+        .back-link:hover {
+          background: #f8fafc;
+        }
+
+        .toolbar {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 20px;
+          padding: 20px 22px;
+          border: 1px solid #e2e8f0;
+          border-radius: 16px;
+          background: #fff;
+          box-shadow: 0 4px 16px rgba(15, 23, 42, 0.04);
+        }
+
+        .toolbar h2,
+        .group-title h2 {
+          margin: 0;
+          color: #0f172a;
+          font-size: 19px;
+        }
+
+        .toolbar p {
+          margin: 5px 0 0;
+          color: #64748b;
+          font-size: 14px;
+        }
+
+        .add-button,
+        .primary-button {
+          display: inline-flex;
           align-items: center;
           justify-content: center;
+          gap: 8px;
+          min-height: 42px;
+          padding: 0 16px;
+          border: 0;
+          border-radius: 10px;
+          background: #8f211c;
+          color: #fff;
+          font-size: 14px;
+          font-weight: 700;
+          cursor: pointer;
         }
 
-        .actualites-item-actions .btn {
-          flex: 0 0 auto !important;
-          width: auto !important;
-          min-width: 145px !important;
-          max-width: none !important;
-          min-height: 40px !important;
-          height: 40px !important;
-          padding: 5px 16px !important;
-          display: inline-flex !important;
-          flex-direction: row !important;
-          align-items: center !important;
-          justify-content: center !important;
-          gap: 7px !important;
-          box-sizing: border-box !important;
-          font-size: 14px !important;
-          line-height: 1 !important;
+        .add-button:hover,
+        .primary-button:hover {
+          background: #7a1c18;
         }
 
+        .add-button:disabled,
+        .primary-button:disabled,
+        .secondary-button:disabled,
+        .delete-button:disabled {
+          cursor: not-allowed;
+          opacity: 0.55;
+        }
 
-        .actualites-modal-backdrop {
+        .page-error,
+        .form-error {
+          padding: 12px 14px;
+          border: 1px solid #e8c7c4;
+          border-radius: 10px;
+          background: #fff7f6;
+          color: #8f211c;
+          font-size: 14px;
+        }
+
+        .empty-card {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          min-height: 330px;
+          padding: 40px 24px;
+          border: 1px dashed #cbd5e1;
+          border-radius: 18px;
+          background: #fff;
+          text-align: center;
+        }
+
+        .empty-icon {
+          display: grid;
+          place-items: center;
+          width: 64px;
+          height: 64px;
+          border-radius: 16px;
+          background: #fff0d9;
+          color: #302b27;
+        }
+
+        .empty-card h2 {
+          margin: 18px 0 0;
+          color: #0f172a;
+          font-size: 20px;
+        }
+
+        .empty-card p {
+          max-width: 540px;
+          margin: 8px 0 0;
+          color: #64748b;
+          line-height: 1.6;
+        }
+
+        .meeting-sections {
+          display: grid;
+          gap: 24px;
+        }
+
+        .meeting-group {
+          display: grid;
+          gap: 12px;
+        }
+
+        .group-title {
+          display: flex;
+          align-items: center;
+          gap: 9px;
+        }
+
+        .group-title span {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          min-width: 25px;
+          height: 25px;
+          padding: 0 7px;
+          border-radius: 999px;
+          background: #fff0d9;
+          color: #302b27;
+          font-size: 12px;
+          font-weight: 700;
+        }
+
+        .meeting-list {
+          display: grid;
+          gap: 10px;
+        }
+
+        .meeting-card {
+          display: grid;
+          grid-template-columns: minmax(220px, 1fr) auto;
+          align-items: center;
+          gap: 20px;
+          padding: 18px 20px;
+          border: 1px solid #e2e8f0;
+          border-radius: 15px;
+          background: #fff;
+          box-shadow: 0 4px 16px rgba(15, 23, 42, 0.04);
+          cursor: pointer;
+          transition: border-color 0.15s ease, box-shadow 0.15s ease;
+        }
+
+        .meeting-card:hover {
+          border-color: #d8b8b4;
+          box-shadow: 0 8px 22px rgba(15, 23, 42, 0.07);
+        }
+
+        .meeting-main {
+          min-width: 0;
+        }
+
+        .meeting-type {
+          display: inline-flex;
+          align-items: center;
+          min-height: 25px;
+          padding: 4px 9px;
+          border-radius: 999px;
+          background: #fff0d9;
+          color: #302b27;
+          font-size: 12px;
+          font-weight: 700;
+        }
+
+        .meeting-main h3 {
+          margin: 8px 0 0;
+          color: #0f172a;
+          font-size: 17px;
+        }
+
+        .meeting-meta {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 12px 18px;
+          margin-top: 8px;
+          color: #64748b;
+          font-size: 13px;
+        }
+
+        .meeting-meta span {
+          display: inline-flex;
+          align-items: center;
+          gap: 5px;
+        }
+
+        .open-hint {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          min-height: 40px;
+          padding: 0 14px;
+          border: 1px solid #e4c8c5;
+          border-radius: 10px;
+          background: #fff;
+          color: #8f211c;
+          font-size: 14px;
+          font-weight: 700;
+        }
+
+        .modal-backdrop {
+          position: fixed;
+          inset: 0;
+          z-index: 1000;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 20px;
+          background: rgba(15, 23, 42, 0.45);
+        }
+
+        .modal {
+          width: min(620px, 100%);
+          max-height: calc(100vh - 40px);
+          overflow-y: auto;
+          border-radius: 18px;
+          background: #fff;
+          box-shadow: 0 20px 60px rgba(15, 23, 42, 0.2);
+        }
+
+        .modal-head {
+          display: flex;
+          align-items: flex-start;
+          justify-content: space-between;
+          gap: 16px;
+          padding: 22px 24px;
+          border-bottom: 1px solid #e2e8f0;
+        }
+
+        .modal-head span {
+          color: #64748b;
+          font-size: 11px;
+          font-weight: 800;
+          letter-spacing: 0.08em;
+        }
+
+        .modal-head h2 {
+          margin: 5px 0 0;
+          color: #0f172a;
+          font-size: 21px;
+        }
+
+        .close-button {
+          display: grid;
+          place-items: center;
+          width: 38px;
+          height: 38px;
+          border: 1px solid #e2e8f0;
+          border-radius: 10px;
+          background: #fff;
+          color: #475569;
+          cursor: pointer;
+        }
+
+        .close-button:hover {
+          background: #f8fafc;
+        }
+
+        .modal form {
+          padding: 24px;
+          min-width: 0;
+        }
+
+        .form-grid {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 16px;
+          min-width: 0;
+        }
+
+        label {
+          display: grid;
+          gap: 7px;
+          min-width: 0;
+        }
+
+        label.full {
+          grid-column: 1 / -1;
+        }
+
+        label > span {
+          color: #334155;
+          font-size: 13px;
+          font-weight: 700;
+        }
+
+        input,
+        select {
+          width: 100%;
+          min-width: 0;
+          max-width: 100%;
+          min-height: 44px;
           box-sizing: border-box;
+          padding: 0 12px;
+          border: 1px solid #e2d7d1;
+          border-radius: 10px;
+          background: #fff;
+          color: #0f172a;
+          font: inherit;
+          outline: none;
         }
 
-        .actualites-modal-card {
-          box-sizing: border-box;
+        input:focus,
+        select:focus {
+          border-color: #8f211c;
+          box-shadow: 0 0 0 3px rgba(143, 33, 28, 0.08);
         }
 
-        .actualites-field {
+        .instances-field {
           display: grid;
           gap: 7px;
           font-size: 12px;
@@ -1266,107 +893,145 @@ export default function SiteActualitesPage() {
           min-width: 0;
         }
 
-        .actualites-two-columns {
+        .instances-field label {
+          color: #334155;
+          font-size: 13px;
+          font-weight: 700;
+        }
+
+        .instances-two-columns {
           display: grid;
           grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
           gap: 16px;
           min-width: 0;
         }
 
-        .actualites-date-input {
+        .instances-date-input,
+        .instances-time-input {
           width: 100% !important;
           min-width: 0 !important;
           max-width: 100% !important;
           box-sizing: border-box !important;
         }
 
-        @media (max-width: 700px) {
-          .actualites-section-head {
-            align-items: stretch !important;
-            flex-direction: column !important;
+        .modal-actions {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 10px;
+          margin-top: 24px;
+          padding-top: 18px;
+          border-top: 1px solid #eef2f7;
+        }
+
+        .modal-actions-right {
+          display: flex;
+          gap: 10px;
+        }
+
+        .secondary-button,
+        .delete-button {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 7px;
+          min-height: 42px;
+          padding: 0 16px;
+          border-radius: 10px;
+          font-size: 14px;
+          font-weight: 700;
+          cursor: pointer;
+        }
+
+        .secondary-button {
+          border: 1px solid #e2d7d1;
+          background: #fff;
+          color: #475569;
+        }
+
+        .secondary-button:hover {
+          background: #f8fafc;
+        }
+
+        .delete-button {
+          border: 1px solid #e4c8c5;
+          background: #fff;
+          color: #8f211c;
+        }
+
+        .delete-button:hover {
+          border-color: #8f211c;
+          background: #fff8f7;
+        }
+
+        @media (max-width: 760px) {
+          .page {
+            gap: 18px;
+            padding: 18px 14px;
           }
 
-          .actualites-section-head > div:last-child {
-            width: 100% !important;
+          .hero {
+            flex-direction: column;
+            gap: 14px;
           }
 
-          .actualites-list-item {
-            flex-direction: column !important;
-            align-items: stretch !important;
-            gap: 14px !important;
-          }
-
-          .actualites-item-main {
-            width: 100%;
-          }
-
-          .actualites-item-actions {
-            width: 100%;
-            margin-left: 0;
-            justify-content: center !important;
-            gap: 10px !important;
-          }
-
-          .actualites-item-actions .btn {
-            flex: 0 0 auto !important;
-            width: auto !important;
-            min-width: 145px !important;
-            max-width: none !important;
-            min-height: 40px !important;
-            height: 40px !important;
-            padding: 5px 16px !important;
-            display: inline-flex !important;
-            flex-direction: row !important;
-            align-items: center !important;
-            justify-content: center !important;
-            gap: 7px !important;
-            box-sizing: border-box !important;
-            font-size: 14px !important;
-            line-height: 1 !important;
-          }
-
-          .actualites-modal-backdrop {
-            padding: 10px !important;
-          }
-
-          .actualites-modal-card {
-            width: 100% !important;
-            margin: 10px auto !important;
-            padding: 16px !important;
-            border-radius: 14px !important;
-          }
-
-          .actualites-modal-card .section-head {
-            align-items: flex-start !important;
-            gap: 12px !important;
-          }
-
-          .actualites-modal-card .section-head .btn {
-            flex-shrink: 0;
-          }
-
-          .actualites-two-columns {
-            grid-template-columns: minmax(0, 1fr) !important;
-            gap: 16px !important;
-          }
-
-          .actualites-form-actions {
-            flex-direction: column-reverse !important;
-            align-items: stretch !important;
-          }
-
-          .actualites-form-actions .btn {
+          .back-link {
             width: 100%;
             justify-content: center;
           }
 
-          .actualites-modal-card input[type='file'] {
-            width: 100%;
-            max-width: 100%;
-            box-sizing: border-box;
+          .toolbar {
+            align-items: stretch;
+            flex-direction: column;
+            padding: 18px;
           }
 
-          .actualites-date-input {
+          .add-button {
+            width: 100%;
+          }
+
+          .meeting-card {
+            grid-template-columns: 1fr;
+            gap: 14px;
+          }
+
+          .open-hint {
+            width: 100%;
+          }
+
+          .modal-backdrop {
+            align-items: flex-end;
+            padding: 0;
+          }
+
+          .modal {
+            width: 100%;
+            max-height: 92vh;
+            border-radius: 18px 18px 0 0;
+          }
+
+          .modal-head,
+          .modal form {
+            padding-left: 18px;
+            padding-right: 18px;
+          }
+
+          .form-grid {
+            grid-template-columns: minmax(0, 1fr);
+            min-width: 0;
+          }
+
+          label.full {
+            grid-column: auto;
+          }
+
+          .instances-two-columns {
+            grid-template-columns: minmax(0, 1fr) !important;
+            gap: 16px !important;
+          }
+
+          .instances-date-input,
+          .instances-time-input {
             width: 100% !important;
             min-width: 0 !important;
             max-width: 100% !important;
@@ -1375,29 +1040,73 @@ export default function SiteActualitesPage() {
             -webkit-appearance: none !important;
             appearance: none !important;
           }
-        }
 
-        @media (max-width: 480px) {
-          .actualites-item-main {
-            gap: 10px !important;
+          .modal-actions {
+            align-items: stretch;
+            flex-direction: column;
           }
 
-          .actualites-item-main > img,
-          .actualites-item-main > div:first-child {
-            width: 58px !important;
-            height: 58px !important;
-          }
-
-          .actualites-modal-card {
-            padding: 14px !important;
-          }
-
-          .actualites-modal-card .section-title {
-            font-size: 19px !important;
+          .modal-actions-right {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
           }
         }
       `}</style>
-    </>
-  );
+    </main>
+  )
+}
+
+function MeetingCard({
+  meeting,
+  onOpen,
+}: {
+  meeting: Meeting
+  onOpen: () => void
+}) {
+  return (
+    <article
+      className="meeting-card"
+      role="button"
+      tabIndex={0}
+      onClick={onOpen}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault()
+          onOpen()
+        }
+      }}
+    >
+      <div className="meeting-main">
+        <span className="meeting-type">{meeting.type}</span>
+        <h3>{meeting.subject}</h3>
+
+        <div className="meeting-meta">
+          <span>
+            <CalendarDays size={14} />
+            {formatDate(meeting.meeting_date)}
+          </span>
+
+          {meeting.meeting_time && (
+            <span>
+              <Clock3 size={14} />
+              {meeting.meeting_time.slice(0, 5)}
+            </span>
+          )}
+
+          {meeting.location && (
+            <span>
+              <MapPin size={14} />
+              {meeting.location}
+            </span>
+          )}
+        </div>
+      </div>
+
+      <span className="open-hint">
+        <Pencil size={15} />
+        Modifier
+      </span>
+    </article>
+  )
 }
 
