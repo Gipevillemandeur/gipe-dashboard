@@ -434,11 +434,11 @@ export default function InstancesPage() {
                   />
                 </label>
 
-                <div className="instance-two-columns">
-                  <div className="instance-form-field">
-                    <label className="instance-label">Date *</label>
+                <div className="agenda-two-columns">
+                  <div className="agenda-form-field">
+                    <label className="label">Date *</label>
                     <input
-                      className="input instance-native-date"
+                      className="input agenda-native-date"
                       type="date"
                       value={meetingDate}
                       onChange={(event) => setMeetingDate(event.target.value)}
@@ -446,10 +446,10 @@ export default function InstancesPage() {
                     />
                   </div>
 
-                  <div className="instance-form-field">
-                    <label className="instance-label">Heure *</label>
+                  <div className="agenda-form-field">
+                    <label className="label">Heure *</label>
                     <input
-                      className="input instance-native-time"
+                      className="input agenda-native-time"
                       type="time"
                       value={meetingTime}
                       onChange={(event) => setMeetingTime(event.target.value)}
@@ -837,17 +837,20 @@ export default function InstancesPage() {
 
         .modal form {
           padding: 24px;
+          min-width: 0;
         }
 
         .form-grid {
           display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 17px;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 16px;
+          min-width: 0;
         }
 
         label {
           display: grid;
           gap: 7px;
+          min-width: 0;
         }
 
         label.full {
@@ -863,6 +866,8 @@ export default function InstancesPage() {
         input,
         select {
           width: 100%;
+          min-width: 0;
+          max-width: 100%;
           min-height: 44px;
           box-sizing: border-box;
           padding: 0 12px;
@@ -880,39 +885,23 @@ export default function InstancesPage() {
           box-shadow: 0 0 0 3px rgba(143, 33, 28, 0.08);
         }
 
-        .instance-two-columns {
+        .agenda-form-field {
+          min-width: 0;
+        }
+
+        .agenda-two-columns {
           display: grid;
           grid-template-columns: repeat(2, minmax(0, 1fr));
-          gap: 17px;
-          min-width: 0;
-          grid-column: 1 / -1;
-        }
-
-        .instance-two-columns > div {
+          gap: 16px;
           min-width: 0;
         }
 
-        .instance-form-field {
+        .agenda-two-columns > div {
           min-width: 0;
         }
 
-        .instance-label {
-          display: block;
-          margin-bottom: 7px;
-          color: #334155;
-          font-size: 13px;
-          font-weight: 700;
-        }
-
-        .instance-form-field .input {
-          width: 100%;
-          min-width: 0;
-          max-width: 100%;
-          box-sizing: border-box;
-        }
-
-        .instance-native-date,
-        .instance-native-time {
+        .agenda-native-date,
+        .agenda-native-time {
           width: 100%;
           min-width: 0;
           max-width: 100%;
@@ -1022,20 +1011,21 @@ export default function InstancesPage() {
           }
 
           .form-grid {
-            grid-template-columns: 1fr;
+            grid-template-columns: minmax(0, 1fr);
+            min-width: 0;
           }
 
           label.full {
             grid-column: auto;
           }
 
-          .instance-two-columns {
+          .agenda-two-columns {
             grid-template-columns: minmax(0, 1fr);
-            gap: 17px;
+            gap: 16px;
           }
 
-          .instance-native-date,
-          .instance-native-time {
+          .agenda-native-date,
+          .agenda-native-time {
             width: 100% !important;
             min-width: 0 !important;
             max-width: 100% !important;
@@ -1110,4 +1100,5 @@ function MeetingCard({
     </article>
   )
 }
+
 
