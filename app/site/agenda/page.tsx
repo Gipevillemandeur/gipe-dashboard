@@ -687,10 +687,15 @@ export default function SiteAgendaPage() {
 
         .agenda-native-date,
         .agenda-native-time {
-          width: 100%;
-          min-width: 0;
-          max-width: 100%;
-          box-sizing: border-box;
+          display: block;
+          width: 100% !important;
+          inline-size: 100% !important;
+          min-width: 0 !important;
+          min-inline-size: 0 !important;
+          max-width: 100% !important;
+          max-inline-size: 100% !important;
+          box-sizing: border-box !important;
+          font: inherit;
         }
 
         .agenda-location-wrap {
@@ -834,9 +839,13 @@ export default function SiteAgendaPage() {
 
           .agenda-native-date,
           .agenda-native-time {
+            display: block;
             width: 100% !important;
+            inline-size: 100% !important;
             min-width: 0 !important;
+            min-inline-size: 0 !important;
             max-width: 100% !important;
+            max-inline-size: 100% !important;
             box-sizing: border-box !important;
           }
         }
