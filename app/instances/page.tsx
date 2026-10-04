@@ -437,6 +437,7 @@ export default function InstancesPage() {
                 <label>
                   <span>Date *</span>
                   <input
+                    className="instance-native-date"
                     type="date"
                     value={meetingDate}
                     onChange={(event) => setMeetingDate(event.target.value)}
@@ -447,6 +448,7 @@ export default function InstancesPage() {
                 <label>
                   <span>Heure *</span>
                   <input
+                    className="instance-native-time"
                     type="time"
                     value={meetingTime}
                     onChange={(event) => setMeetingTime(event.target.value)}
@@ -843,7 +845,6 @@ export default function InstancesPage() {
 
         label {
           display: grid;
-          min-width: 0;
           gap: 7px;
         }
 
@@ -875,6 +876,14 @@ export default function InstancesPage() {
         select:focus {
           border-color: #8f211c;
           box-shadow: 0 0 0 3px rgba(143, 33, 28, 0.08);
+        }
+
+        .instance-native-date,
+        .instance-native-time {
+          width: 100%;
+          min-width: 0;
+          max-width: 100%;
+          box-sizing: border-box;
         }
 
         .modal-actions {
@@ -980,40 +989,19 @@ export default function InstancesPage() {
           }
 
           .form-grid {
-            grid-template-columns: minmax(0, 1fr);
-          }
-
-          .form-grid > label {
-            width: 100%;
-            min-width: 0;
-          }
-
-          .form-grid input,
-          .form-grid select {
-            width: 100%;
-            min-width: 0;
-            max-width: 100%;
-            box-sizing: border-box;
-          }
-
-          .form-grid input[type='date'],
-          .form-grid input[type='time'] {
-            display: block;
-            width: 100%;
-            min-width: 0;
-            max-width: 100%;
-            box-sizing: border-box;
-            min-inline-size: 0;
-            padding-left: 12px;
-            padding-right: 12px;
-            font-size: 16px;
-            text-align: center;
-            -webkit-appearance: none;
-            appearance: none;
+            grid-template-columns: 1fr;
           }
 
           label.full {
             grid-column: auto;
+          }
+
+          .instance-native-date,
+          .instance-native-time {
+            width: 100% !important;
+            min-width: 0 !important;
+            max-width: 100% !important;
+            box-sizing: border-box !important;
           }
 
           .modal-actions {
