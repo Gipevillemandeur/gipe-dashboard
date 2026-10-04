@@ -511,20 +511,30 @@ export default function SiteAgendaPage() {
         }
 
         .agenda-location-wrap {
-          position: relative; min-width: 0; width: 100%; height: 48px;
-          display: grid;
+          position: relative;
+          width: 100%;
+          height: 48px;
+          min-width: 0;
         }
         .agenda-location-wrap > svg {
-          grid-area: 1 / 1;
-          align-self: center; justify-self: start;
-          margin-left: 11px;
-          width: 15px; height: 15px; display: block;
-          color: var(--gipe-muted); pointer-events: none; z-index: 2;
+          position: absolute;
+          left: 11px;
+          top: 50%;
+          width: 15px;
+          height: 15px;
+          display: block;
+          transform: translateY(-50%);
+          color: var(--gipe-muted);
+          pointer-events: none;
+          z-index: 2;
         }
         .agenda-location-wrap .input {
-          grid-area: 1 / 1;
-          width: 100%; height: 48px; min-height: 48px;
-          box-sizing: border-box; padding-left: 34px; display: block;
+          width: 100%;
+          height: 48px;
+          min-height: 48px;
+          box-sizing: border-box;
+          padding-left: 34px;
+          display: block;
         }
         .agenda-help { margin-top: 6px; font-size: 12px; color: var(--gipe-muted); }
         .agenda-current-image { margin-bottom: 12px; }
