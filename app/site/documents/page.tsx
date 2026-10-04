@@ -328,6 +328,7 @@ export default function SiteDocumentsPage() {
         .documents-pdf-link { display: inline-block; margin-top: 6px; font-size: 13px; font-weight: 600; }
         .documents-item-actions { display: flex; gap: 8px; flex-shrink: 0; margin-left: 12px; }
         .documents-delete-button { color: #8a2b22; border-color: #efc8c4; }
+        .documents-item-actions .btn { box-sizing: border-box; line-height: 1.1; }
         .documents-modal-backdrop { position: fixed; inset: 0; background: rgba(15,23,42,.45); z-index: 100; display: flex; align-items: center; justify-content: center; padding: 20px; box-sizing: border-box; overflow-y: auto; }
         .documents-modal-card { width: min(760px, 100%); max-height: calc(100vh - 40px); overflow-y: auto; padding: 24px; box-sizing: border-box; }
         .documents-modal-head { margin-bottom: 20px; gap: 14px; }
@@ -347,13 +348,13 @@ export default function SiteDocumentsPage() {
 
         @media (max-width: 700px) {
           .documents-topbar { align-items: stretch !important; flex-direction: column !important; gap: 14px !important; }
-          .documents-new-button { width: 100%; justify-content: center; }
+          .documents-new-button { width: 280px; max-width: 100%; justify-content: center; }
           .documents-section-head { align-items: stretch !important; flex-direction: column !important; }
           .documents-search-wrap { width: 100%; }
           .documents-list-item { flex-direction: column !important; align-items: stretch !important; padding: 14px !important; gap: 14px !important; }
           .documents-item-main { width: 100%; }
-          .documents-item-actions { width: 100%; margin-left: 0; }
-          .documents-item-actions .btn { flex: 1 1 0; justify-content: center; }
+          .documents-item-actions { width: 100%; margin-left: 0; gap: 10px; }
+          .documents-item-actions .btn { flex: 1 1 0; min-height: 52px; height: 52px; padding: 9px 12px; justify-content: center; font-size: 14px; }
           .documents-modal-backdrop { padding: 10px !important; align-items: flex-start !important; }
           .documents-modal-card { width: 100% !important; max-width: 100% !important; max-height: calc(100vh - 20px) !important; margin: 10px auto !important; padding: 16px !important; border-radius: 14px !important; }
           .documents-modal-head { align-items: flex-start !important; }
