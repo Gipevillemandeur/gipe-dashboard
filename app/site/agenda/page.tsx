@@ -10,7 +10,6 @@ import {
 
 import {
   CalendarDays,
-  MapPin,
   Pencil,
   Plus,
   Search,
@@ -355,15 +354,12 @@ export default function SiteAgendaPage() {
               <div className="agenda-two-columns">
                 <div className="agenda-form-field">
                   <label className="label">Lieu</label>
-                  <div className="agenda-location-wrap">
-                    <MapPin size={15} />
-                    <input
-                      className="input"
-                      value={location}
-                      onChange={(e) => setLocation(e.target.value)}
-                      placeholder="Lieu de l’événement"
-                    />
-                  </div>
+                  <input
+                    className="input"
+                    value={location}
+                    onChange={(e) => setLocation(e.target.value)}
+                    placeholder="Lieu de l’événement"
+                  />
                 </div>
 
                 <div className="agenda-form-field">
@@ -510,32 +506,6 @@ export default function SiteAgendaPage() {
           box-sizing: border-box !important;
         }
 
-        .agenda-location-wrap {
-          position: relative;
-          width: 100%;
-          height: 48px;
-          min-width: 0;
-        }
-        .agenda-location-wrap > svg {
-          position: absolute;
-          left: 11px;
-          top: 50%;
-          width: 15px;
-          height: 15px;
-          display: block;
-          transform: translateY(-50%);
-          color: var(--gipe-muted);
-          pointer-events: none;
-          z-index: 2;
-        }
-        .agenda-location-wrap .input {
-          width: 100%;
-          height: 48px;
-          min-height: 48px;
-          box-sizing: border-box;
-          padding-left: 34px;
-          display: block;
-        }
         .agenda-help { margin-top: 6px; font-size: 12px; color: var(--gipe-muted); }
         .agenda-current-image { margin-bottom: 12px; }
         .agenda-current-image img {
@@ -614,6 +584,5 @@ export default function SiteAgendaPage() {
     </>
   );
 }
-
 
 
