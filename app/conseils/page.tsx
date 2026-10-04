@@ -12,8 +12,8 @@ import { getDashboardSnapshot } from '@/lib/dashboard-data'
 export default async function ConseilsPage() {
   const snapshot = await getDashboardSnapshot()
 
-  const realClasses = snapshot.classes.filter((c) => c.kind !== 'demo')
-  const demoClasses = snapshot.classes.filter((c) => c.kind === 'demo')
+  const realClasses = snapshot.classes.filter((c) => c.status !== 'demo')
+  const demoClasses = snapshot.classes.filter((c) => c.status === 'demo')
 
   const totalStudents = realClasses.reduce((sum, c) => sum + c.students, 0)
   const teacherAssignments = realClasses.reduce((sum, c) => sum + c.teachers, 0)
@@ -37,7 +37,7 @@ export default async function ConseilsPage() {
 
         <div className="year">
           <span>Année active</span>
-          <strong>{snapshot.schoolYear?.label ?? 'Aucune année active'}</strong>
+          <strong>{snapshot.schoolYear || 'Aucune année active'}</strong>
         </div>
       </section>
 
