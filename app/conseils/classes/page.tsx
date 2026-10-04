@@ -371,14 +371,21 @@ export default async function ClassesPage() {
           align-items: center;
           justify-content: center;
           gap: 7px;
-          color: #2563eb;
+          color: #8f211c;
           font-weight: 700;
           text-decoration: none;
+          min-height: 40px;
+          padding: 0 14px;
+          border: 1px solid #e4c8c5;
+          border-radius: 10px;
+          background: #fff;
         }
 
         .consult-link:hover,
         .mobile-consult-link:hover {
-          text-decoration: underline;
+          border-color: #8f211c;
+          background: #fff8f7;
+          text-decoration: none;
         }
 
         .muted {
@@ -516,7 +523,7 @@ export default async function ClassesPage() {
             margin-top: 14px;
             padding: 11px 12px;
             border-radius: 10px;
-            background: #f8fafc;
+            background: #fff;
             text-decoration: none;
           }
         }
