@@ -845,13 +845,15 @@ export default function InstancesPage() {
 
         .form-grid {
           display: grid;
-          grid-template-columns: 1fr 1fr;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
           gap: 17px;
+          min-width: 0;
         }
 
         label {
           display: grid;
           gap: 7px;
+          min-width: 0;
         }
 
         label.full {
@@ -882,6 +884,17 @@ export default function InstancesPage() {
         select:focus {
           border-color: #8f211c;
           box-shadow: 0 0 0 3px rgba(143, 33, 28, 0.08);
+        }
+
+        .form-grid > label {
+          min-width: 0;
+          max-width: 100%;
+        }
+
+        .form-grid input,
+        .form-grid select {
+          min-width: 0;
+          max-width: 100%;
         }
 
         .instance-two-columns {
@@ -1011,7 +1024,8 @@ export default function InstancesPage() {
           }
 
           .form-grid {
-            grid-template-columns: 1fr;
+            grid-template-columns: minmax(0, 1fr);
+            min-width: 0;
           }
 
           label.full {
