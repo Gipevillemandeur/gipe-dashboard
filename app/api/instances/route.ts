@@ -75,6 +75,54 @@ function validType(value: string) {
   return MEETING_TYPES.includes(value)
 }
 
+function validateMeetingInput(body: {
+  type?: unknown
+  subject?: unknown
+  meetingDate?: unknown
+  meetingTime?: unknown
+  location?: unknown
+}) {
+  const type = cleanString(body.type)
+  const subject = cleanString(body.subject)
+  const meetingDate = cleanString(body.meetingDate)
+  const meetingTime = cleanString(body.meetingTime)
+  const location = cleanString(body.location)
+
+  if (!validType(type)) {
+    return { error: 'Le type de réunion est invalide.' }
+  }
+
+  if (!subject) {
+    return { error: "L'objet de la réunion est obligatoire." }
+  }
+
+  if (subject.length > 200) {
+    return { error: "L'objet de la réunion est trop long." }
+  }
+
+  if (!validDate(meetingDate)) {
+    return { error: 'La date est invalide.' }
+  }
+
+  if (!validTime(meetingTime)) {
+    return { error: "L'heure est invalide." }
+  }
+
+  if (location.length > 200) {
+    return { error: 'Le lieu est trop long.' }
+  }
+
+  return {
+    values: {
+      type,
+      subject,
+      meetingDate,
+      meetingTime,
+      location,
+    },
+  }
+}
+
 export async function GET() {
   const auth = await requireAdmin()
 
@@ -92,7 +140,9 @@ export async function GET() {
 
   if (schoolYearError) {
     return NextResponse.json(
-      { error: `Impossible de charger l'année active : ${schoolYearError.message}` },
+      {
+        error: `Impossible de charger l'année active : ${schoolYearError.message}`,
+      },
       { status: 500 }
     )
   }
@@ -145,50 +195,11 @@ export async function POST(request: Request) {
       location?: unknown
     }
 
-    const type = cleanString(body.type)
-    const subject = cleanString(body.subject)
-    const meetingDate = cleanString(body.meetingDate)
-    const meetingTime = cleanString(body.meetingTime)
-    const location = cleanString(body.location)
+    const validated = validateMeetingInput(body)
 
-    if (!validType(type)) {
+    if ('error' in validated) {
       return NextResponse.json(
-        { error: 'Le type de réunion est invalide.' },
-        { status: 400 }
-      )
-    }
-
-    if (!subject) {
-      return NextResponse.json(
-        { error: "L'objet de la réunion est obligatoire." },
-        { status: 400 }
-      )
-    }
-
-    if (subject.length > 200) {
-      return NextResponse.json(
-        { error: "L'objet de la réunion est trop long." },
-        { status: 400 }
-      )
-    }
-
-    if (!validDate(meetingDate)) {
-      return NextResponse.json(
-        { error: 'La date est invalide.' },
-        { status: 400 }
-      )
-    }
-
-    if (!validTime(meetingTime)) {
-      return NextResponse.json(
-        { error: "L'heure est invalide." },
-        { status: 400 }
-      )
-    }
-
-    if (location.length > 200) {
-      return NextResponse.json(
-        { error: 'Le lieu est trop long.' },
+        { error: validated.error },
         { status: 400 }
       )
     }
@@ -201,7 +212,9 @@ export async function POST(request: Request) {
 
     if (schoolYearError) {
       return NextResponse.json(
-        { error: `Impossible de charger l'année active : ${schoolYearError.message}` },
+        {
+          error: `Impossible de charger l'année active : ${schoolYearError.message}`,
+        },
         { status: 500 }
       )
     }
@@ -213,15 +226,17 @@ export async function POST(request: Request) {
       )
     }
 
+    const { values } = validated
+
     const { data, error } = await admin
       .from('instance_meetings')
       .insert({
         school_year_id: schoolYear.id,
-        type,
-        subject,
-        meeting_date: meetingDate,
-        meeting_time: meetingTime,
-        location: location || null,
+        type: values.type,
+        subject: values.subject,
+        meeting_date: values.meetingDate,
+        meeting_time: values.meetingTime,
+        location: values.location || null,
       })
       .select(
         'id,type,subject,meeting_date,meeting_time,location,school_year_id'
@@ -254,3 +269,173 @@ export async function POST(request: Request) {
     )
   }
 }
+
+export async function PUT(request: Request) {
+  const auth = await requireAdmin()
+
+  if ('error' in auth) {
+    return auth.error
+  }
+
+  const { admin } = auth
+
+  try {
+    const body = (await request.json()) as {
+      id?: unknown
+      type?: unknown
+      subject?: unknown
+      meetingDate?: unknown
+      meetingTime?: unknown
+      location?: unknown
+    }
+
+    const id = cleanString(body.id)
+
+    if (!id) {
+      return NextResponse.json(
+        { error: 'Réunion introuvable.' },
+        { status: 400 }
+      )
+    }
+
+    const validated = validateMeetingInput(body)
+
+    if ('error' in validated) {
+      return NextResponse.json(
+        { error: validated.error },
+        { status: 400 }
+      )
+    }
+
+    const { data: existing, error: existingError } = await admin
+      .from('instance_meetings')
+      .select('id')
+      .eq('id', id)
+      .maybeSingle()
+
+    if (existingError) {
+      return NextResponse.json(
+        { error: existingError.message },
+        { status: 500 }
+      )
+    }
+
+    if (!existing) {
+      return NextResponse.json(
+        { error: 'Réunion introuvable.' },
+        { status: 404 }
+      )
+    }
+
+    const { values } = validated
+
+    const { data, error } = await admin
+      .from('instance_meetings')
+      .update({
+        type: values.type,
+        subject: values.subject,
+        meeting_date: values.meetingDate,
+        meeting_time: values.meetingTime,
+        location: values.location || null,
+      })
+      .eq('id', id)
+      .select(
+        'id,type,subject,meeting_date,meeting_time,location,school_year_id'
+      )
+      .single()
+
+    if (error) {
+      return NextResponse.json(
+        { error: `Impossible de modifier la réunion : ${error.message}` },
+        { status: 500 }
+      )
+    }
+
+    return NextResponse.json({
+      ok: true,
+      meeting: data,
+    })
+  } catch (error) {
+    return NextResponse.json(
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : 'Impossible de modifier la réunion.',
+      },
+      { status: 500 }
+    )
+  }
+}
+
+export async function DELETE(request: Request) {
+  const auth = await requireAdmin()
+
+  if ('error' in auth) {
+    return auth.error
+  }
+
+  const { admin } = auth
+
+  try {
+    const body = (await request.json()) as {
+      id?: unknown
+    }
+
+    const id = cleanString(body.id)
+
+    if (!id) {
+      return NextResponse.json(
+        { error: 'Réunion introuvable.' },
+        { status: 400 }
+      )
+    }
+
+    const { data: existing, error: existingError } = await admin
+      .from('instance_meetings')
+      .select('id')
+      .eq('id', id)
+      .maybeSingle()
+
+    if (existingError) {
+      return NextResponse.json(
+        { error: existingError.message },
+        { status: 500 }
+      )
+    }
+
+    if (!existing) {
+      return NextResponse.json(
+        { error: 'Réunion introuvable.' },
+        { status: 404 }
+      )
+    }
+
+    const { error } = await admin
+      .from('instance_meetings')
+      .delete()
+      .eq('id', id)
+
+    if (error) {
+      return NextResponse.json(
+        { error: `Impossible de supprimer la réunion : ${error.message}` },
+        { status: 500 }
+      )
+    }
+
+    return NextResponse.json({
+      ok: true,
+    })
+  } catch (error) {
+    return NextResponse.json(
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : 'Impossible de supprimer la réunion.',
+      },
+      { status: 500 }
+    )
+  }
+}
+
