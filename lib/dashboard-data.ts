@@ -31,7 +31,7 @@ export async function getDashboardSnapshot(): Promise<DashboardSnapshot> {
     const { data, error } = await supabase
       .from('classes')
       .select(
-        'name,level,kind,active,students(count),class_teachers(count)'
+        'id,name,level,kind,active,students(count),class_teachers(count)'
       )
       .eq('school_year_id', activeYear.id)
       .eq('active', true)
@@ -48,6 +48,7 @@ export async function getDashboardSnapshot(): Promise<DashboardSnapshot> {
     }
 
     const classes: ClassRow[] = data.map((row: any) => ({
+      id: row.id,
       name: row.name,
       level:
         row.level ||
@@ -97,3 +98,4 @@ export async function getDashboardSnapshot(): Promise<DashboardSnapshot> {
     };
   }
 }
+
