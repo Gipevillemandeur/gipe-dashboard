@@ -705,6 +705,8 @@ export default function SiteAgendaPage() {
 
         .agenda-location-wrap {
           position: relative;
+          width: 100%;
+          height: 42px;
           min-width: 0;
         }
 
@@ -713,12 +715,18 @@ export default function SiteAgendaPage() {
           left: 11px;
           top: 50%;
           transform: translateY(-50%);
+          width: 16px;
+          height: 16px;
           color: var(--gipe-muted);
           pointer-events: none;
+          z-index: 2;
         }
 
         .agenda-location-wrap .input {
+          position: absolute;
+          inset: 0;
           width: 100%;
+          height: 42px;
           box-sizing: border-box;
           padding-left: 34px;
         }
@@ -883,5 +891,6 @@ export default function SiteAgendaPage() {
     </>
   );
 }
+
 
 
