@@ -7,7 +7,9 @@ import {
   CalendarDays,
   Clock3,
   MapPin,
+  Pencil,
   Plus,
+  Trash2,
   X,
 } from 'lucide-react'
 
@@ -56,8 +58,10 @@ export default function InstancesPage() {
   const [schoolYear, setSchoolYear] = useState<SchoolYear | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [deleting, setDeleting] = useState(false)
   const [error, setError] = useState('')
-  const [modalOpen, setModalOpen] = useState(false)
+  const [modalMode, setModalMode] = useState<'create' | 'edit' | null>(null)
+  const [selectedMeeting, setSelectedMeeting] = useState<Meeting | null>(null)
 
   const [type, setType] = useState('Réunion GIPE')
   const [subject, setSubject] = useState('')
@@ -105,15 +109,28 @@ export default function InstancesPage() {
     setLocation('')
   }
 
-  function openModal() {
+  function openCreate() {
     setError('')
     resetForm()
-    setModalOpen(true)
+    setSelectedMeeting(null)
+    setModalMode('create')
+  }
+
+  function openEdit(meeting: Meeting) {
+    setError('')
+    setSelectedMeeting(meeting)
+    setType(meeting.type)
+    setSubject(meeting.subject)
+    setMeetingDate(meeting.meeting_date)
+    setMeetingTime(meeting.meeting_time?.slice(0, 5) || '')
+    setLocation(meeting.location || '')
+    setModalMode('edit')
   }
 
   function closeModal() {
-    if (saving) return
-    setModalOpen(false)
+    if (saving || deleting) return
+    setModalMode(null)
+    setSelectedMeeting(null)
   }
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -124,11 +141,14 @@ export default function InstancesPage() {
       setError('')
 
       const response = await fetch('/api/instances', {
-        method: 'POST',
+        method: modalMode === 'edit' ? 'PUT' : 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
+          ...(modalMode === 'edit'
+            ? { id: selectedMeeting?.id }
+            : {}),
           type,
           subject,
           meetingDate,
@@ -140,27 +160,95 @@ export default function InstancesPage() {
       const data = await response.json()
 
       if (!response.ok) {
-        throw new Error(data.error || "Impossible d'ajouter la réunion.")
+        throw new Error(
+          data.error ||
+            (modalMode === 'edit'
+              ? 'Impossible de modifier la réunion.'
+              : "Impossible d'ajouter la réunion.")
+        )
       }
 
-      setMeetings((current) =>
-        [...current, data.meeting].sort((a, b) => {
+      setMeetings((current) => {
+        const next =
+          modalMode === 'edit'
+            ? current.map((meeting) =>
+                meeting.id === data.meeting.id
+                  ? data.meeting
+                  : meeting
+              )
+            : [...current, data.meeting]
+
+        return [...next].sort((a, b) => {
           const aKey = `${a.meeting_date}T${a.meeting_time || '23:59'}`
           const bKey = `${b.meeting_date}T${b.meeting_time || '23:59'}`
           return aKey.localeCompare(bKey)
         })
-      )
+      })
 
-      setModalOpen(false)
+      setModalMode(null)
+      setSelectedMeeting(null)
       resetForm()
     } catch (err) {
       setError(
         err instanceof Error
           ? err.message
-          : "Impossible d'ajouter la réunion."
+          : modalMode === 'edit'
+            ? 'Impossible de modifier la réunion.'
+            : "Impossible d'ajouter la réunion."
       )
     } finally {
       setSaving(false)
+    }
+  }
+
+  async function handleDelete() {
+    if (!selectedMeeting) return
+
+    const confirmed = window.confirm(
+      `Supprimer la réunion « ${selectedMeeting.subject} » ?\n\nCette action est définitive.`
+    )
+
+    if (!confirmed) return
+
+    try {
+      setDeleting(true)
+      setError('')
+
+      const response = await fetch('/api/instances', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          id: selectedMeeting.id,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(
+          data.error || 'Impossible de supprimer la réunion.'
+        )
+      }
+
+      setMeetings((current) =>
+        current.filter(
+          (meeting) => meeting.id !== selectedMeeting.id
+        )
+      )
+
+      setModalMode(null)
+      setSelectedMeeting(null)
+      resetForm()
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'Impossible de supprimer la réunion.'
+      )
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -207,13 +295,13 @@ export default function InstancesPage() {
           </p>
         </div>
 
-        <button type="button" className="add-button" onClick={openModal}>
+        <button type="button" className="add-button" onClick={openCreate}>
           <Plus size={18} />
           Ajouter une réunion
         </button>
       </section>
 
-      {error && !modalOpen && (
+      {error && !modalMode && (
         <div className="page-error" role="alert">
           {error}
         </div>
@@ -250,7 +338,11 @@ export default function InstancesPage() {
 
               <div className="meeting-list">
                 {upcomingMeetings.map((meeting) => (
-                  <MeetingCard key={meeting.id} meeting={meeting} />
+                  <MeetingCard
+                    key={meeting.id}
+                    meeting={meeting}
+                    onOpen={() => openEdit(meeting)}
+                  />
                 ))}
               </div>
             </div>
@@ -265,7 +357,11 @@ export default function InstancesPage() {
 
               <div className="meeting-list">
                 {pastMeetings.map((meeting) => (
-                  <MeetingCard key={meeting.id} meeting={meeting} />
+                  <MeetingCard
+                    key={meeting.id}
+                    meeting={meeting}
+                    onOpen={() => openEdit(meeting)}
+                  />
                 ))}
               </div>
             </div>
@@ -273,7 +369,7 @@ export default function InstancesPage() {
         </section>
       )}
 
-      {modalOpen && (
+      {modalMode && (
         <div className="modal-backdrop" onMouseDown={closeModal}>
           <div
             className="modal"
@@ -285,14 +381,18 @@ export default function InstancesPage() {
             <div className="modal-head">
               <div>
                 <span>INSTANCE</span>
-                <h2 id="meeting-modal-title">Ajouter une réunion</h2>
+                <h2 id="meeting-modal-title">
+                  {modalMode === 'edit'
+                    ? 'Modifier la réunion'
+                    : 'Ajouter une réunion'}
+                </h2>
               </div>
 
               <button
                 type="button"
                 className="close-button"
                 onClick={closeModal}
-                disabled={saving}
+                disabled={saving || deleting}
                 aria-label="Fermer"
               >
                 <X size={20} />
@@ -367,22 +467,41 @@ export default function InstancesPage() {
               </div>
 
               <div className="modal-actions">
-                <button
-                  type="button"
-                  className="secondary-button"
-                  onClick={closeModal}
-                  disabled={saving}
-                >
-                  Annuler
-                </button>
+                {modalMode === 'edit' && (
+                  <button
+                    type="button"
+                    className="delete-button"
+                    onClick={handleDelete}
+                    disabled={saving || deleting}
+                  >
+                    <Trash2 size={16} />
+                    {deleting ? 'Suppression…' : 'Supprimer'}
+                  </button>
+                )}
 
-                <button
-                  type="submit"
-                  className="primary-button"
-                  disabled={saving}
-                >
-                  {saving ? 'Enregistrement…' : 'Enregistrer'}
-                </button>
+                <div className="modal-actions-right">
+                  <button
+                    type="button"
+                    className="secondary-button"
+                    onClick={closeModal}
+                    disabled={saving || deleting}
+                  >
+                    Annuler
+                  </button>
+
+                  <button
+                    type="submit"
+                    className="primary-button"
+                    disabled={saving || deleting}
+                  >
+                    <Pencil size={16} />
+                    {saving
+                      ? 'Enregistrement…'
+                      : modalMode === 'edit'
+                        ? 'Enregistrer'
+                        : 'Enregistrer'}
+                  </button>
+                </div>
               </div>
             </form>
           </div>
@@ -497,7 +616,8 @@ export default function InstancesPage() {
 
         .add-button:disabled,
         .primary-button:disabled,
-        .secondary-button:disabled {
+        .secondary-button:disabled,
+        .delete-button:disabled {
           cursor: not-allowed;
           opacity: 0.55;
         }
@@ -593,6 +713,13 @@ export default function InstancesPage() {
           border-radius: 15px;
           background: #fff;
           box-shadow: 0 4px 16px rgba(15, 23, 42, 0.04);
+          cursor: pointer;
+          transition: border-color 0.15s ease, box-shadow 0.15s ease;
+        }
+
+        .meeting-card:hover {
+          border-color: #d8b8b4;
+          box-shadow: 0 8px 22px rgba(15, 23, 42, 0.07);
         }
 
         .meeting-main {
@@ -630,6 +757,20 @@ export default function InstancesPage() {
           display: inline-flex;
           align-items: center;
           gap: 5px;
+        }
+
+        .open-hint {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          min-height: 40px;
+          padding: 0 14px;
+          border: 1px solid #e4c8c5;
+          border-radius: 10px;
+          background: #fff;
+          color: #8f211c;
+          font-size: 14px;
+          font-weight: 700;
         }
 
         .modal-backdrop {
@@ -737,27 +878,52 @@ export default function InstancesPage() {
 
         .modal-actions {
           display: flex;
-          justify-content: flex-end;
+          align-items: center;
+          justify-content: space-between;
           gap: 10px;
           margin-top: 24px;
           padding-top: 18px;
           border-top: 1px solid #eef2f7;
         }
 
-        .secondary-button {
+        .modal-actions-right {
+          display: flex;
+          gap: 10px;
+        }
+
+        .secondary-button,
+        .delete-button {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 7px;
           min-height: 42px;
           padding: 0 16px;
-          border: 1px solid #e2d7d1;
           border-radius: 10px;
-          background: #fff;
-          color: #475569;
           font-size: 14px;
           font-weight: 700;
           cursor: pointer;
         }
 
+        .secondary-button {
+          border: 1px solid #e2d7d1;
+          background: #fff;
+          color: #475569;
+        }
+
         .secondary-button:hover {
           background: #f8fafc;
+        }
+
+        .delete-button {
+          border: 1px solid #e4c8c5;
+          background: #fff;
+          color: #8f211c;
+        }
+
+        .delete-button:hover {
+          border-color: #8f211c;
+          background: #fff8f7;
         }
 
         @media (max-width: 760px) {
@@ -791,6 +957,10 @@ export default function InstancesPage() {
             gap: 14px;
           }
 
+          .open-hint {
+            width: 100%;
+          }
+
           .modal-backdrop {
             align-items: flex-end;
             padding: 0;
@@ -817,6 +987,11 @@ export default function InstancesPage() {
           }
 
           .modal-actions {
+            align-items: stretch;
+            flex-direction: column;
+          }
+
+          .modal-actions-right {
             display: grid;
             grid-template-columns: 1fr 1fr;
           }
@@ -826,9 +1001,26 @@ export default function InstancesPage() {
   )
 }
 
-function MeetingCard({ meeting }: { meeting: Meeting }) {
+function MeetingCard({
+  meeting,
+  onOpen,
+}: {
+  meeting: Meeting
+  onOpen: () => void
+}) {
   return (
-    <article className="meeting-card">
+    <article
+      className="meeting-card"
+      role="button"
+      tabIndex={0}
+      onClick={onOpen}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault()
+          onOpen()
+        }
+      }}
+    >
       <div className="meeting-main">
         <span className="meeting-type">{meeting.type}</span>
         <h3>{meeting.subject}</h3>
@@ -855,6 +1047,10 @@ function MeetingCard({ meeting }: { meeting: Meeting }) {
         </div>
       </div>
 
+      <span className="open-hint">
+        <Pencil size={15} />
+        Modifier
+      </span>
     </article>
   )
 }
