@@ -351,8 +351,30 @@ export default function SiteDocumentsPage() {
           .documents-search-wrap { width: 100%; }
           .documents-list-item { flex-direction: column !important; align-items: stretch !important; padding: 14px !important; gap: 14px !important; }
           .documents-item-main { width: 100%; }
-          .documents-item-actions { width: auto; margin-left: 0; gap: 10px; justify-content: center; align-self: center; }
-          .documents-item-actions .btn { flex: 0 0 auto; width: auto; min-width: 0; justify-content: center; }
+          .documents-item-actions {
+            width: 100%;
+            margin-left: 0;
+            gap: 10px;
+            justify-content: center;
+            align-items: center;
+          }
+          .documents-item-actions .btn {
+            flex: 0 0 auto !important;
+            width: auto !important;
+            min-width: 145px !important;
+            max-width: none !important;
+            min-height: 40px !important;
+            height: 40px !important;
+            padding: 5px 16px !important;
+            display: inline-flex !important;
+            flex-direction: row !important;
+            align-items: center !important;
+            justify-content: center !important;
+            gap: 7px !important;
+            box-sizing: border-box !important;
+            font-size: 14px !important;
+            line-height: 1 !important;
+          }
           .documents-modal-backdrop { padding: 10px !important; align-items: flex-start !important; }
           .documents-modal-card { width: 100% !important; max-width: 100% !important; max-height: calc(100vh - 20px) !important; margin: 10px auto !important; padding: 16px !important; border-radius: 14px !important; }
           .documents-modal-head { align-items: flex-start !important; }
