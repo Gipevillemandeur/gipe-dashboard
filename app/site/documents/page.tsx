@@ -181,14 +181,14 @@ export default function SiteDocumentsPage() {
 
   return (
     <>
-      <div className="topbar documents-topbar">
+      <div className="topbar">
         <div>
           <div className="eyebrow">Site internet</div>
           <h1>Documents</h1>
           <div className="kicker">Gestion des documents publiés sur gipevillemandeur.com.</div>
         </div>
         <div className="topbar-right">
-          <button className="btn btn-primary documents-new-button" type="button" onClick={openNew}>
+          <button className="btn btn-primary" type="button" onClick={openNew}>
             <Plus size={15} />
             Nouveau document
           </button>
@@ -347,18 +347,6 @@ export default function SiteDocumentsPage() {
         .documents-error { margin-bottom: 18px; }
 
         @media (max-width: 700px) {
-          .documents-topbar { align-items: stretch !important; flex-direction: column !important; gap: 14px !important; }
-          .documents-topbar .topbar-right { width: auto !important; align-self: flex-start !important; flex: 0 0 auto !important; }
-          .documents-new-button {
-            width: 282px !important;
-            min-width: 282px !important;
-            max-width: 282px !important;
-            flex: 0 0 282px !important;
-            align-self: flex-start !important;
-            box-sizing: border-box;
-            justify-content: center;
-            white-space: nowrap !important;
-          }
           .documents-section-head { align-items: stretch !important; flex-direction: column !important; }
           .documents-search-wrap { width: 100%; }
           .documents-list-item { flex-direction: column !important; align-items: stretch !important; padding: 14px !important; gap: 14px !important; }
@@ -386,6 +374,7 @@ export default function SiteDocumentsPage() {
     </>
   );
 }
+
 
 
 
