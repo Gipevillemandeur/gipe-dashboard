@@ -845,15 +845,13 @@ export default function InstancesPage() {
 
         .form-grid {
           display: grid;
-          grid-template-columns: repeat(2, minmax(0, 1fr));
+          grid-template-columns: 1fr 1fr;
           gap: 17px;
-          min-width: 0;
         }
 
         label {
           display: grid;
           gap: 7px;
-          min-width: 0;
         }
 
         label.full {
@@ -884,17 +882,6 @@ export default function InstancesPage() {
         select:focus {
           border-color: #8f211c;
           box-shadow: 0 0 0 3px rgba(143, 33, 28, 0.08);
-        }
-
-        .form-grid > label {
-          min-width: 0;
-          max-width: 100%;
-        }
-
-        .form-grid input,
-        .form-grid select {
-          min-width: 0;
-          max-width: 100%;
         }
 
         .instance-two-columns {
@@ -1007,14 +994,16 @@ export default function InstancesPage() {
           }
 
           .modal-backdrop {
-            align-items: flex-end;
-            padding: 0;
+            align-items: center;
+            padding: 10px;
+            box-sizing: border-box;
           }
 
           .modal {
-            width: 100%;
-            max-height: 92vh;
-            border-radius: 18px 18px 0 0;
+            width: calc(100% - 0px);
+            max-width: 620px;
+            max-height: calc(100vh - 20px);
+            border-radius: 18px;
           }
 
           .modal-head,
@@ -1024,8 +1013,7 @@ export default function InstancesPage() {
           }
 
           .form-grid {
-            grid-template-columns: minmax(0, 1fr);
-            min-width: 0;
+            grid-template-columns: 1fr;
           }
 
           label.full {
@@ -1113,5 +1101,4 @@ function MeetingCard({
     </article>
   )
 }
-
 
