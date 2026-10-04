@@ -839,34 +839,13 @@ export default function SiteActualitesPage() {
                 />
               </label>
 
-              <div
-                className="actualites-two-columns"
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns:
-                    '1fr 1fr',
-                  gap: 12,
-                }}
-              >
-                <label
-                  style={{
-                    display: 'grid',
-                    gap: 7,
-                    fontSize: 12,
-                    fontWeight: 700,
-                  }}
-                >
+              <div className="actualites-two-columns">
+                <label className="actualites-field">
                   Date
                   <input
                     className="input actualites-date-input"
                     type="date"
                     value={date}
-                    style={{
-                      width: '100%',
-                      minWidth: 0,
-                      maxWidth: '100%',
-                      boxSizing: 'border-box',
-                    }}
                     onChange={(e) =>
                       setDate(
                         e.target.value
@@ -876,14 +855,7 @@ export default function SiteActualitesPage() {
                   />
                 </label>
 
-                <label
-                  style={{
-                    display: 'grid',
-                    gap: 7,
-                    fontSize: 12,
-                    fontWeight: 700,
-                  }}
-                >
+                <label className="actualites-field">
                   Auteur
                   <input
                     className="input"
@@ -1286,12 +1258,26 @@ export default function SiteActualitesPage() {
           box-sizing: border-box;
         }
 
+        .actualites-field {
+          display: grid;
+          gap: 7px;
+          font-size: 12px;
+          font-weight: 700;
+          min-width: 0;
+        }
+
+        .actualites-two-columns {
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+          gap: 16px;
+          min-width: 0;
+        }
+
         .actualites-date-input {
           width: 100% !important;
           min-width: 0 !important;
           max-width: 100% !important;
           box-sizing: border-box !important;
-          display: block !important;
         }
 
         @media (max-width: 700px) {
@@ -1360,7 +1346,8 @@ export default function SiteActualitesPage() {
           }
 
           .actualites-two-columns {
-            grid-template-columns: 1fr !important;
+            grid-template-columns: minmax(0, 1fr) !important;
+            gap: 16px !important;
           }
 
           .actualites-form-actions {
@@ -1379,12 +1366,14 @@ export default function SiteActualitesPage() {
             box-sizing: border-box;
           }
 
-          .actualites-modal-card input[type='date'] {
+          .actualites-date-input {
             width: 100% !important;
-            max-width: 100% !important;
             min-width: 0 !important;
+            max-width: 100% !important;
             box-sizing: border-box !important;
-            display: block;
+            display: block !important;
+            -webkit-appearance: none !important;
+            appearance: none !important;
           }
         }
 
