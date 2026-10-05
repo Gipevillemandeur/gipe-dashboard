@@ -9,6 +9,9 @@ import {
   MapPin,
   Save,
   FileText,
+  Upload,
+  Trash2,
+  ExternalLink,
 } from 'lucide-react'
 
 type Meeting = {
@@ -20,6 +23,18 @@ type Meeting = {
   location: string | null
   school_year_id: string
   summary: string | null
+}
+
+type MeetingDocument = {
+  id: string
+  meeting_id: string
+  file_name: string
+  file_url: string
+  file_type: string | null
+  file_size: number | null
+  created_at: string
+  updated_at: string
+  download_url: string | null
 }
 
 type PageProps = {
@@ -36,13 +51,74 @@ function formatDate(value: string) {
   }).format(new Date(`${value}T00:00:00`))
 }
 
-export default function InstanceDetailPage({ params }: PageProps) {
-  const [meeting, setMeeting] = useState<Meeting | null>(null)
+function formatFileSize(size: number | null) {
+  if (!size) return ''
+
+  if (size < 1024) {
+    return `${size} o`
+  }
+
+  if (size < 1024 * 1024) {
+    return `${Math.round(size / 1024)} Ko`
+  }
+
+  return `${(size / (1024 * 1024)).toFixed(1)} Mo`
+}
+
+export default function InstanceDetailPage({
+  params,
+}: PageProps) {
+  const [meeting, setMeeting] =
+    useState<Meeting | null>(null)
+
   const [summary, setSummary] = useState('')
+
+  const [documents, setDocuments] =
+    useState<MeetingDocument[]>([])
+
   const [loading, setLoading] = useState(true)
+  const [documentsLoading, setDocumentsLoading] =
+    useState(true)
+
   const [saving, setSaving] = useState(false)
+  const [uploading, setUploading] = useState(false)
+  const [deletingDocumentId, setDeletingDocumentId] =
+    useState<string | null>(null)
+
   const [error, setError] = useState('')
   const [saved, setSaved] = useState(false)
+
+  async function loadDocuments(id: string) {
+    try {
+      setDocumentsLoading(true)
+
+      const response = await fetch(
+        `/api/instances/${id}/documents`,
+        {
+          cache: 'no-store',
+        }
+      )
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(
+          data.error ||
+            'Impossible de charger les documents.'
+        )
+      }
+
+      setDocuments(data.documents || [])
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'Impossible de charger les documents.'
+      )
+    } finally {
+      setDocumentsLoading(false)
+    }
+  }
 
   useEffect(() => {
     async function load() {
@@ -52,20 +128,26 @@ export default function InstanceDetailPage({ params }: PageProps) {
 
         const { id } = await params
 
-        const response = await fetch(`/api/instances/${id}`, {
-          cache: 'no-store',
-        })
+        const response = await fetch(
+          `/api/instances/${id}`,
+          {
+            cache: 'no-store',
+          }
+        )
 
         const data = await response.json()
 
         if (!response.ok) {
           throw new Error(
-            data.error || 'Impossible de charger la réunion.'
+            data.error ||
+              'Impossible de charger la réunion.'
           )
         }
 
         setMeeting(data.meeting)
         setSummary(data.meeting.summary || '')
+
+        await loadDocuments(id)
       } catch (err) {
         setError(
           err instanceof Error
@@ -80,7 +162,9 @@ export default function InstanceDetailPage({ params }: PageProps) {
     load()
   }, [params])
 
-  async function saveSummary(event: React.FormEvent<HTMLFormElement>) {
+  async function saveSummary(
+    event: React.FormEvent<HTMLFormElement>
+  ) {
     event.preventDefault()
 
     if (!meeting) return
@@ -90,21 +174,25 @@ export default function InstanceDetailPage({ params }: PageProps) {
       setSaved(false)
       setError('')
 
-      const response = await fetch(`/api/instances/${meeting.id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          summary,
-        }),
-      })
+      const response = await fetch(
+        `/api/instances/${meeting.id}`,
+        {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            summary,
+          }),
+        }
+      )
 
       const data = await response.json()
 
       if (!response.ok) {
         throw new Error(
-          data.error || 'Impossible d’enregistrer le résumé.'
+          data.error ||
+            'Impossible d’enregistrer le résumé.'
         )
       }
 
@@ -119,6 +207,116 @@ export default function InstanceDetailPage({ params }: PageProps) {
       )
     } finally {
       setSaving(false)
+    }
+  }
+
+  async function handleUpload(
+    event: React.ChangeEvent<HTMLInputElement>
+  ) {
+    if (!meeting) return
+
+    const file = event.target.files?.[0]
+
+    event.target.value = ''
+
+    if (!file) return
+
+    if (file.size > 50 * 1024 * 1024) {
+      setError(
+        'Le fichier dépasse la limite de 50 Mo.'
+      )
+      return
+    }
+
+    try {
+      setUploading(true)
+      setError('')
+
+      const formData = new FormData()
+      formData.append('file', file)
+
+      const response = await fetch(
+        `/api/instances/${meeting.id}/documents`,
+        {
+          method: 'POST',
+          body: formData,
+        }
+      )
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(
+          data.error ||
+            'Impossible d’ajouter le document.'
+        )
+      }
+
+      setDocuments((current) => [
+        data.document,
+        ...current,
+      ])
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'Impossible d’ajouter le document.'
+      )
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  async function deleteDocument(
+    document: MeetingDocument
+  ) {
+    if (!meeting) return
+
+    const confirmed = window.confirm(
+      `Supprimer le document « ${document.file_name} » ?`
+    )
+
+    if (!confirmed) return
+
+    try {
+      setDeletingDocumentId(document.id)
+      setError('')
+
+      const response = await fetch(
+        `/api/instances/${meeting.id}/documents`,
+        {
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            documentId: document.id,
+          }),
+        }
+      )
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(
+          data.error ||
+            'Impossible de supprimer le document.'
+        )
+      }
+
+      setDocuments((current) =>
+        current.filter(
+          (item) => item.id !== document.id
+        )
+      )
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'Impossible de supprimer le document.'
+      )
+    } finally {
+      setDeletingDocumentId(null)
     }
   }
 
@@ -137,9 +335,13 @@ export default function InstanceDetailPage({ params }: PageProps) {
       <main className="page">
         <section className="state-card">
           <h1>Réunion introuvable</h1>
+
           <p>{error}</p>
 
-          <Link href="/instances" className="back-link">
+          <Link
+            href="/instances"
+            className="back-link"
+          >
             <ArrowLeft size={16} />
             Retour aux réunions
           </Link>
@@ -151,24 +353,33 @@ export default function InstanceDetailPage({ params }: PageProps) {
   return (
     <main className="page">
       <div className="topbar">
-        <Link href="/instances" className="back-link">
+        <Link
+          href="/instances"
+          className="back-link"
+        >
           <ArrowLeft size={16} />
           Retour aux réunions
         </Link>
 
-        <span className="status">Réunion passée</span>
+        <span className="status">
+          Réunion passée
+        </span>
       </div>
 
       <section className="hero">
         <div>
-          <span className="eyebrow">{meeting.type}</span>
+          <span className="eyebrow">
+            {meeting.type}
+          </span>
 
           <h1>{meeting.subject}</h1>
 
           <div className="meta">
             <span>
               <CalendarDays size={16} />
-              {formatDate(meeting.meeting_date)}
+              {formatDate(
+                meeting.meeting_date
+              )}
             </span>
 
             {meeting.meeting_time && (
@@ -199,10 +410,13 @@ export default function InstanceDetailPage({ params }: PageProps) {
           <CalendarDays size={19} />
 
           <div>
-            <h2>Informations de la réunion</h2>
+            <h2>
+              Informations de la réunion
+            </h2>
+
             <p>
-              Les informations enregistrées lors de la création de la
-              réunion.
+              Les informations enregistrées lors
+              de la création de la réunion.
             </p>
           </div>
         </div>
@@ -220,19 +434,26 @@ export default function InstanceDetailPage({ params }: PageProps) {
 
           <div>
             <span>Date</span>
-            <strong>{formatDate(meeting.meeting_date)}</strong>
+            <strong>
+              {formatDate(
+                meeting.meeting_date
+              )}
+            </strong>
           </div>
 
           <div>
             <span>Heure</span>
             <strong>
-              {meeting.meeting_time?.slice(0, 5) || '—'}
+              {meeting.meeting_time?.slice(0, 5) ||
+                '—'}
             </strong>
           </div>
 
           <div className="full">
             <span>Lieu</span>
-            <strong>{meeting.location || '—'}</strong>
+            <strong>
+              {meeting.location || '—'}
+            </strong>
           </div>
         </div>
       </section>
@@ -242,10 +463,14 @@ export default function InstanceDetailPage({ params }: PageProps) {
           <FileText size={19} />
 
           <div>
-            <h2>Résumé / compte rendu</h2>
+            <h2>
+              Résumé / compte rendu
+            </h2>
+
             <p>
-              Ajoutez ici le résumé de ce qui a été dit et décidé lors
-              de la réunion.
+              Ajoutez ici le résumé de ce qui a
+              été dit et décidé lors de la
+              réunion.
             </p>
           </div>
         </div>
@@ -273,6 +498,7 @@ export default function InstanceDetailPage({ params }: PageProps) {
               disabled={saving}
             >
               <Save size={16} />
+
               {saving
                 ? 'Enregistrement…'
                 : 'Enregistrer le résumé'}
@@ -281,21 +507,118 @@ export default function InstanceDetailPage({ params }: PageProps) {
         </form>
       </section>
 
-      <section className="content-card future-card">
-        <div className="section-title">
-          <FileText size={19} />
+      <section className="content-card">
+        <div className="documents-header">
+          <div className="section-title">
+            <FileText size={19} />
 
-          <div>
-            <h2>Documents</h2>
-            <p>
-              Les documents liés à cette réunion seront ajoutés ici.
-            </p>
+            <div>
+              <h2>Documents associés</h2>
+
+              <p>
+                Tous les documents de cette
+                réunion seront conservés avec
+                elle et archivés dans son dossier
+                Drive lors de la clôture.
+              </p>
+            </div>
           </div>
+
+          <label className="upload-button">
+            <Upload size={16} />
+
+            {uploading
+              ? 'Envoi…'
+              : 'Ajouter un document'}
+
+            <input
+              type="file"
+              onChange={handleUpload}
+              disabled={uploading}
+            />
+          </label>
         </div>
 
-        <div className="documents-placeholder">
-          L’ajout de documents sera disponible dans la prochaine étape.
-        </div>
+        {documentsLoading ? (
+          <div className="documents-empty">
+            Chargement des documents…
+          </div>
+        ) : documents.length === 0 ? (
+          <div className="documents-empty">
+            Aucun document associé à cette
+            réunion pour le moment.
+          </div>
+        ) : (
+          <div className="documents-list">
+            {documents.map((document) => (
+              <div
+                key={document.id}
+                className="document-row"
+              >
+                <div className="document-icon">
+                  <FileText size={20} />
+                </div>
+
+                <div className="document-info">
+                  <strong>
+                    {document.file_name}
+                  </strong>
+
+                  <span>
+                    {[
+                      document.file_type,
+                      formatFileSize(
+                        document.file_size
+                      ),
+                    ]
+                      .filter(Boolean)
+                      .join(' • ')}
+                  </span>
+                </div>
+
+                <div className="document-actions">
+                  {document.download_url && (
+                    <a
+                      href={
+                        document.download_url
+                      }
+                      target="_blank"
+                      rel="noreferrer"
+                      className="document-action"
+                    >
+                      <ExternalLink
+                        size={15}
+                      />
+                      Ouvrir
+                    </a>
+                  )}
+
+                  <button
+                    type="button"
+                    className="document-delete"
+                    onClick={() =>
+                      deleteDocument(
+                        document
+                      )
+                    }
+                    disabled={
+                      deletingDocumentId ===
+                      document.id
+                    }
+                    aria-label={`Supprimer ${document.file_name}`}
+                  >
+                    <Trash2 size={15} />
+
+                    {deletingDocumentId ===
+                    document.id
+                      ? 'Suppression…'
+                      : 'Supprimer'}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </section>
 
       <style>{`
@@ -525,19 +848,140 @@ export default function InstanceDetailPage({ params }: PageProps) {
           cursor: not-allowed;
         }
 
-        .future-card {
-          min-height: 150px;
+        .documents-header {
+          display: flex;
+          align-items: flex-start;
+          justify-content: space-between;
+          gap: 18px;
         }
 
-        .documents-placeholder {
+        .upload-button {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+          min-height: 42px;
+          padding: 0 15px;
+          border-radius: 10px;
+          background: #8f211c;
+          color: #fff;
+          font-size: 14px;
+          font-weight: 700;
+          cursor: pointer;
+          white-space: nowrap;
+        }
+
+        .upload-button:hover {
+          background: #7a1c18;
+        }
+
+        .upload-button input {
+          display: none;
+        }
+
+        .documents-empty {
           margin-top: 18px;
-          padding: 20px;
+          padding: 22px;
           border: 1px dashed #d8c5bd;
           border-radius: 12px;
           background: #fffaf4;
           color: #64748b;
           font-size: 14px;
           text-align: center;
+        }
+
+        .documents-list {
+          display: grid;
+          gap: 10px;
+          margin-top: 18px;
+        }
+
+        .document-row {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          min-width: 0;
+          padding: 12px 14px;
+          border: 1px solid #eadfd5;
+          border-radius: 11px;
+          background: #fffaf4;
+        }
+
+        .document-icon {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          flex: 0 0 auto;
+          width: 38px;
+          height: 38px;
+          border-radius: 9px;
+          background: #fff0d9;
+          color: #8f211c;
+        }
+
+        .document-info {
+          display: grid;
+          gap: 4px;
+          min-width: 0;
+          flex: 1 1 auto;
+        }
+
+        .document-info strong {
+          color: #0f172a;
+          font-size: 14px;
+          overflow-wrap: anywhere;
+        }
+
+        .document-info span {
+          color: #64748b;
+          font-size: 12px;
+        }
+
+        .document-actions {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          flex: 0 0 auto;
+        }
+
+        .document-action,
+        .document-delete {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 6px;
+          min-height: 36px;
+          padding: 0 10px;
+          border-radius: 8px;
+          font-size: 12px;
+          font-weight: 700;
+          cursor: pointer;
+          text-decoration: none;
+        }
+
+        .document-action {
+          border: 1px solid #e4c8c5;
+          background: #fff;
+          color: #8f211c;
+        }
+
+        .document-action:hover {
+          background: #fff8f7;
+        }
+
+        .document-delete {
+          border: 1px solid #e4c8c5;
+          background: #fff;
+          color: #8f211c;
+        }
+
+        .document-delete:hover {
+          background: #fff0ef;
+        }
+
+        .document-delete:disabled {
+          opacity: 0.55;
+          cursor: not-allowed;
         }
 
         .state-card {
@@ -609,12 +1053,35 @@ export default function InstanceDetailPage({ params }: PageProps) {
             gap: 9px 14px;
           }
 
-          .future-card {
-            min-height: 120px;
+          .documents-header {
+            align-items: stretch;
+            flex-direction: column;
+          }
+
+          .upload-button {
+            width: 100%;
+          }
+
+          .document-row {
+            align-items: flex-start;
+            flex-wrap: wrap;
+          }
+
+          .document-info {
+            min-width: calc(100% - 52px);
+          }
+
+          .document-actions {
+            width: 100%;
+            margin-left: 50px;
+          }
+
+          .document-action,
+          .document-delete {
+            flex: 1 1 0;
           }
         }
       `}</style>
     </main>
   )
 }
-
