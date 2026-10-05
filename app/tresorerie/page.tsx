@@ -957,15 +957,23 @@ export default function TresoreriePage() {
 
           .tresorerie-modal-overlay {
             padding: 12px;
-            align-items: center;
+            align-items: flex-start;
+            justify-content: center;
+            min-height: 100dvh;
+            height: 100dvh;
+            overflow: hidden;
           }
 
           .tresorerie-modal {
             width: 100%;
             max-width: none;
-            max-height: calc(100vh - 24px);
+            max-height: calc(100dvh - 24px);
+            height: auto;
+            margin-top: 12px;
             padding: 20px 18px 18px;
             border-radius: 22px;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
           }
 
           .tresorerie-modal-head {
