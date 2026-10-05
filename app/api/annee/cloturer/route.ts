@@ -5,6 +5,7 @@ import {
   buildAnnualReportPdf,
   type AnnualReportData,
 } from '@/lib/annual-report-pdf';
+import { archiveInstanceMeeting } from '@/lib/instance-meeting-drive';
 
 async function requireAdmin() {
   const supabase = await createClient();
@@ -59,7 +60,9 @@ function sanitizeFileNamePart(value: string) {
     .trim();
 }
 
-async function buildCurrentAnnualReport(admin: ReturnType<typeof createAdminClient>) {
+async function buildCurrentAnnualReport(
+  admin: ReturnType<typeof createAdminClient>
+) {
   const { data: year, error: yearError } = await admin
     .from('school_years')
     .select('id,label')
@@ -74,18 +77,19 @@ async function buildCurrentAnnualReport(admin: ReturnType<typeof createAdminClie
     throw new Error('Aucune année scolaire active.');
   }
 
-  const { data: memberships, error: membershipsError } = await admin
-    .from('gipe_memberships')
-    .select(`
-      id,
-      gipe_membership_children (
-        class_id,
-        classes (
-          name
+  const { data: memberships, error: membershipsError } =
+    await admin
+      .from('gipe_memberships')
+      .select(`
+        id,
+        gipe_membership_children (
+          class_id,
+          classes (
+            name
+          )
         )
-      )
-    `)
-    .eq('school_year_id', year.id);
+      `)
+      .eq('school_year_id', year.id);
 
   if (membershipsError) {
     throw new Error(membershipsError.message);
@@ -157,6 +161,7 @@ async function archivePdfInDrive(
 ) {
   const scriptUrl =
     process.env.GOOGLE_DRIVE_APPS_SCRIPT_URL?.trim();
+
   const token =
     process.env.GOOGLE_DRIVE_APPS_SCRIPT_TOKEN?.trim();
 
@@ -167,10 +172,12 @@ async function archivePdfInDrive(
   }
 
   const safeYear = sanitizeFileNamePart(schoolYear);
+
   const fileName =
     `Bilan-annuel-GIPE-${safeYear}.pdf`;
 
-  const pdfBase64 = Buffer.from(pdf).toString('base64');
+  const pdfBase64 =
+    Buffer.from(pdf).toString('base64');
 
   const response = await fetch(scriptUrl, {
     method: 'POST',
@@ -210,6 +217,54 @@ async function archivePdfInDrive(
   return result;
 }
 
+async function archiveCurrentYearInstances(
+  admin: ReturnType<typeof createAdminClient>,
+  schoolYearId: string
+) {
+  const { data: meetings, error } = await admin
+    .from('instance_meetings')
+    .select('id, meeting_date, meeting_time, type, subject')
+    .eq('school_year_id', schoolYearId)
+    .order('meeting_date', {
+      ascending: true,
+    })
+    .order('meeting_time', {
+      ascending: true,
+    });
+
+  if (error) {
+    throw new Error(
+      `Impossible de récupérer les réunions à archiver : ${error.message}`
+    );
+  }
+
+  const rows = meetings || [];
+
+  const archived = [];
+
+  for (const meeting of rows) {
+    try {
+      const result = await archiveInstanceMeeting(
+        admin,
+        meeting.id
+      );
+
+      archived.push(result);
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : 'Erreur inconnue lors de l’archivage.';
+
+      throw new Error(
+        `Échec de l’archivage de la réunion "${meeting.type} - ${meeting.subject}" : ${message}`
+      );
+    }
+  }
+
+  return archived;
+}
+
 export async function POST(request: Request) {
   const auth = await requireAdmin();
 
@@ -219,7 +274,7 @@ export async function POST(request: Request) {
 
   const { admin } = auth;
 
-  const body = await request.json().catch(() => null) as {
+  const body = (await request.json().catch(() => null)) as {
     newYearLabel?: string;
   } | null;
 
@@ -259,44 +314,75 @@ export async function POST(request: Request) {
 
   try {
     /*
-     * 1. On lit et prépare le bilan de l'année actuellement active.
-     *    Aucune modification de Supabase n'a encore été faite.
+     * 1. Lecture et préparation du bilan
+     *
+     * Aucune modification de Supabase n'est encore effectuée.
      */
     const { year, report } =
       await buildCurrentAnnualReport(admin);
 
     /*
-     * 2. Génération du PDF avec le modèle validé.
-     */
-    const pdf = await buildAnnualReportPdf(report);
-
-    /*
-     * 3. Archivage Drive AVANT la clôture SQL.
+     * 2. Archivage de toutes les réunions de l'année active.
      *
-     * Si Drive échoue, on s'arrête ici et l'année reste active.
+     * Chaque réunion est envoyée dans :
+     *
+     * Archives/
+     *   année/
+     *     Instances/
+     *       réunion/
+     *         Fiche-reunion.pdf
+     *         documents associés...
+     *
+     * Cette étape ne modifie ni ne supprime les données Supabase.
      */
-    const drive = await archivePdfInDrive(
-      year.label,
-      pdf
-    );
+    const archivedInstances =
+      await archiveCurrentYearInstances(
+        admin,
+        year.id
+      );
 
     /*
-     * 4. Seulement si Drive confirme l'archivage,
-     *    on effectue la vraie clôture.
+     * 3. Génération du bilan annuel.
      */
-    const { data, error } = await admin.rpc(
-      'gipe_cloturer_annee',
-      {
-        p_new_year_label: newYearLabel,
-      }
-    );
+    const pdf =
+      await buildAnnualReportPdf(report);
+
+    /*
+     * 4. Archivage du bilan annuel dans Drive.
+     *
+     * Si cette étape échoue, la clôture est interrompue.
+     */
+    const drive =
+      await archivePdfInDrive(
+        year.label,
+        pdf
+      );
+
+    /*
+     * 5. Seulement si :
+     *
+     * - toutes les réunions ont été archivées ;
+     * - tous leurs documents ont été archivés ;
+     * - le bilan annuel a été archivé ;
+     *
+     * on effectue la vraie clôture SQL.
+     */
+    const { data, error } =
+      await admin.rpc(
+        'gipe_cloturer_annee',
+        {
+          p_new_year_label:
+            newYearLabel,
+        }
+      );
 
     if (error) {
       return NextResponse.json(
         {
           error:
-            `Le bilan a bien été archivé dans Google Drive, mais la clôture Supabase a échoué : ${error.message}`,
+            `Les archives ont bien été envoyées dans Google Drive, mais la clôture Supabase a échoué : ${error.message}`,
           drive,
+          archivedInstances,
         },
         { status: 500 }
       );
@@ -306,6 +392,7 @@ export async function POST(request: Request) {
       ok: true,
       result: data,
       drive,
+      archivedInstances,
     });
   } catch (error) {
     console.error(
