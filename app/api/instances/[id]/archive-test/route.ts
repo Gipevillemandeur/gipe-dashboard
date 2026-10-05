@@ -12,13 +12,9 @@ type RouteContext = {
 async function requireAdmin() {
   const supabase = await createClient()
 
-  const {
-    data: { claims },
-  } = await supabase.auth.getClaims()
+  const { data, error } = await supabase.auth.getClaims()
 
-  const userId = claims?.sub
-
-  if (!userId) {
+  if (error || !data?.sub) {
     return {
       ok: false as const,
       response: NextResponse.json(
@@ -30,25 +26,31 @@ async function requireAdmin() {
 
   const admin = createAdminClient()
 
-  const { data, error } = await admin
+  const { data: adminUser, error: adminError } = await admin
     .from('gipe_admins')
     .select('user_id')
-    .eq('user_id', userId)
+    .eq('user_id', data.sub)
     .maybeSingle()
 
-  if (error) {
-    console.error('Erreur vérification administrateur :', error)
+  if (adminError) {
+    console.error(
+      'Erreur vérification administrateur :',
+      adminError
+    )
 
     return {
       ok: false as const,
       response: NextResponse.json(
-        { error: 'Impossible de vérifier les droits administrateur.' },
+        {
+          error:
+            'Impossible de vérifier les droits administrateur.',
+        },
         { status: 500 }
       ),
     }
   }
 
-  if (!data) {
+  if (!adminUser) {
     return {
       ok: false as const,
       response: NextResponse.json(
@@ -84,7 +86,10 @@ export async function GET(
       return auth.response
     }
 
-    const result = await archiveInstanceMeeting(auth.admin, id)
+    const result = await archiveInstanceMeeting(
+      auth.admin,
+      id
+    )
 
     return NextResponse.json({
       ok: true,
@@ -92,7 +97,10 @@ export async function GET(
       result,
     })
   } catch (error) {
-    console.error('Erreur test archivage réunion :', error)
+    console.error(
+      'Erreur test archivage réunion :',
+      error
+    )
 
     return NextResponse.json(
       {
