@@ -12,9 +12,12 @@ type RouteContext = {
 async function requireAdmin() {
   const supabase = await createClient()
 
-  const { data, error } = await supabase.auth.getClaims()
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser()
 
-  if (error || !data?.sub) {
+  if (error || !user) {
     return {
       ok: false as const,
       response: NextResponse.json(
@@ -29,7 +32,7 @@ async function requireAdmin() {
   const { data: adminUser, error: adminError } = await admin
     .from('gipe_admins')
     .select('user_id')
-    .eq('user_id', data.sub)
+    .eq('user_id', user.id)
     .maybeSingle()
 
   if (adminError) {
