@@ -292,7 +292,7 @@ export default function TresoreriePage() {
 
   return (
     <>
-      <div className="topbar">
+      <div className="topbar tresorerie-topbar">
         <div>
           <div className="eyebrow">Trésorerie</div>
           <h1>Gestion de la trésorerie</h1>
@@ -323,85 +323,41 @@ export default function TresoreriePage() {
       )}
 
       <section
-        className="card"
+        className="card tresorerie-summary-card"
         style={{
           padding: 22,
           marginBottom: 18,
         }}
       >
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(3, 1fr)',
-            gap: 14,
-          }}
-        >
-          <div
-            style={{
-              padding: 18,
-              border: '1px solid #eadfd5',
-              borderRadius: 12,
-              background: '#fffaf3',
-              textAlign: 'center',
-            }}
-          >
+        <div className="tresorerie-summary-grid">
+          <div className="tresorerie-stat">
             <ArrowUpCircle size={18} />
-            <div className="stat-label" style={{ marginTop: 7 }}>
+            <div className="stat-label tresorerie-stat-label">
               RECETTES
             </div>
-            <div
-              style={{
-                marginTop: 5,
-                fontSize: 27,
-                fontWeight: 800,
-              }}
-            >
+            <div className="tresorerie-stat-value">
               {formatMoney(totals.income)}
             </div>
           </div>
 
-          <div
-            style={{
-              padding: 18,
-              border: '1px solid #eadfd5',
-              borderRadius: 12,
-              background: '#fffaf3',
-              textAlign: 'center',
-            }}
-          >
+          <div className="tresorerie-stat">
             <ArrowDownCircle size={18} />
-            <div className="stat-label" style={{ marginTop: 7 }}>
+            <div className="stat-label tresorerie-stat-label">
               DÉPENSES
             </div>
-            <div
-              style={{
-                marginTop: 5,
-                fontSize: 27,
-                fontWeight: 800,
-              }}
-            >
+            <div className="tresorerie-stat-value">
               {formatMoney(totals.expense)}
             </div>
           </div>
 
-          <div
-            style={{
-              padding: 18,
-              border: '1px solid #eadfd5',
-              borderRadius: 12,
-              background: '#f8fafc',
-              textAlign: 'center',
-            }}
-          >
+          <div className="tresorerie-stat tresorerie-stat-balance">
             <WalletCards size={18} />
-            <div className="stat-label" style={{ marginTop: 7 }}>
+            <div className="stat-label tresorerie-stat-label">
               SOLDE
             </div>
             <div
+              className="tresorerie-stat-value"
               style={{
-                marginTop: 5,
-                fontSize: 27,
-                fontWeight: 800,
                 color:
                   totals.balance < 0
                     ? '#b91c1c'
@@ -414,8 +370,8 @@ export default function TresoreriePage() {
         </div>
       </section>
 
-      <section className="card section-card">
-        <div className="section-head">
+      <section className="card section-card tresorerie-operations-card">
+        <div className="section-head tresorerie-section-head">
           <div>
             <h2 className="section-title">Opérations</h2>
             <p className="section-sub">
@@ -425,12 +381,7 @@ export default function TresoreriePage() {
             </p>
           </div>
 
-          <div
-            style={{
-              width: 320,
-              maxWidth: '100%',
-            }}
-          >
+          <div className="tresorerie-search">
             <input
               className="input"
               placeholder="Rechercher une opération..."
@@ -445,12 +396,7 @@ export default function TresoreriePage() {
             Chargement de la trésorerie…
           </p>
         ) : filteredTransactions.length === 0 ? (
-          <div
-            style={{
-              textAlign: 'center',
-              padding: '48px 20px',
-            }}
-          >
+          <div className="tresorerie-empty">
             <CreditCard
               size={34}
               style={{ opacity: 0.35 }}
@@ -463,7 +409,7 @@ export default function TresoreriePage() {
             </p>
           </div>
         ) : (
-          <div style={{ overflowX: 'auto' }}>
+          <div className="tresorerie-table-wrap">
             <table className="table">
               <thead>
                 <tr>
@@ -514,6 +460,7 @@ export default function TresoreriePage() {
                       <div style={{ fontWeight: 700 }}>
                         {item.label}
                       </div>
+
                       {item.note && (
                         <div
                           style={{
@@ -546,13 +493,7 @@ export default function TresoreriePage() {
                     </td>
 
                     <td style={{ textAlign: 'right' }}>
-                      <div
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: 6,
-                        }}
-                      >
+                      <div className="tresorerie-row-actions">
                         <button
                           type="button"
                           className="btn"
@@ -587,46 +528,12 @@ export default function TresoreriePage() {
       </section>
 
       {showForm && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(15, 23, 42, 0.45)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: 20,
-            zIndex: 1000,
-          }}
-        >
-          <div
-            className="card"
-            style={{
-              width: '100%',
-              maxWidth: 620,
-              maxHeight: '90vh',
-              overflowY: 'auto',
-              padding: '20px 22px 22px',
-              boxSizing: 'border-box',
-              background: '#fff',
-              boxShadow:
-                '0 20px 50px rgba(15, 23, 42, 0.20)',
-            }}
-          >
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                gap: 12,
-              }}
-            >
+        <div className="tresorerie-modal-overlay">
+          <div className="card tresorerie-modal">
+            <div className="tresorerie-modal-head">
               <div>
                 <div className="eyebrow">Trésorerie</div>
-                <h2
-                  className="section-title"
-                  style={{ marginTop: 4 }}
-                >
+                <h2 className="section-title tresorerie-modal-title">
                   {editingId
                     ? 'Modifier l’opération'
                     : 'Ajouter une opération'}
@@ -635,7 +542,7 @@ export default function TresoreriePage() {
 
               <button
                 type="button"
-                className="btn"
+                className="btn tresorerie-close-button"
                 onClick={closeForm}
                 disabled={saving}
                 title="Fermer"
@@ -645,25 +552,19 @@ export default function TresoreriePage() {
             </div>
 
             <form onSubmit={save}>
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: '1fr 1fr',
-                  gap: 14,
-                  marginTop: 20,
-                }}
-              >
-                <div>
+              <div className="tresorerie-form-grid">
+                <div className="tresorerie-form-field">
                   <label
                     className="form-label"
                     htmlFor="transaction-date"
                   >
                     Date
                   </label>
+
                   <input
                     id="transaction-date"
                     type="date"
-                    className="input"
+                    className="input tresorerie-date-input"
                     value={form.date}
                     onChange={(event) =>
                       setForm((current) => ({
@@ -675,17 +576,12 @@ export default function TresoreriePage() {
                   />
                 </div>
 
-                <div>
+                <div className="tresorerie-form-field">
                   <label className="form-label">
                     Type
                   </label>
-                  <div
-                    style={{
-                      display: 'grid',
-                      gridTemplateColumns: '1fr 1fr',
-                      gap: 8,
-                    }}
-                  >
+
+                  <div className="tresorerie-type-buttons">
                     <button
                       type="button"
                       className={
@@ -712,13 +608,14 @@ export default function TresoreriePage() {
                   </div>
                 </div>
 
-                <div>
+                <div className="tresorerie-form-field">
                   <label
                     className="form-label"
                     htmlFor="transaction-category"
                   >
                     Catégorie
                   </label>
+
                   <select
                     id="transaction-category"
                     className="input"
@@ -734,6 +631,7 @@ export default function TresoreriePage() {
                     <option value="">
                       Sélectionner une catégorie
                     </option>
+
                     {categories.map((category) => (
                       <option key={category} value={category}>
                         {category}
@@ -742,13 +640,14 @@ export default function TresoreriePage() {
                   </select>
                 </div>
 
-                <div>
+                <div className="tresorerie-form-field">
                   <label
                     className="form-label"
                     htmlFor="transaction-amount"
                   >
                     Montant
                   </label>
+
                   <input
                     id="transaction-amount"
                     className="input"
@@ -765,13 +664,14 @@ export default function TresoreriePage() {
                   />
                 </div>
 
-                <div style={{ gridColumn: '1 / -1' }}>
+                <div className="tresorerie-form-field tresorerie-field-full">
                   <label
                     className="form-label"
                     htmlFor="transaction-label"
                   >
                     Libellé
                   </label>
+
                   <input
                     id="transaction-label"
                     className="input"
@@ -787,13 +687,14 @@ export default function TresoreriePage() {
                   />
                 </div>
 
-                <div>
+                <div className="tresorerie-form-field">
                   <label
                     className="form-label"
                     htmlFor="transaction-payment"
                   >
                     Mode de paiement
                   </label>
+
                   <select
                     id="transaction-payment"
                     className="input"
@@ -808,6 +709,7 @@ export default function TresoreriePage() {
                     <option value="">
                       Non renseigné
                     </option>
+
                     {paymentMethods.map((method) => (
                       <option
                         key={method.value}
@@ -819,13 +721,14 @@ export default function TresoreriePage() {
                   </select>
                 </div>
 
-                <div>
+                <div className="tresorerie-form-field">
                   <label
                     className="form-label"
                     htmlFor="transaction-note"
                   >
                     Note
                   </label>
+
                   <input
                     id="transaction-note"
                     className="input"
@@ -841,14 +744,7 @@ export default function TresoreriePage() {
                 </div>
               </div>
 
-              <div
-                style={{
-                  display: 'flex',
-                  justifyContent: 'flex-end',
-                  gap: 10,
-                  marginTop: 24,
-                }}
-              >
+              <div className="tresorerie-modal-actions">
                 <button
                   type="button"
                   className="btn"
@@ -874,7 +770,257 @@ export default function TresoreriePage() {
           </div>
         </div>
       )}
+
+      <style jsx>{`
+        .tresorerie-summary-grid {
+          display: grid;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+          gap: 14px;
+          min-width: 0;
+        }
+
+        .tresorerie-stat {
+          min-width: 0;
+          padding: 18px;
+          border: 1px solid #eadfd5;
+          border-radius: 12px;
+          background: #fffaf3;
+          text-align: center;
+          box-sizing: border-box;
+        }
+
+        .tresorerie-stat-balance {
+          background: #f8fafc;
+        }
+
+        .tresorerie-stat-label {
+          margin-top: 7px;
+        }
+
+        .tresorerie-stat-value {
+          margin-top: 5px;
+          font-size: 27px;
+          font-weight: 800;
+          white-space: nowrap;
+        }
+
+        .tresorerie-section-head {
+          min-width: 0;
+        }
+
+        .tresorerie-search {
+          width: 320px;
+          max-width: 100%;
+          min-width: 0;
+        }
+
+        .tresorerie-search :global(.input) {
+          width: 100%;
+          box-sizing: border-box;
+        }
+
+        .tresorerie-table-wrap {
+          width: 100%;
+          max-width: 100%;
+          overflow-x: auto;
+          -webkit-overflow-scrolling: touch;
+        }
+
+        .tresorerie-row-actions {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+        }
+
+        .tresorerie-empty {
+          text-align: center;
+          padding: 48px 20px;
+        }
+
+        .tresorerie-modal-overlay {
+          position: fixed;
+          inset: 0;
+          background: rgba(15, 23, 42, 0.45);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 20px;
+          z-index: 1000;
+          box-sizing: border-box;
+        }
+
+        .tresorerie-modal {
+          width: 100%;
+          max-width: 620px;
+          max-height: 90vh;
+          overflow-y: auto;
+          padding: 20px 22px 22px;
+          box-sizing: border-box;
+          background: #fff;
+          box-shadow: 0 20px 50px rgba(15, 23, 42, 0.20);
+        }
+
+        .tresorerie-modal-head {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+        }
+
+        .tresorerie-modal-title {
+          margin-top: 4px;
+        }
+
+        .tresorerie-close-button {
+          flex: 0 0 auto;
+        }
+
+        .tresorerie-form-grid {
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+          gap: 14px;
+          margin-top: 20px;
+          min-width: 0;
+        }
+
+        .tresorerie-form-field {
+          min-width: 0;
+        }
+
+        .tresorerie-field-full {
+          grid-column: 1 / -1;
+        }
+
+        .tresorerie-form-field :global(.input) {
+          width: 100%;
+          max-width: 100%;
+          min-width: 0;
+          box-sizing: border-box;
+        }
+
+        .tresorerie-date-input {
+          -webkit-appearance: none;
+          appearance: none;
+        }
+
+        .tresorerie-type-buttons {
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+          gap: 8px;
+          min-width: 0;
+        }
+
+        .tresorerie-type-buttons .btn {
+          min-width: 0;
+          white-space: nowrap;
+        }
+
+        .tresorerie-modal-actions {
+          display: flex;
+          justify-content: flex-end;
+          gap: 10px;
+          margin-top: 24px;
+        }
+
+        @media (max-width: 700px) {
+          .tresorerie-summary-card {
+            padding: 16px !important;
+          }
+
+          .tresorerie-summary-grid {
+            grid-template-columns: minmax(0, 1fr);
+            gap: 12px;
+          }
+
+          .tresorerie-stat {
+            padding: 16px;
+          }
+
+          .tresorerie-stat-value {
+            font-size: 25px;
+          }
+
+          .tresorerie-section-head {
+            display: flex;
+            flex-direction: column;
+            align-items: stretch;
+            gap: 14px;
+          }
+
+          .tresorerie-search {
+            width: 100%;
+          }
+
+          .tresorerie-empty {
+            padding: 42px 16px;
+          }
+
+          .tresorerie-modal-overlay {
+            padding: 12px;
+            align-items: center;
+          }
+
+          .tresorerie-modal {
+            width: 100%;
+            max-width: none;
+            max-height: calc(100vh - 24px);
+            padding: 20px 18px 18px;
+            border-radius: 22px;
+          }
+
+          .tresorerie-modal-head {
+            align-items: flex-start;
+          }
+
+          .tresorerie-form-grid {
+            grid-template-columns: minmax(0, 1fr);
+            gap: 16px;
+            margin-top: 20px;
+          }
+
+          .tresorerie-field-full {
+            grid-column: auto;
+          }
+
+          .tresorerie-type-buttons {
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+          }
+
+          .tresorerie-modal-actions {
+            flex-direction: column-reverse;
+            gap: 10px;
+          }
+
+          .tresorerie-modal-actions .btn {
+            width: 100%;
+            justify-content: center;
+          }
+
+          .tresorerie-table-wrap {
+            margin-right: -2px;
+          }
+        }
+
+        @media (max-width: 420px) {
+          .tresorerie-topbar :global(.topbar-right) {
+            width: 100%;
+          }
+
+          .tresorerie-topbar :global(.topbar-right .btn) {
+            width: auto;
+          }
+
+          .tresorerie-modal {
+            padding-left: 16px;
+            padding-right: 16px;
+          }
+
+          .tresorerie-type-buttons .btn {
+            padding-left: 10px;
+            padding-right: 10px;
+          }
+        }
+      `}</style>
     </>
   );
 }
-
