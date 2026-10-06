@@ -57,7 +57,6 @@ export default function ConfigurationDirectionPage() {
     void load();
   }, []);
 
-
   function updateDirection(
     index: number,
     field: 'display_name' | 'role',
@@ -66,12 +65,14 @@ export default function ConfigurationDirectionPage() {
     setDirection((current) =>
       current.map((item, i) =>
         i === index
-          ? { ...item, [field]: value }
+          ? {
+              ...item,
+              [field]: value,
+            }
           : item
       )
     );
   }
-
 
   function addDirection() {
     setDirection((current) => [
@@ -84,13 +85,11 @@ export default function ConfigurationDirectionPage() {
     ]);
   }
 
-
   function removeDirection(index: number) {
     setDirection((current) =>
       current.filter((_, i) => i !== index)
     );
   }
-
 
   async function saveDirection() {
     setSavingDirection(true);
@@ -104,7 +103,12 @@ export default function ConfigurationDirectionPage() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          members: direction,
+          members: direction.map((member) => ({
+            id: member.id,
+            displayName: member.display_name,
+            role: member.role || '',
+            active: member.active,
+          })),
         }),
       });
 
@@ -133,13 +137,10 @@ export default function ConfigurationDirectionPage() {
     }
   }
 
-
   return (
     <>
       <div className="topbar">
-
         <div>
-
           <div className="eyebrow">
             Configuration · Direction
           </div>
@@ -153,12 +154,9 @@ export default function ConfigurationDirectionPage() {
             et reste en place lorsqu’un import ne contient pas
             de direction.
           </div>
-
         </div>
 
-
         <div className="topbar-right">
-
           <Link
             className="btn"
             href="/configuration"
@@ -166,11 +164,8 @@ export default function ConfigurationDirectionPage() {
             <ArrowLeft size={14} />
             Configuration
           </Link>
-
         </div>
-
       </div>
-
 
       {(message || error) && (
         <div
@@ -187,13 +182,9 @@ export default function ConfigurationDirectionPage() {
         </div>
       )}
 
-
       <section className="card section-card">
-
         <div className="section-head">
-
           <div>
-
             <h2 className="section-title">
               Membres de la direction
             </h2>
@@ -202,25 +193,23 @@ export default function ConfigurationDirectionPage() {
               Ajoute, modifie ou supprime les personnes
               qui doivent apparaître dans les comptes rendus.
             </p>
-
           </div>
 
-
           <div className="btn-row">
-
             <button
               className="btn"
               onClick={addDirection}
+              type="button"
             >
               <Plus size={14} />
               Ajouter
             </button>
 
-
             <button
               className="btn btn-primary"
               onClick={saveDirection}
               disabled={savingDirection || loading}
+              type="button"
             >
               <Save size={14} />
 
@@ -228,11 +217,8 @@ export default function ConfigurationDirectionPage() {
                 ? 'Enregistrement…'
                 : 'Enregistrer'}
             </button>
-
           </div>
-
         </div>
-
 
         {loading ? (
           <p className="kicker">
@@ -240,31 +226,23 @@ export default function ConfigurationDirectionPage() {
           </p>
         ) : (
           <table className="table">
-
             <thead>
-
               <tr>
                 <th>Nom</th>
                 <th>Fonction</th>
                 <th></th>
               </tr>
-
             </thead>
 
-
             <tbody>
-
               {direction.map((member, index) => (
-
                 <tr
                   key={
                     member.id ||
                     `new-${index}`
                   }
                 >
-
                   <td>
-
                     <input
                       className="input"
                       value={
@@ -279,12 +257,9 @@ export default function ConfigurationDirectionPage() {
                       }
                       placeholder="Nom Prénom"
                     />
-
                   </td>
 
-
                   <td>
-
                     <input
                       className="input"
                       value={
@@ -299,33 +274,25 @@ export default function ConfigurationDirectionPage() {
                       }
                       placeholder="Principale, principale adjointe…"
                     />
-
                   </td>
 
-
                   <td style={{ width: 60 }}>
-
                     <button
                       className="btn"
                       title="Supprimer"
                       onClick={() =>
                         removeDirection(index)
                       }
+                      type="button"
                     >
                       <Trash2 size={14} />
                     </button>
-
                   </td>
-
                 </tr>
-
               ))}
-
             </tbody>
-
           </table>
         )}
-
 
         <div
           className="notice"
@@ -346,8 +313,54 @@ export default function ConfigurationDirectionPage() {
             ici dans le dashboard.
           </div>
         </div>
-
       </section>
+
+      <style jsx>{`
+        @media (max-width: 700px) {
+          .topbar {
+            gap: 14px;
+          }
+
+          .topbar-right {
+            width: 100%;
+          }
+
+          .topbar-right .btn {
+            width: auto;
+          }
+
+          .section-head {
+            align-items: flex-start;
+          }
+
+          .btn-row {
+            flex-wrap: wrap;
+          }
+
+          .btn-row .btn {
+            width: auto;
+          }
+
+          .table {
+            min-width: 620px;
+          }
+
+          .card.section-card {
+            overflow-x: auto;
+          }
+        }
+
+        @media (max-width: 480px) {
+          .btn-row {
+            width: 100%;
+          }
+
+          .btn-row .btn {
+            flex: 1;
+            justify-content: center;
+          }
+        }
+      `}</style>
     </>
   );
 }
