@@ -182,9 +182,11 @@ export default function ConfigurationDirectionPage() {
         </div>
       )}
 
-      <section className="card section-card">
-        <div className="section-head">
-          <div>
+      <section className="card section-card direction-card">
+
+        <div className="section-head direction-section-head">
+
+          <div className="direction-intro">
             <h2 className="section-title">
               Membres de la direction
             </h2>
@@ -195,7 +197,8 @@ export default function ConfigurationDirectionPage() {
             </p>
           </div>
 
-          <div className="btn-row">
+          <div className="btn-row direction-actions">
+
             <button
               className="btn"
               onClick={addDirection}
@@ -208,7 +211,9 @@ export default function ConfigurationDirectionPage() {
             <button
               className="btn btn-primary"
               onClick={saveDirection}
-              disabled={savingDirection || loading}
+              disabled={
+                savingDirection || loading
+              }
               type="button"
             >
               <Save size={14} />
@@ -217,86 +222,192 @@ export default function ConfigurationDirectionPage() {
                 ? 'Enregistrement…'
                 : 'Enregistrer'}
             </button>
+
           </div>
+
         </div>
 
         {loading ? (
           <p className="kicker">
             Chargement…
           </p>
+        ) : direction.length === 0 ? (
+          <p className="kicker">
+            Aucun membre de la direction enregistré.
+          </p>
         ) : (
-          <table className="table">
-            <thead>
-              <tr>
-                <th>Nom</th>
-                <th>Fonction</th>
-                <th></th>
-              </tr>
-            </thead>
+          <>
+            {/* VERSION PC / TABLETTE */}
+            <div className="direction-desktop-table">
+              <table className="table">
 
-            <tbody>
-              {direction.map((member, index) => (
-                <tr
-                  key={
-                    member.id ||
-                    `new-${index}`
-                  }
-                >
-                  <td>
-                    <input
-                      className="input"
-                      value={
-                        member.display_name
-                      }
-                      onChange={(e) =>
-                        updateDirection(
-                          index,
-                          'display_name',
-                          e.target.value
-                        )
-                      }
-                      placeholder="Nom Prénom"
-                    />
-                  </td>
+                <thead>
+                  <tr>
+                    <th>Nom</th>
+                    <th>Fonction</th>
+                    <th></th>
+                  </tr>
+                </thead>
 
-                  <td>
-                    <input
-                      className="input"
-                      value={
-                        member.role || ''
-                      }
-                      onChange={(e) =>
-                        updateDirection(
-                          index,
-                          'role',
-                          e.target.value
-                        )
-                      }
-                      placeholder="Principale, principale adjointe…"
-                    />
-                  </td>
+                <tbody>
+                  {direction.map(
+                    (member, index) => (
+                      <tr
+                        key={
+                          member.id ||
+                          `new-${index}`
+                        }
+                      >
 
-                  <td style={{ width: 60 }}>
-                    <button
-                      className="btn"
-                      title="Supprimer"
-                      onClick={() =>
-                        removeDirection(index)
-                      }
-                      type="button"
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                        <td>
+                          <input
+                            className="input"
+                            value={
+                              member.display_name
+                            }
+                            onChange={(e) =>
+                              updateDirection(
+                                index,
+                                'display_name',
+                                e.target.value
+                              )
+                            }
+                            placeholder="Nom Prénom"
+                          />
+                        </td>
+
+                        <td>
+                          <input
+                            className="input"
+                            value={
+                              member.role || ''
+                            }
+                            onChange={(e) =>
+                              updateDirection(
+                                index,
+                                'role',
+                                e.target.value
+                              )
+                            }
+                            placeholder="Principale, principale adjointe…"
+                          />
+                        </td>
+
+                        <td
+                          style={{
+                            width: 60,
+                          }}
+                        >
+                          <button
+                            className="btn"
+                            title="Supprimer"
+                            onClick={() =>
+                              removeDirection(
+                                index
+                              )
+                            }
+                            type="button"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </td>
+
+                      </tr>
+                    )
+                  )}
+                </tbody>
+
+              </table>
+            </div>
+
+            {/* VERSION MOBILE */}
+            <div className="direction-mobile-list">
+
+              {direction.map(
+                (member, index) => (
+                  <div
+                    className="direction-mobile-item"
+                    key={
+                      member.id ||
+                      `mobile-${index}`
+                    }
+                  >
+
+                    <div className="direction-mobile-head">
+                      <div className="direction-mobile-number">
+                        {index + 1}
+                      </div>
+
+                      <div className="direction-mobile-label">
+                        Membre de la direction
+                      </div>
+
+                      <button
+                        className="direction-mobile-delete"
+                        title="Supprimer"
+                        onClick={() =>
+                          removeDirection(
+                            index
+                          )
+                        }
+                        type="button"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+
+                    <div className="direction-mobile-field">
+                      <label>
+                        Nom
+                      </label>
+
+                      <input
+                        className="input"
+                        value={
+                          member.display_name
+                        }
+                        onChange={(e) =>
+                          updateDirection(
+                            index,
+                            'display_name',
+                            e.target.value
+                          )
+                        }
+                        placeholder="Nom Prénom"
+                      />
+                    </div>
+
+                    <div className="direction-mobile-field">
+                      <label>
+                        Fonction
+                      </label>
+
+                      <input
+                        className="input"
+                        value={
+                          member.role || ''
+                        }
+                        onChange={(e) =>
+                          updateDirection(
+                            index,
+                            'role',
+                            e.target.value
+                          )
+                        }
+                        placeholder="Principale, principale adjointe…"
+                      />
+                    </div>
+
+                  </div>
+                )
+              )}
+
+            </div>
+          </>
         )}
 
         <div
-          className="notice"
-          style={{ marginTop: 16 }}
+          className="notice direction-notice"
         >
           <ShieldCheck size={16} />
 
@@ -313,51 +424,134 @@ export default function ConfigurationDirectionPage() {
             ici dans le dashboard.
           </div>
         </div>
+
       </section>
 
       <style jsx>{`
+        .direction-mobile-list {
+          display: none;
+        }
+
+        .direction-mobile-item {
+          border: 1px solid #eadfd5;
+          border-radius: 14px;
+          background: #fffaf3;
+          padding: 15px;
+          box-sizing: border-box;
+        }
+
+        .direction-mobile-head {
+          display: flex;
+          align-items: center;
+          gap: 9px;
+          margin-bottom: 15px;
+        }
+
+        .direction-mobile-number {
+          width: 28px;
+          height: 28px;
+          flex: 0 0 28px;
+          border-radius: 8px;
+          background: #fff0d9;
+          color: #8f211c;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 12px;
+          font-weight: 800;
+        }
+
+        .direction-mobile-label {
+          flex: 1;
+          min-width: 0;
+          font-size: 12px;
+          font-weight: 700;
+          color: #756a67;
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+        }
+
+        .direction-mobile-delete {
+          width: 36px;
+          height: 36px;
+          flex: 0 0 36px;
+          border: 1px solid #eadfd5;
+          border-radius: 9px;
+          background: #fff;
+          color: #7d201a;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+        }
+
+        .direction-mobile-field {
+          display: grid;
+          gap: 7px;
+          margin-top: 13px;
+          min-width: 0;
+        }
+
+        .direction-mobile-field label {
+          font-size: 12px;
+          font-weight: 700;
+          color: #756a67;
+        }
+
+        .direction-notice {
+          margin-top: 16px;
+        }
+
         @media (max-width: 700px) {
-          .topbar {
-            gap: 14px;
+          .direction-section-head {
+            display: flex;
+            flex-direction: column;
+            align-items: stretch;
+            gap: 16px;
           }
 
-          .topbar-right {
+          .direction-intro {
+            min-width: 0;
+          }
+
+          .direction-actions {
             width: 100%;
+            display: grid;
+            grid-template-columns:
+              minmax(0, 1fr)
+              minmax(0, 1fr);
+            gap: 10px;
           }
 
-          .topbar-right .btn {
-            width: auto;
+          .direction-actions .btn {
+            width: 100%;
+            justify-content: center;
+            box-sizing: border-box;
           }
 
-          .section-head {
+          .direction-desktop-table {
+            display: none;
+          }
+
+          .direction-mobile-list {
+            display: grid;
+            gap: 12px;
+            min-width: 0;
+          }
+
+          .direction-notice {
             align-items: flex-start;
-          }
-
-          .btn-row {
-            flex-wrap: wrap;
-          }
-
-          .btn-row .btn {
-            width: auto;
-          }
-
-          .table {
-            min-width: 620px;
-          }
-
-          .card.section-card {
-            overflow-x: auto;
           }
         }
 
-        @media (max-width: 480px) {
-          .btn-row {
-            width: 100%;
+        @media (max-width: 430px) {
+          .direction-actions {
+            grid-template-columns:
+              minmax(0, 1fr);
           }
 
-          .btn-row .btn {
-            flex: 1;
-            justify-content: center;
+          .direction-actions .btn {
+            width: 100%;
           }
         }
       `}</style>
