@@ -1456,6 +1456,10 @@ export default function AdherentsPage() {
           max-width: 100% !important;
           box-sizing: border-box !important;
         }
+        .adherents-date-input-empty {
+  height: 42px !important;
+  min-height: 42px !important;
+}
 
         .adherents-cheque-field {
           margin-top: 12px;
