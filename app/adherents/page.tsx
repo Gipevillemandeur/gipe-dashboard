@@ -124,6 +124,7 @@ export default function AdherentsPage() {
 
       setMembers(membersData.members || []);
       setSchoolYear(membersData.schoolYear || null);
+
       setClasses(
         (configData.classes || []).map((item: any) => ({
           id: item.id,
@@ -147,6 +148,7 @@ export default function AdherentsPage() {
 
   const filteredMembers = useMemo(() => {
     const value = search.trim().toLowerCase();
+
     if (!value) return members;
 
     return members.filter((member) => {
@@ -158,7 +160,9 @@ export default function AdherentsPage() {
         .join(' ');
 
       return (
-        `${member.firstName} ${member.lastName}`.toLowerCase().includes(value) ||
+        `${member.firstName} ${member.lastName}`
+          .toLowerCase()
+          .includes(value) ||
         member.email.toLowerCase().includes(value) ||
         member.phone.toLowerCase().includes(value) ||
         childrenText.toLowerCase().includes(value)
@@ -172,13 +176,19 @@ export default function AdherentsPage() {
     for (const member of members) {
       for (const child of member.children) {
         if (!child.className) continue;
-        counts[child.className] = (counts[child.className] || 0) + 1;
+
+        counts[child.className] =
+          (counts[child.className] || 0) + 1;
       }
     }
 
     return Object.entries(counts)
       .map(([name, count]) => ({ name, count }))
-      .sort((a, b) => a.name.localeCompare(b.name, 'fr', { numeric: true }));
+      .sort((a, b) =>
+        a.name.localeCompare(b.name, 'fr', {
+          numeric: true,
+        })
+      );
   }, [members]);
 
   function addChild() {
@@ -186,7 +196,11 @@ export default function AdherentsPage() {
       ...current,
       children: [
         ...current.children,
-        { lastName: '', firstName: '', classId: '' },
+        {
+          lastName: '',
+          firstName: '',
+          classId: '',
+        },
       ],
     }));
   }
@@ -194,7 +208,9 @@ export default function AdherentsPage() {
   function removeChild(index: number) {
     setForm((current) => ({
       ...current,
-      children: current.children.filter((_, i) => i !== index),
+      children: current.children.filter(
+        (_, i) => i !== index
+      ),
     }));
   }
 
@@ -206,7 +222,12 @@ export default function AdherentsPage() {
     setForm((current) => ({
       ...current,
       children: current.children.map((child, i) =>
-        i === index ? { ...child, [field]: value } : child
+        i === index
+          ? {
+              ...child,
+              [field]: value,
+            }
+          : child
       ),
     }));
   }
@@ -228,7 +249,8 @@ export default function AdherentsPage() {
       phone: member.phone || '',
       email: member.email || '',
       renewal: member.renewal,
-      councilParticipation: member.councilParticipation,
+      councilParticipation:
+        member.councilParticipation,
       boardMember: member.boardMember,
       caMember: member.caMember,
       paymentReceived: member.paymentReceived,
@@ -236,7 +258,8 @@ export default function AdherentsPage() {
       paymentMethod: member.paymentMethod || '',
       chequeNumber: member.chequeNumber || '',
       amount:
-        member.amount !== null && member.amount !== undefined
+        member.amount !== null &&
+        member.amount !== undefined
           ? String(member.amount)
           : '',
       children: member.children.map((child) => ({
@@ -253,6 +276,7 @@ export default function AdherentsPage() {
 
   function closeForm() {
     if (saving) return;
+
     setShowForm(false);
     setEditingMember(null);
     setForm(emptyForm);
@@ -264,28 +288,40 @@ export default function AdherentsPage() {
 
     try {
       const isEditing = Boolean(editingMember);
+
       const payload = {
         ...form,
-        ...(isEditing ? { id: editingMember?.id } : {}),
+        ...(isEditing
+          ? {
+              id: editingMember?.id,
+            }
+          : {}),
       };
 
-      const response = await fetch('/api/adherents', {
-        method: isEditing ? 'PUT' : 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
+      const response = await fetch(
+        '/api/adherents',
+        {
+          method: isEditing ? 'PUT' : 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(payload),
+        }
+      );
 
       const data = await response.json();
 
       if (!response.ok) {
         throw new Error(
-          data.error || 'Impossible d’enregistrer l’adhérent.'
+          data.error ||
+            'Impossible d’enregistrer l’adhérent.'
         );
       }
 
       setShowForm(false);
       setEditingMember(null);
       setForm(emptyForm);
+
       await load();
     } catch (e) {
       setError(
@@ -315,7 +351,9 @@ export default function AdherentsPage() {
     }
   }
 
-  function councilLabel(value: Member['councilParticipation']) {
+  function councilLabel(
+    value: Member['councilParticipation']
+  ) {
     switch (value) {
       case 'child_class':
         return 'Classe enfant';
@@ -331,7 +369,9 @@ export default function AdherentsPage() {
       <div className="topbar adherents-topbar">
         <div>
           <div className="eyebrow">Adhérents</div>
+
           <h1>Gestion des adhérents</h1>
+
           <div className="kicker">
             Année scolaire {schoolYear || '—'}
           </div>
@@ -357,22 +397,33 @@ export default function AdherentsPage() {
       <section className="card adherents-summary">
         <div className="adherents-summary-grid">
           <div className="adherents-stat">
-            <div className="stat-label">ADHÉRENTS</div>
-            <div className="stat-value">{members.length}</div>
+            <div className="stat-label">
+              ADHÉRENTS
+            </div>
+
+            <div className="stat-value">
+              {members.length}
+            </div>
+
             <div className="stat-note">
-              adhérent{members.length > 1 ? 's' : ''} cette année
+              adhérent
+              {members.length > 1 ? 's' : ''} cette
+              année
             </div>
           </div>
 
           <div>
             <div className="adherents-class-title">
               <GraduationCap size={17} />
-              <strong>Répartition par classe</strong>
+              <strong>
+                Répartition par classe
+              </strong>
             </div>
 
             {byClass.length === 0 ? (
               <div className="kicker">
-                Aucun enfant rattaché à une classe pour le moment.
+                Aucun enfant rattaché à une classe
+                pour le moment.
               </div>
             ) : (
               <div className="adherents-class-list">
@@ -393,33 +444,55 @@ export default function AdherentsPage() {
       <section className="card section-card">
         <div className="section-head adherents-list-head">
           <div>
-            <h2 className="section-title">Liste des adhérents</h2>
+            <h2 className="section-title">
+              Liste des adhérents
+            </h2>
+
             <p className="section-sub">
               {filteredMembers.length} adhérent
-              {filteredMembers.length > 1 ? 's' : ''} affiché
-              {filteredMembers.length > 1 ? 's' : ''}
+              {filteredMembers.length > 1
+                ? 's'
+                : ''}{' '}
+              affiché
+              {filteredMembers.length > 1
+                ? 's'
+                : ''}
             </p>
           </div>
 
           <div className="adherents-search">
-            <Search className="adherents-search-icon" size={15} />
+            <Search
+              className="adherents-search-icon"
+              size={15}
+            />
+
             <input
               className="input"
               placeholder="Rechercher un nom, enfant, classe..."
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) =>
+                setSearch(e.target.value)
+              }
             />
           </div>
         </div>
 
         {loading ? (
-          <p className="kicker">Chargement des adhérents…</p>
+          <p className="kicker">
+            Chargement des adhérents…
+          </p>
         ) : filteredMembers.length === 0 ? (
           <div className="adherents-empty">
-            <Users size={32} style={{ opacity: 0.35 }} />
+            <Users
+              size={32}
+              style={{ opacity: 0.35 }}
+            />
+
             <h3>Aucun adhérent</h3>
+
             <p className="section-sub">
-              Commence par ajouter le premier adhérent de l'année.
+              Commence par ajouter le premier
+              adhérent de l'année.
             </p>
           </div>
         ) : (
@@ -437,140 +510,230 @@ export default function AdherentsPage() {
                     <th>CA</th>
                   </tr>
                 </thead>
+
                 <tbody>
-                  {filteredMembers.map((member) => (
-                    <tr key={member.id}>
-                      <td>
-                        <button
-                          type="button"
-                          onClick={() => openEditMember(member)}
-                          className="adherent-name-button"
-                        >
-                          {member.lastName} {member.firstName}
-                        </button>
-                        <div className="adherent-contact">
-                          {member.phone || member.email || '—'}
-                        </div>
-                      </td>
+                  {filteredMembers.map(
+                    (member) => (
+                      <tr key={member.id}>
+                        <td>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              openEditMember(
+                                member
+                              )
+                            }
+                            className="adherent-name-button"
+                          >
+                            {member.lastName}{' '}
+                            {member.firstName}
+                          </button>
 
-                      <td>
-                        {member.children.length === 0 ? (
-                          '—'
-                        ) : (
-                          <div className="adherent-children-list">
-                            {member.children.map((child, index) => (
-                              <span key={child.id || index}>
-                                {child.lastName} {child.firstName}
-                                {child.className
-                                  ? ` · ${child.className}`
-                                  : ''}
-                              </span>
-                            ))}
+                          <div className="adherent-contact">
+                            {member.phone ||
+                              member.email ||
+                              '—'}
                           </div>
-                        )}
-                      </td>
+                        </td>
 
-                      <td>
-                        <span className="badge badge-info">
-                          {councilLabel(member.councilParticipation)}
-                        </span>
-                      </td>
+                        <td>
+                          {member.children.length ===
+                          0 ? (
+                            '—'
+                          ) : (
+                            <div className="adherent-children-list">
+                              {member.children.map(
+                                (
+                                  child,
+                                  index
+                                ) => (
+                                  <span
+                                    key={
+                                      child.id ||
+                                      index
+                                    }
+                                  >
+                                    {
+                                      child.lastName
+                                    }{' '}
+                                    {
+                                      child.firstName
+                                    }
 
-                      <td>
-                        {member.renewal ? (
-                          <span className="badge badge-ok">Oui</span>
-                        ) : (
-                          <span className="badge badge-warn">Non</span>
-                        )}
-                      </td>
+                                    {child.className
+                                      ? ` · ${child.className}`
+                                      : ''}
+                                  </span>
+                                )
+                              )}
+                            </div>
+                          )}
+                        </td>
 
-                      <td>
-                        {member.paymentReceived ? (
-                          <span className="badge badge-ok">
-                            <CreditCard size={11} />
-                            {paymentLabel(member.paymentMethod)}
+                        <td>
+                          <span className="badge badge-info">
+                            {councilLabel(
+                              member.councilParticipation
+                            )}
                           </span>
-                        ) : (
-                          <span className="badge badge-warn">À payer</span>
-                        )}
-                      </td>
+                        </td>
 
-                      <td>{member.boardMember ? '✓' : '—'}</td>
-                      <td>{member.caMember ? '✓' : '—'}</td>
-                    </tr>
-                  ))}
+                        <td>
+                          {member.renewal ? (
+                            <span className="badge badge-ok">
+                              Oui
+                            </span>
+                          ) : (
+                            <span className="badge badge-warn">
+                              Non
+                            </span>
+                          )}
+                        </td>
+
+                        <td>
+                          {member.paymentReceived ? (
+                            <span className="badge badge-ok">
+                              <CreditCard size={11} />
+
+                              {paymentLabel(
+                                member.paymentMethod
+                              )}
+                            </span>
+                          ) : (
+                            <span className="badge badge-warn">
+                              À payer
+                            </span>
+                          )}
+                        </td>
+
+                        <td>
+                          {member.boardMember
+                            ? '✓'
+                            : '—'}
+                        </td>
+
+                        <td>
+                          {member.caMember
+                            ? '✓'
+                            : '—'}
+                        </td>
+                      </tr>
+                    )
+                  )}
                 </tbody>
               </table>
             </div>
 
             <div className="adherents-mobile-list">
-              {filteredMembers.map((member) => (
-                <button
-                  key={member.id}
-                  type="button"
-                  className="adherent-mobile-card"
-                  onClick={() => openEditMember(member)}
-                >
-                  <div className="adherent-mobile-card-head">
-                    <div>
-                      <strong>
-                        {member.lastName} {member.firstName}
-                      </strong>
-                      <span>
-                        {member.phone || member.email || 'Aucun contact'}
+              {filteredMembers.map(
+                (member) => (
+                  <button
+                    key={member.id}
+                    type="button"
+                    className="adherent-mobile-card"
+                    onClick={() =>
+                      openEditMember(member)
+                    }
+                  >
+                    <div className="adherent-mobile-card-head">
+                      <div>
+                        <strong>
+                          {member.lastName}{' '}
+                          {member.firstName}
+                        </strong>
+
+                        <span>
+                          {member.phone ||
+                            member.email ||
+                            'Aucun contact'}
+                        </span>
+                      </div>
+
+                      <span className="adherent-mobile-edit">
+                        Modifier
                       </span>
                     </div>
-                    <span className="adherent-mobile-edit">Modifier</span>
-                  </div>
 
-                  <div className="adherent-mobile-children">
-                    <span className="adherent-mobile-label">Enfant(s)</span>
-                    {member.children.length === 0 ? (
-                      <span>—</span>
-                    ) : (
-                      member.children.map((child, index) => (
-                        <span key={child.id || index}>
-                          {child.lastName} {child.firstName}
-                          {child.className ? ` · ${child.className}` : ''}
+                    <div className="adherent-mobile-children">
+                      <span className="adherent-mobile-label">
+                        Enfant(s)
+                      </span>
+
+                      {member.children.length ===
+                      0 ? (
+                        <span>—</span>
+                      ) : (
+                        member.children.map(
+                          (child, index) => (
+                            <span
+                              key={
+                                child.id ||
+                                index
+                              }
+                            >
+                              {child.lastName}{' '}
+                              {child.firstName}
+
+                              {child.className
+                                ? ` · ${child.className}`
+                                : ''}
+                            </span>
+                          )
+                        )
+                      )}
+                    </div>
+
+                    <div className="adherent-mobile-badges">
+                      <span className="badge badge-info">
+                        Conseils :{' '}
+                        {councilLabel(
+                          member.councilParticipation
+                        )}
+                      </span>
+
+                      <span
+                        className={
+                          member.renewal
+                            ? 'badge badge-ok'
+                            : 'badge badge-warn'
+                        }
+                      >
+                        Renouvellement :{' '}
+                        {member.renewal
+                          ? 'Oui'
+                          : 'Non'}
+                      </span>
+
+                      <span
+                        className={
+                          member.paymentReceived
+                            ? 'badge badge-ok'
+                            : 'badge badge-warn'
+                        }
+                      >
+                        Paiement :{' '}
+                        {member.paymentReceived
+                          ? paymentLabel(
+                              member.paymentMethod
+                            )
+                          : 'À payer'}
+                      </span>
+
+                      {member.boardMember && (
+                        <span className="badge badge-info">
+                          Bureau
                         </span>
-                      ))
-                    )}
-                  </div>
+                      )}
 
-                  <div className="adherent-mobile-badges">
-                    <span className="badge badge-info">
-                      Conseils : {councilLabel(member.councilParticipation)}
-                    </span>
-                    <span
-                      className={
-                        member.renewal
-                          ? 'badge badge-ok'
-                          : 'badge badge-warn'
-                      }
-                    >
-                      Renouvellement : {member.renewal ? 'Oui' : 'Non'}
-                    </span>
-                    <span
-                      className={
-                        member.paymentReceived
-                          ? 'badge badge-ok'
-                          : 'badge badge-warn'
-                      }
-                    >
-                      Paiement :{' '}
-                      {member.paymentReceived
-                        ? paymentLabel(member.paymentMethod)
-                        : 'À payer'}
-                    </span>
-                    {member.boardMember && (
-                      <span className="badge badge-info">Bureau</span>
-                    )}
-                    {member.caMember && (
-                      <span className="badge badge-info">CA</span>
-                    )}
-                  </div>
-                </button>
-              ))}
+                      {member.caMember && (
+                        <span className="badge badge-info">
+                          CA
+                        </span>
+                      )}
+                    </div>
+                  </button>
+                )
+              )}
             </div>
           </>
         )}
@@ -582,8 +745,11 @@ export default function AdherentsPage() {
             <div className="section-head adherents-modal-head">
               <div>
                 <div className="eyebrow">
-                  {editingMember ? 'Fiche adhérent' : 'Nouvelle adhésion'}
+                  {editingMember
+                    ? 'Fiche adhérent'
+                    : 'Nouvelle adhésion'}
                 </div>
+
                 <h2 className="section-title">
                   {editingMember
                     ? `${editingMember.lastName} ${editingMember.firstName}`
@@ -603,7 +769,9 @@ export default function AdherentsPage() {
 
             <div className="adherents-form">
               <div>
-                <h3 className="section-title">Informations adhérent</h3>
+                <h3 className="section-title">
+                  Informations adhérent
+                </h3>
 
                 <div className="adherents-fields-grid">
                   <input
@@ -611,40 +779,64 @@ export default function AdherentsPage() {
                     placeholder="Nom *"
                     value={form.lastName}
                     onChange={(e) =>
-                      setForm({ ...form, lastName: e.target.value })
+                      setForm({
+                        ...form,
+                        lastName:
+                          e.target.value,
+                      })
                     }
                   />
+
                   <input
                     className="input"
                     placeholder="Prénom *"
                     value={form.firstName}
                     onChange={(e) =>
-                      setForm({ ...form, firstName: e.target.value })
+                      setForm({
+                        ...form,
+                        firstName:
+                          e.target.value,
+                      })
                     }
                   />
+
                   <input
                     className="input"
                     placeholder="Adresse"
                     value={form.address}
                     onChange={(e) =>
-                      setForm({ ...form, address: e.target.value })
+                      setForm({
+                        ...form,
+                        address:
+                          e.target.value,
+                      })
                     }
                   />
+
                   <input
                     className="input"
                     placeholder="Téléphone"
                     value={form.phone}
                     onChange={(e) =>
-                      setForm({ ...form, phone: e.target.value })
+                      setForm({
+                        ...form,
+                        phone:
+                          e.target.value,
+                      })
                     }
                   />
+
                   <input
                     className="input"
                     placeholder="Mail"
                     type="email"
                     value={form.email}
                     onChange={(e) =>
-                      setForm({ ...form, email: e.target.value })
+                      setForm({
+                        ...form,
+                        email:
+                          e.target.value,
+                      })
                     }
                   />
                 </div>
@@ -653,9 +845,13 @@ export default function AdherentsPage() {
               <div>
                 <div className="section-head adherents-subsection-head">
                   <div>
-                    <h3 className="section-title">Enfant(s)</h3>
+                    <h3 className="section-title">
+                      Enfant(s)
+                    </h3>
+
                     <p className="section-sub">
-                      Une même famille peut avoir plusieurs enfants.
+                      Une même famille peut avoir
+                      plusieurs enfants.
                     </p>
                   </div>
 
@@ -670,56 +866,99 @@ export default function AdherentsPage() {
                 </div>
 
                 {form.children.length === 0 && (
-                  <p className="kicker">Aucun enfant renseigné.</p>
+                  <p className="kicker">
+                    Aucun enfant renseigné.
+                  </p>
                 )}
 
                 <div className="adherents-children-form">
-                  {form.children.map((child, index) => (
-                    <div
-                      key={child.id || `new-${index}`}
-                      className="adherents-child-row"
-                    >
-                      <input
-                        className="input"
-                        placeholder="Nom"
-                        value={child.lastName}
-                        onChange={(e) =>
-                          updateChild(index, 'lastName', e.target.value)
+                  {form.children.map(
+                    (child, index) => (
+                      <div
+                        key={
+                          child.id ||
+                          `new-${index}`
                         }
-                      />
-                      <input
-                        className="input"
-                        placeholder="Prénom"
-                        value={child.firstName}
-                        onChange={(e) =>
-                          updateChild(index, 'firstName', e.target.value)
-                        }
-                      />
-                      <select
-                        className="select"
-                        value={child.classId}
-                        onChange={(e) =>
-                          updateChild(index, 'classId', e.target.value)
-                        }
+                        className="adherents-child-row"
                       >
-                        <option value="">Classe</option>
-                        {classes.map((item) => (
-                          <option key={item.id} value={item.id}>
-                            {item.name}
-                          </option>
-                        ))}
-                      </select>
+                        <input
+                          className="input"
+                          placeholder="Nom"
+                          value={
+                            child.lastName
+                          }
+                          onChange={(e) =>
+                            updateChild(
+                              index,
+                              'lastName',
+                              e.target.value
+                            )
+                          }
+                        />
 
-                      <button
-                        className="btn"
-                        type="button"
-                        title="Supprimer"
-                        onClick={() => removeChild(index)}
-                      >
-                        <X size={14} />
-                      </button>
-                    </div>
-                  ))}
+                        <input
+                          className="input"
+                          placeholder="Prénom"
+                          value={
+                            child.firstName
+                          }
+                          onChange={(e) =>
+                            updateChild(
+                              index,
+                              'firstName',
+                              e.target.value
+                            )
+                          }
+                        />
+
+                        <select
+                          className="select"
+                          value={
+                            child.classId
+                          }
+                          onChange={(e) =>
+                            updateChild(
+                              index,
+                              'classId',
+                              e.target.value
+                            )
+                          }
+                        >
+                          <option value="">
+                            Classe
+                          </option>
+
+                          {classes.map(
+                            (item) => (
+                              <option
+                                key={
+                                  item.id
+                                }
+                                value={
+                                  item.id
+                                }
+                              >
+                                {item.name}
+                              </option>
+                            )
+                          )}
+                        </select>
+
+                        <button
+                          className="btn"
+                          type="button"
+                          title="Supprimer"
+                          onClick={() =>
+                            removeChild(
+                              index
+                            )
+                          }
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+                    )
+                  )}
                 </div>
               </div>
 
@@ -730,7 +969,8 @@ export default function AdherentsPage() {
 
                 <div className="adherents-participation">
                   <label className="adherents-label">
-                    Souhaite participer aux conseils de classe ?
+                    Souhaite participer aux conseils
+                    de classe ?
                   </label>
 
                   <div className="adherents-radio-group">
@@ -738,11 +978,15 @@ export default function AdherentsPage() {
                       <input
                         type="radio"
                         name="council"
-                        checked={form.councilParticipation === 'no'}
+                        checked={
+                          form.councilParticipation ===
+                          'no'
+                        }
                         onChange={() =>
                           setForm({
                             ...form,
-                            councilParticipation: 'no',
+                            councilParticipation:
+                              'no',
                           })
                         }
                       />{' '}
@@ -754,12 +998,14 @@ export default function AdherentsPage() {
                         type="radio"
                         name="council"
                         checked={
-                          form.councilParticipation === 'child_class'
+                          form.councilParticipation ===
+                          'child_class'
                         }
                         onChange={() =>
                           setForm({
                             ...form,
-                            councilParticipation: 'child_class',
+                            councilParticipation:
+                              'child_class',
                           })
                         }
                       />{' '}
@@ -771,12 +1017,14 @@ export default function AdherentsPage() {
                         type="radio"
                         name="council"
                         checked={
-                          form.councilParticipation === 'all_classes'
+                          form.councilParticipation ===
+                          'all_classes'
                         }
                         onChange={() =>
                           setForm({
                             ...form,
-                            councilParticipation: 'all_classes',
+                            councilParticipation:
+                              'all_classes',
                           })
                         }
                       />{' '}
@@ -792,7 +1040,8 @@ export default function AdherentsPage() {
                         onChange={(e) =>
                           setForm({
                             ...form,
-                            renewal: e.target.checked,
+                            renewal:
+                              e.target.checked,
                           })
                         }
                       />{' '}
@@ -802,11 +1051,14 @@ export default function AdherentsPage() {
                     <label>
                       <input
                         type="checkbox"
-                        checked={form.boardMember}
+                        checked={
+                          form.boardMember
+                        }
                         onChange={(e) =>
                           setForm({
                             ...form,
-                            boardMember: e.target.checked,
+                            boardMember:
+                              e.target.checked,
                           })
                         }
                       />{' '}
@@ -816,11 +1068,14 @@ export default function AdherentsPage() {
                     <label>
                       <input
                         type="checkbox"
-                        checked={form.caMember}
+                        checked={
+                          form.caMember
+                        }
                         onChange={(e) =>
                           setForm({
                             ...form,
-                            caMember: e.target.checked,
+                            caMember:
+                              e.target.checked,
                           })
                         }
                       />{' '}
@@ -831,68 +1086,109 @@ export default function AdherentsPage() {
               </div>
 
               <div>
-                <h3 className="section-title">Cotisation / paiement</h3>
+                <h3 className="section-title">
+                  Cotisation / paiement
+                </h3>
 
                 <div className="adherents-payment-grid">
                   <label className="adherents-field-label">
                     <span>Paiement</span>
+
                     <select
                       className="select"
-                      value={form.paymentReceived ? 'yes' : 'no'}
+                      value={
+                        form.paymentReceived
+                          ? 'yes'
+                          : 'no'
+                      }
                       onChange={(e) =>
                         setForm({
                           ...form,
-                          paymentReceived: e.target.value === 'yes',
+                          paymentReceived:
+                            e.target.value ===
+                            'yes',
                         })
                       }
                     >
-                      <option value="no">Non payé</option>
-                      <option value="yes">Payé</option>
+                      <option value="no">
+                        Non payé
+                      </option>
+
+                      <option value="yes">
+                        Payé
+                      </option>
                     </select>
                   </label>
 
                   <label className="adherents-field-label">
                     <span>Date</span>
+
                     <input
-                      className="input"
+                      className="input adherents-date-input"
                       type="date"
                       value={form.paymentDate}
                       onChange={(e) =>
                         setForm({
                           ...form,
-                          paymentDate: e.target.value,
+                          paymentDate:
+                            e.target.value,
                         })
                       }
                     />
                   </label>
 
                   <label className="adherents-field-label">
-                    <span>Mode de paiement</span>
+                    <span>
+                      Mode de paiement
+                    </span>
+
                     <select
                       className="select"
-                      value={form.paymentMethod}
+                      value={
+                        form.paymentMethod
+                      }
                       onChange={(e) =>
                         setForm({
                           ...form,
-                          paymentMethod: e.target.value,
+                          paymentMethod:
+                            e.target.value,
                           chequeNumber:
-                            e.target.value === 'cheque'
+                            e.target.value ===
+                            'cheque'
                               ? form.chequeNumber
                               : '',
                         })
                       }
                     >
-                      <option value="">Choisir</option>
-                      <option value="cheque">Chèque</option>
-                      <option value="cash">Espèces</option>
-                      <option value="transfer">Virement</option>
-                      <option value="online">Paiement en ligne</option>
-                      <option value="other">Autre</option>
+                      <option value="">
+                        Choisir
+                      </option>
+
+                      <option value="cheque">
+                        Chèque
+                      </option>
+
+                      <option value="cash">
+                        Espèces
+                      </option>
+
+                      <option value="transfer">
+                        Virement
+                      </option>
+
+                      <option value="online">
+                        Paiement en ligne
+                      </option>
+
+                      <option value="other">
+                        Autre
+                      </option>
                     </select>
                   </label>
 
                   <label className="adherents-field-label">
                     <span>Montant</span>
+
                     <input
                       className="input"
                       type="number"
@@ -902,24 +1198,32 @@ export default function AdherentsPage() {
                       onChange={(e) =>
                         setForm({
                           ...form,
-                          amount: e.target.value,
+                          amount:
+                            e.target.value,
                         })
                       }
                     />
                   </label>
                 </div>
 
-                {form.paymentMethod === 'cheque' && (
+                {form.paymentMethod ===
+                  'cheque' && (
                   <div className="adherents-cheque-field">
                     <label className="adherents-field-label">
-                      <span>Numéro de chèque</span>
+                      <span>
+                        Numéro de chèque
+                      </span>
+
                       <input
                         className="input"
-                        value={form.chequeNumber}
+                        value={
+                          form.chequeNumber
+                        }
                         onChange={(e) =>
                           setForm({
                             ...form,
-                            chequeNumber: e.target.value,
+                            chequeNumber:
+                              e.target.value,
                           })
                         }
                         placeholder="N° du chèque"
@@ -1133,12 +1437,21 @@ export default function AdherentsPage() {
           grid-template-columns: 180px 180px 1fr 1fr;
           gap: 12px;
           margin-top: 12px;
+          min-width: 0;
         }
 
         .adherents-field-label {
           font-size: 12px;
           display: grid;
           gap: 6px;
+          min-width: 0;
+        }
+
+        .adherents-date-input {
+          width: 100% !important;
+          min-width: 0 !important;
+          max-width: 100% !important;
+          box-sizing: border-box !important;
         }
 
         .adherents-cheque-field {
@@ -1314,7 +1627,17 @@ export default function AdherentsPage() {
           }
 
           .adherents-payment-grid {
-            grid-template-columns: 1fr;
+            grid-template-columns: minmax(0, 1fr);
+          }
+
+          .adherents-date-input {
+            width: 100% !important;
+            min-width: 0 !important;
+            max-width: 100% !important;
+            box-sizing: border-box !important;
+            display: block !important;
+            -webkit-appearance: none !important;
+            appearance: none !important;
           }
 
           .adherents-cheque-field {
@@ -1359,4 +1682,3 @@ export default function AdherentsPage() {
     </>
   );
 }
-
