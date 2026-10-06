@@ -1124,17 +1124,20 @@ export default function AdherentsPage() {
                     <span>Date</span>
 
                     <input
-                      className="input adherents-date-input"
-                      type="date"
-                      value={form.paymentDate}
-                      onChange={(e) =>
-                        setForm({
-                          ...form,
-                          paymentDate:
-                            e.target.value,
-                        })
-                      }
-                    />
+  className={`input adherents-date-input ${
+    !form.paymentDate
+      ? 'adherents-date-input-empty'
+      : ''
+  }`}
+  type="date"
+  value={form.paymentDate}
+  onChange={(e) =>
+    setForm({
+      ...form,
+      paymentDate: e.target.value,
+    })
+  }
+/>
                   </label>
 
                   <label className="adherents-field-label">
