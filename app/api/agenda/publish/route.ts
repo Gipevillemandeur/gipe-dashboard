@@ -153,10 +153,8 @@ export async function POST(request: Request) {
     // ---------------------------------------------------------
     // Copie de l'image vers l'Agenda public
     //
-    // IMPORTANT :
-    // On ne réutilise pas directement l'image interne.
-    // Elle est copiée dans events/ afin que la suppression
-    // depuis l'Agenda public ne supprime pas l'image interne.
+    // On crée une copie dans events/ afin que l'image
+    // interne reste indépendante de l'image publique.
     // ---------------------------------------------------------
     let publicImageUrl: string | null = null
     let copiedImagePath: string | null = null
@@ -236,6 +234,11 @@ export async function POST(request: Request) {
 
     // ---------------------------------------------------------
     // Création de l'événement dans l'Agenda public
+    //
+    // ATTENTION :
+    // La table events utilise "date" et "time",
+    // contrairement à internal_agenda_events qui utilise
+    // "event_date" et "start_time".
     // ---------------------------------------------------------
     const {
       data: publicEvent,
@@ -246,9 +249,9 @@ export async function POST(request: Request) {
         title: internalEvent.title,
         description:
           internalEvent.description || null,
-        event_date:
+        date:
           internalEvent.event_date,
-        start_time:
+        time:
           internalEvent.start_time || null,
         location:
           internalEvent.location || null,
@@ -282,6 +285,9 @@ export async function POST(request: Request) {
         {
           error:
             'Impossible de créer l’événement dans l’Agenda du site.',
+          details:
+            publicEventError?.message ||
+            null,
         },
         { status: 500 }
       )
@@ -311,7 +317,6 @@ export async function POST(request: Request) {
       )
 
       // Suppression de l'événement public
-      // pour éviter un événement orphelin.
       await admin
         .from('events')
         .delete()
