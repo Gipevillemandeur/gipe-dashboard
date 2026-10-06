@@ -593,6 +593,9 @@ export async function DELETE(
       );
     }
 
+    // ---------------------------------------------------------
+    // Récupération de l'événement public
+    // ---------------------------------------------------------
     const {
       data: existing,
       error: existingError,
@@ -624,6 +627,51 @@ export async function DELETE(
       );
     }
 
+    // ---------------------------------------------------------
+    // Recherche éventuelle de l'événement interne associé
+    // ---------------------------------------------------------
+    const {
+      data: internalEvent,
+      error: internalLookupError,
+    } = await admin
+      .from('internal_agenda_events')
+      .select(`
+        id,
+        school_year_id,
+        title,
+        description,
+        event_date,
+        start_time,
+        end_time,
+        location,
+        image_url,
+        category,
+        published_on_site,
+        site_event_id,
+        created_at,
+        updated_at
+      `)
+      .eq('site_event_id', id)
+      .maybeSingle();
+
+    if (internalLookupError) {
+      console.error(
+        'Erreur recherche événement interne associé:',
+        internalLookupError
+      );
+
+      return NextResponse.json(
+        {
+          error:
+            'Impossible de vérifier la synchronisation avec l’Agenda interne.',
+        },
+        { status: 500 }
+      );
+    }
+
+    // ---------------------------------------------------------
+    // Suppression de l'événement public
+    // ---------------------------------------------------------
     const { error } =
       await admin
         .from('events')
@@ -640,11 +688,54 @@ export async function DELETE(
       );
     }
 
+    // ---------------------------------------------------------
+    // Suppression de l'image publique
+    // ---------------------------------------------------------
     if (existing.image_url) {
       await deleteSupabaseImage(
         admin,
         existing.image_url
       );
+    }
+
+    // ---------------------------------------------------------
+    // Synchronisation :
+    // si l'événement provenait de l'Agenda interne,
+    // on supprime également sa fiche interne.
+    // ---------------------------------------------------------
+    if (internalEvent) {
+      const {
+        error: internalDeleteError,
+      } = await admin
+        .from('internal_agenda_events')
+        .delete()
+        .eq(
+          'id',
+          internalEvent.id
+        );
+
+      if (internalDeleteError) {
+        console.error(
+          'Erreur suppression événement interne associé:',
+          internalDeleteError
+        );
+
+        return NextResponse.json(
+          {
+            ok: true,
+            warning:
+              'L’événement du site a bien été supprimé, mais sa fiche interne n’a pas pu être supprimée automatiquement.',
+          }
+        );
+      }
+
+      // L'image interne est distincte de l'image publique.
+      if (internalEvent.image_url) {
+        await deleteSupabaseImage(
+          admin,
+          internalEvent.image_url
+        );
+      }
     }
 
     return NextResponse.json({
