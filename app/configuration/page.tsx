@@ -46,7 +46,6 @@ type LastImport = {
 };
 
 export default function ConfigurationPage() {
-
   const [schoolYear, setSchoolYear] =
     useState<string | null>(null);
 
@@ -78,24 +77,18 @@ export default function ConfigurationPage() {
     useState('');
 
   useEffect(() => {
-
     async function loadConfiguration() {
-
       try {
+        const response = await fetch(
+          '/api/configuration',
+          {
+            cache: 'no-store',
+          }
+        );
 
-        const response =
-          await fetch(
-            '/api/configuration',
-            {
-              cache: 'no-store',
-            }
-          );
-
-        const data =
-          await response.json();
+        const data = await response.json();
 
         if (response.ok) {
-
           setSchoolYear(
             data.schoolYear || null
           );
@@ -103,22 +96,16 @@ export default function ConfigurationPage() {
           setLastImport(
             data.lastImport || null
           );
-
         }
-
       } catch {
         // Rien à afficher.
       }
-
     }
 
     loadConfiguration();
-
   }, []);
 
-
   async function openClosure() {
-
     setError('');
     setClosurePreview(null);
     setConfirmClosure(false);
@@ -127,142 +114,108 @@ export default function ConfigurationPage() {
     setShowClosure(true);
 
     try {
+      const response = await fetch(
+        '/api/annee/apercu-cloture',
+        {
+          method: 'GET',
+          cache: 'no-store',
+        }
+      );
 
-      const response =
-        await fetch(
-          '/api/annee/apercu-cloture',
-          {
-            method: 'GET',
-            cache: 'no-store',
-          }
-        );
-
-      const data =
-        await response.json();
+      const data = await response.json();
 
       if (!response.ok) {
-
         throw new Error(
           data?.error ||
             'Impossible de préparer l’aperçu de clôture.'
         );
-
       }
 
       setClosurePreview(data);
-
     } catch (err) {
-
       setError(
         err instanceof Error
           ? err.message
           : 'Une erreur est survenue.'
       );
-
     } finally {
-
       setLoadingPreview(false);
-
     }
-
   }
 
-
   function closeClosure() {
-
     if (closing) return;
 
     setShowClosure(false);
     setClosurePreview(null);
     setConfirmClosure(false);
     setError('');
-
   }
 
-
   async function handleClosure() {
-
     const label =
       newYearLabel.trim();
 
     if (!label) {
-
       setError(
         'Indique le libellé de la nouvelle année scolaire.'
       );
-
       return;
     }
 
-    if (
-      !/^\d{4}-\d{4}$/.test(
-        label
-      )
-    ) {
-
+    if (!/^\d{4}-\d{4}$/.test(label)) {
       setError(
         'Format invalide. Exemple : 2027-2028.'
       );
-
       return;
     }
 
     if (!closurePreview) {
-
       setError(
         'L’aperçu de clôture n’est pas disponible.'
       );
-
       return;
     }
 
     if (!confirmClosure) {
-
       setConfirmClosure(true);
       setError('');
-
       return;
     }
 
-    if (!window.confirm(
-      `Dernière confirmation : clôturer ${closurePreview.schoolYear} et créer ${label} ?`
-    )) {
-
+    if (
+      !window.confirm(
+        `Dernière confirmation : clôturer ${closurePreview.schoolYear} et créer ${label} ?`
+      )
+    ) {
       return;
-
     }
 
     setClosing(true);
     setError('');
 
     try {
+      const response = await fetch(
+        '/api/annee/cloturer',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type':
+              'application/json',
+          },
+          body: JSON.stringify({
+            newYearLabel: label,
+          }),
+        }
+      );
 
-      const response =
-        await fetch(
-          '/api/annee/cloturer',
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type':
-                'application/json',
-            },
-            body: JSON.stringify({
-              newYearLabel:
-                label,
-            }),
-          }
-        );
-
-      const data =
-        await response.json();
+      const data = await response.json();
 
       if (!response.ok) {
-
         throw new Error(
           data?.error ||
             'Impossible de clôturer l’année scolaire.'
         );
-
       }
 
       setClosureResult(
@@ -278,35 +231,21 @@ export default function ConfigurationPage() {
       );
 
       setLastImport(null);
-
     } catch (err) {
-
       setError(
         err instanceof Error
           ? err.message
           : 'Une erreur est survenue.'
       );
-
     } finally {
-
       setClosing(false);
-
     }
-
   }
-
 
   return (
     <>
-
-      {/* ================================================= */}
-      {/* EN-TÊTE */}
-      {/* ================================================= */}
-
-      <div className="topbar">
-
+      <div className="topbar configuration-topbar">
         <div>
-
           <div className="eyebrow">
             Configuration
           </div>
@@ -318,36 +257,19 @@ export default function ConfigurationPage() {
           <div className="kicker">
             Gère les différents paramètres du tableau de bord.
           </div>
-
         </div>
-
-
       </div>
 
-
-      {/* ================================================= */}
-      {/* LIGNE 1 : CLASSES + DIRECTION */}
-      {/* ================================================= */}
-
-      <div
-        className="page-grid"
-        style={{
-          gridTemplateColumns:
-            '1fr 1fr',
-        }}
-      >
-
+      <div className="configuration-grid">
         <Link
           href="/configuration/classes"
-          className="card section-card"
+          className="card section-card configuration-card"
           style={{
             textDecoration: 'none',
             color: 'inherit',
           }}
         >
-
           <div className="stat-top">
-
             <div className="stat-label">
               Classes
             </div>
@@ -355,7 +277,6 @@ export default function ConfigurationPage() {
             <div className="stat-icon">
               <GraduationCap size={17} />
             </div>
-
           </div>
 
           <h2
@@ -378,31 +299,26 @@ export default function ConfigurationPage() {
           </p>
 
           <div
+            className="configuration-card-action"
             style={{
               marginTop: 18,
             }}
           >
-
             <span className="btn btn-primary">
               Ouvrir la gestion des classes →
             </span>
-
           </div>
-
         </Link>
-
 
         <Link
           href="/configuration/direction"
-          className="card section-card"
+          className="card section-card configuration-card"
           style={{
             textDecoration: 'none',
             color: 'inherit',
           }}
         >
-
           <div className="stat-top">
-
             <div className="stat-label">
               Direction
             </div>
@@ -410,7 +326,6 @@ export default function ConfigurationPage() {
             <div className="stat-icon">
               <Users size={17} />
             </div>
-
           </div>
 
           <h2
@@ -433,43 +348,21 @@ export default function ConfigurationPage() {
           </p>
 
           <div
+            className="configuration-card-action"
             style={{
               marginTop: 18,
             }}
           >
-
             <span className="btn btn-primary">
               Ouvrir la gestion de la direction →
             </span>
-
           </div>
-
         </Link>
-
       </div>
 
-
-      {/* ================================================= */}
-      {/* LIGNE 2 : ANNÉE + LISTING */}
-      {/* ================================================= */}
-
-      <div
-        className="page-grid"
-        style={{
-          gridTemplateColumns:
-            '1fr 1fr',
-          marginTop: 18,
-        }}
-      >
-
-        {/* ================= ANNÉE ================= */}
-
-        <div
-          className="card section-card"
-        >
-
+      <div className="configuration-grid configuration-grid-second">
+        <div className="card section-card configuration-card">
           <div className="stat-top">
-
             <div className="stat-label">
               Année scolaire
             </div>
@@ -477,7 +370,6 @@ export default function ConfigurationPage() {
             <div className="stat-icon">
               <CalendarDays size={17} />
             </div>
-
           </div>
 
           <h2
@@ -500,27 +392,20 @@ export default function ConfigurationPage() {
             par le GIPE.
           </p>
 
-
           <div
             style={{
               marginTop: 20,
-              padding:
-                '14px 16px',
-              border:
-                '1px solid #eee2d7',
+              padding: '14px 16px',
+              border: '1px solid #eee2d7',
               borderRadius: 10,
-              background:
-                '#fffaf3',
+              background: '#fffaf3',
             }}
           >
-
             <div
               style={{
                 fontSize: 10,
-                textTransform:
-                  'uppercase',
-                letterSpacing:
-                  '.08em',
+                textTransform: 'uppercase',
+                letterSpacing: '.08em',
                 fontWeight: 700,
                 color: '#756a67',
               }}
@@ -538,27 +423,13 @@ export default function ConfigurationPage() {
             >
               {schoolYear || '—'}
             </div>
-
           </div>
 
-
-          <div
-            style={{
-              marginTop: 18,
-              display: 'flex',
-              justifyContent:
-                'space-between',
-              alignItems:
-                'center',
-              gap: 12,
-            }}
-          >
-
+          <div className="configuration-year-footer">
             <div
               style={{
                 display: 'flex',
-                alignItems:
-                  'center',
+                alignItems: 'center',
                 gap: 7,
                 color: '#64748b',
                 fontSize: 12,
@@ -571,33 +442,19 @@ export default function ConfigurationPage() {
               </span>
             </div>
 
-
             <button
-  type="button"
-  className="btn btn-primary"
-  onClick={
-    openClosure
-  }
-              disabled={
-                !schoolYear
-              }
+              type="button"
+              className="btn btn-primary"
+              onClick={openClosure}
+              disabled={!schoolYear}
             >
               Clôturer l’année
             </button>
-
           </div>
-
         </div>
 
-
-        {/* ================= LISTING ================= */}
-
-        <div
-          className="card section-card"
-        >
-
+        <div className="card section-card configuration-card">
           <div className="stat-top">
-
             <div className="stat-label">
               Listing collège
             </div>
@@ -605,7 +462,6 @@ export default function ConfigurationPage() {
             <div className="stat-icon">
               <FileSpreadsheet size={17} />
             </div>
-
           </div>
 
           <h2
@@ -627,130 +483,118 @@ export default function ConfigurationPage() {
             classes, élèves et équipes pédagogiques.
           </p>
 
-
-          <div
-  style={{
-    marginTop: 20,
-    width: '100%',
-    height: 86,
-    minHeight: 86,
-    maxHeight: 86,
-    boxSizing: 'border-box',
-    padding: '13px 16px',
-    border: '1px solid #eee2d7',
-    borderRadius: 10,
-    background: '#fffaf3',
-    overflow: 'hidden',
-    display: 'grid',
-    gridTemplateRows: '14px 20px 17px',
-    rowGap: 3,
-  }}
->
-  {lastImport ? (
-    <>
-      {/* TITRE */}
-      <div
-        style={{
-          minWidth: 0,
-          width: '100%',
-          fontSize: 10,
-          lineHeight: '14px',
-          textTransform: 'uppercase',
-          letterSpacing: '.08em',
-          fontWeight: 700,
-          color: '#756a67',
-          overflow: 'hidden',
-        }}
-      >
-        Dernier import
-      </div>
-
-      {/* NOM DU FICHIER */}
-      <div
-        style={{
-          minWidth: 0,
-          width: '100%',
-          fontSize: 13,
-          lineHeight: '20px',
-          fontWeight: 700,
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          whiteSpace: 'nowrap',
-        }}
-        title={lastImport.file_name}
-      >
-        {lastImport.file_name}
-      </div>
-
-      {/* INFORMATIONS */}
-      <div
-        style={{
-          minWidth: 0,
-          width: '100%',
-          fontSize: 11,
-          lineHeight: '17px',
-          color: '#64748b',
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          whiteSpace: 'nowrap',
-        }}
-        title={`${new Date(
-          lastImport.imported_at
-        ).toLocaleString('fr-FR')} · ${
-          lastImport.classes_count
-        } classes · ${
-          lastImport.students_count
-        } élèves · ${
-          lastImport.teachers_count
-        } enseignants`}
-      >
-        {new Date(
-          lastImport.imported_at
-        ).toLocaleString('fr-FR')}
-
-        {' · '}
-
-        {lastImport.classes_count}
-        {' classes · '}
-
-        {lastImport.students_count}
-        {' élèves · '}
-
-        {lastImport.teachers_count}
-        {' enseignants'}
-      </div>
-    </>
-  ) : (
-    <div
-      style={{
-        gridRow: '1 / span 3',
-        minWidth: 0,
-        display: 'flex',
-        alignItems: 'center',
-        gap: 9,
-        color: '#64748b',
-        fontSize: 12,
-      }}
-    >
-      <FileSpreadsheet size={16} />
-
-      <span>
-        Aucun listing importé pour cette année.
-      </span>
-    </div>
-  )}
-</div>
-
-
           <div
             style={{
-              marginTop: 18,
-              display: 'flex',
-              justifyContent:
-                'flex-end',
+              marginTop: 20,
+              width: '100%',
+              height: 86,
+              minHeight: 86,
+              maxHeight: 86,
+              boxSizing: 'border-box',
+              padding: '13px 16px',
+              border: '1px solid #eee2d7',
+              borderRadius: 10,
+              background: '#fffaf3',
+              overflow: 'hidden',
+              display: 'grid',
+              gridTemplateRows:
+                '14px 20px 17px',
+              rowGap: 3,
             }}
           >
+            {lastImport ? (
+              <>
+                <div
+                  style={{
+                    minWidth: 0,
+                    width: '100%',
+                    fontSize: 10,
+                    lineHeight: '14px',
+                    textTransform: 'uppercase',
+                    letterSpacing: '.08em',
+                    fontWeight: 700,
+                    color: '#756a67',
+                    overflow: 'hidden',
+                  }}
+                >
+                  Dernier import
+                </div>
 
+                <div
+                  style={{
+                    minWidth: 0,
+                    width: '100%',
+                    fontSize: 13,
+                    lineHeight: '20px',
+                    fontWeight: 700,
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}
+                  title={lastImport.file_name}
+                >
+                  {lastImport.file_name}
+                </div>
+
+                <div
+                  style={{
+                    minWidth: 0,
+                    width: '100%',
+                    fontSize: 11,
+                    lineHeight: '17px',
+                    color: '#64748b',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}
+                  title={`${new Date(
+                    lastImport.imported_at
+                  ).toLocaleString('fr-FR')} · ${
+                    lastImport.classes_count
+                  } classes · ${
+                    lastImport.students_count
+                  } élèves · ${
+                    lastImport.teachers_count
+                  } enseignants`}
+                >
+                  {new Date(
+                    lastImport.imported_at
+                  ).toLocaleString('fr-FR')}
+
+                  {' · '}
+
+                  {lastImport.classes_count}
+                  {' classes · '}
+
+                  {lastImport.students_count}
+                  {' élèves · '}
+
+                  {lastImport.teachers_count}
+                  {' enseignants'}
+                </div>
+              </>
+            ) : (
+              <div
+                style={{
+                  gridRow: '1 / span 3',
+                  minWidth: 0,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 9,
+                  color: '#64748b',
+                  fontSize: 12,
+                }}
+              >
+                <FileSpreadsheet size={16} />
+
+                <span>
+                  Aucun listing importé pour cette année.
+                </span>
+              </div>
+            )}
+          </div>
+
+          <div className="configuration-import-action">
             <Link
               href="/import-college"
               className="btn btn-primary"
@@ -761,20 +605,11 @@ export default function ConfigurationPage() {
 
               Importer le listing →
             </Link>
-
           </div>
-
         </div>
-
       </div>
 
-
-      {/* ================================================= */}
-      {/* BILAN APRÈS CLÔTURE */}
-      {/* ================================================= */}
-
       {closureResult && (
-
         <div
           className="card section-card"
           style={{
@@ -783,11 +618,8 @@ export default function ConfigurationPage() {
               '1px solid #bbf7d0',
           }}
         >
-
           <div className="section-head">
-
             <div>
-
               <div className="stat-label">
                 Clôture effectuée
               </div>
@@ -801,27 +633,15 @@ export default function ConfigurationPage() {
                 Bilan de{' '}
                 {closureResult.closedYear}
               </h2>
-
             </div>
 
             <CheckCircle2
               size={20}
             />
-
           </div>
 
-
-          <div
-            className="page-grid"
-            style={{
-              gridTemplateColumns:
-                '1fr 1fr',
-              marginTop: 18,
-            }}
-          >
-
+          <div className="configuration-result-grid">
             <div className="card stat">
-
               <div className="stat-label">
                 Adhérents
               </div>
@@ -831,12 +651,9 @@ export default function ConfigurationPage() {
                   closureResult.totalAdherents
                 }
               </div>
-
             </div>
 
-
             <div className="card stat">
-
               <div className="stat-label">
                 Nouvelle année
               </div>
@@ -846,9 +663,7 @@ export default function ConfigurationPage() {
                   closureResult.newYear
                 }
               </div>
-
             </div>
-
           </div>
 
           <div
@@ -856,7 +671,6 @@ export default function ConfigurationPage() {
               marginTop: 20,
             }}
           >
-
             <div
               className="stat-label"
               style={{
@@ -869,39 +683,32 @@ export default function ConfigurationPage() {
             {closureResult
               .adherentsByClass
               .length === 0 ? (
-
               <div className="section-sub">
                 Aucun adhérent associé à une classe.
               </div>
-
             ) : (
-
               <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns:
-                    'repeat(auto-fit, minmax(145px, 1fr))',
-                  gap: 10,
-                }}
+                className="configuration-class-grid"
               >
-
                 {closureResult
                   .adherentsByClass
                   .map((item) => (
-
                     <div
                       key={item.className}
                       style={{
                         minHeight: 48,
                         padding: '8px 14px',
-                        border: '1px solid #eadfd5',
+                        border:
+                          '1px solid #eadfd5',
                         borderRadius: 10,
                         background: '#fffaf3',
                         display: 'flex',
                         alignItems: 'center',
-                        justifyContent: 'center',
+                        justifyContent:
+                          'center',
                         gap: 10,
-                        boxSizing: 'border-box',
+                        boxSizing:
+                          'border-box',
                       }}
                     >
                       <span
@@ -929,67 +736,24 @@ export default function ConfigurationPage() {
                           fontSize: 12,
                           fontWeight: 800,
                           lineHeight: 1,
-                          boxSizing: 'border-box',
+                          boxSizing:
+                            'border-box',
                         }}
                       >
                         {item.count}
                       </span>
                     </div>
-
                   ))}
-
               </div>
-
             )}
-
           </div>
-
         </div>
-
       )}
 
-
-      {/* ================================================= */}
-      {/* MODALE CLÔTURE */}
-      {/* ================================================= */}
-
       {showClosure && (
-
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(15, 23, 42, 0.45)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: 20,
-            zIndex: 1000,
-          }}
-        >
-
-          <div
-            className="card"
-            style={{
-              width: '100%',
-              maxWidth: 620,
-              maxHeight: '90vh',
-              overflowY: 'auto',
-              padding: '18px 20px 20px',
-              boxSizing: 'border-box',
-              background: '#fff',
-              boxShadow: '0 20px 50px rgba(15, 23, 42, 0.20)',
-            }}
-          >
-
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 10,
-              }}
-            >
-
+        <div className="configuration-modal-overlay">
+          <div className="card configuration-modal">
+            <div className="configuration-modal-head">
               <LockKeyhole size={20} />
 
               <h2
@@ -998,11 +762,9 @@ export default function ConfigurationPage() {
               >
                 Clôturer l’année scolaire
               </h2>
-
             </div>
 
             {loadingPreview ? (
-
               <div
                 style={{
                   padding: '40px 10px',
@@ -1013,32 +775,13 @@ export default function ConfigurationPage() {
               >
                 Préparation de l’aperçu de clôture…
               </div>
-
             ) : error ? (
-
               <>
-
-                <div
-                  style={{
-                    marginTop: 18,
-                    padding: 12,
-                    borderRadius: 10,
-                    background: '#fef2f2',
-                    color: '#b91c1c',
-                    fontSize: 13,
-                  }}
-                >
+                <div className="configuration-error">
                   {error}
                 </div>
 
-                <div
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'flex-end',
-                    marginTop: 22,
-                  }}
-                >
-
+                <div className="configuration-modal-actions">
                   <button
                     type="button"
                     className="btn"
@@ -1046,15 +789,10 @@ export default function ConfigurationPage() {
                   >
                     Fermer
                   </button>
-
                 </div>
-
               </>
-
             ) : closurePreview ? (
-
               <>
-
                 <p
                   className="section-sub"
                   style={{
@@ -1071,13 +809,15 @@ export default function ConfigurationPage() {
                     padding: '14px 16px',
                     borderRadius: 10,
                     background: '#fffaf3',
-                    border: '1px solid #eee2d7',
+                    border:
+                      '1px solid #eee2d7',
                   }}
                 >
                   <div
                     style={{
                       fontSize: 10,
-                      textTransform: 'uppercase',
+                      textTransform:
+                        'uppercase',
                       letterSpacing: '.08em',
                       fontWeight: 700,
                       color: '#756a67',
@@ -1103,7 +843,8 @@ export default function ConfigurationPage() {
                     marginTop: 14,
                     padding: 16,
                     borderRadius: 10,
-                    border: '1px solid #e5e7eb',
+                    border:
+                      '1px solid #e5e7eb',
                   }}
                 >
                   <div className="stat-label">
@@ -1132,111 +873,121 @@ export default function ConfigurationPage() {
                 </div>
 
                 <div style={{ marginTop: 20 }}>
-
                   <div
                     className="stat-label"
-                    style={{ marginBottom: 10 }}
+                    style={{
+                      marginBottom: 10,
+                    }}
                   >
                     Répartition des adhérents par classe
                   </div>
 
-                  {closurePreview.adherentsByClass.length === 0 ? (
-
+                  {closurePreview
+                    .adherentsByClass
+                    .length === 0 ? (
                     <div
                       className="section-sub"
                       style={{
                         padding: 14,
                         borderRadius: 10,
-                        background: '#f8fafc',
-                        textAlign: 'center',
+                        background:
+                          '#f8fafc',
+                        textAlign:
+                          'center',
                       }}
                     >
                       Aucun adhérent associé à une classe.
                     </div>
-
                   ) : (
-
                     <>
-
-                      <div
-                        style={{
-                          display: 'grid',
-                          gridTemplateColumns:
-                            'repeat(auto-fit, minmax(145px, 1fr))',
-                          gap: 10,
-                        }}
-                      >
-
-                        {closurePreview.adherentsByClass.map((item) => (
-
-                          <div
-                            key={item.className}
-                            style={{
-                              minHeight: 48,
-                              padding: '8px 14px',
-                              border: '1px solid #eadfd5',
-                              borderRadius: 10,
-                              background: '#fffaf3',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              gap: 10,
-                              boxSizing: 'border-box',
-                            }}
-                          >
-                            <span
+                      <div className="configuration-class-grid">
+                        {closurePreview
+                          .adherentsByClass
+                          .map((item) => (
+                            <div
+                              key={
+                                item.className
+                              }
                               style={{
-                                fontSize: 13,
-                                fontWeight: 600,
-                                lineHeight: 1.2,
-                                textAlign: 'center',
+                                minHeight: 48,
+                                padding:
+                                  '8px 14px',
+                                border:
+                                  '1px solid #eadfd5',
+                                borderRadius: 10,
+                                background:
+                                  '#fffaf3',
+                                display:
+                                  'flex',
+                                alignItems:
+                                  'center',
+                                justifyContent:
+                                  'center',
+                                gap: 10,
+                                boxSizing:
+                                  'border-box',
                               }}
                             >
-                              {item.className}
-                            </span>
+                              <span
+                                style={{
+                                  fontSize: 13,
+                                  fontWeight: 600,
+                                  lineHeight: 1.2,
+                                  textAlign:
+                                    'center',
+                                }}
+                              >
+                                {
+                                  item.className
+                                }
+                              </span>
 
-                            <span
-                              style={{
-                                minWidth: 28,
-                                height: 28,
-                                padding: '0 8px',
-                                borderRadius: 8,
-                                background: '#8f241d',
-                                color: '#fff',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                fontSize: 12,
-                                fontWeight: 800,
-                                lineHeight: 1,
-                                boxSizing: 'border-box',
-                              }}
-                            >
-                              {item.count}
-                            </span>
-                          </div>
-
-                        ))}
-
+                              <span
+                                style={{
+                                  minWidth: 28,
+                                  height: 28,
+                                  padding:
+                                    '0 8px',
+                                  borderRadius: 8,
+                                  background:
+                                    '#8f241d',
+                                  color: '#fff',
+                                  display:
+                                    'inline-flex',
+                                  alignItems:
+                                    'center',
+                                  justifyContent:
+                                    'center',
+                                  fontSize: 12,
+                                  fontWeight: 800,
+                                  lineHeight: 1,
+                                  boxSizing:
+                                    'border-box',
+                                }}
+                              >
+                                {item.count}
+                              </span>
+                            </div>
+                          ))}
                       </div>
 
                       <div
                         style={{
                           marginTop: 9,
-                          padding: '0 6px',
+                          padding:
+                            '0 6px',
                           fontSize: 11,
                           lineHeight: 1.45,
-                          color: '#64748b',
-                          textAlign: 'center',
+                          color:
+                            '#64748b',
+                          textAlign:
+                            'center',
                         }}
                       >
                         Un même adhérent peut apparaître dans plusieurs classes s’il a plusieurs enfants.
                       </div>
-
                     </>
-
                   )}
-
                 </div>
 
                 <div
@@ -1244,7 +995,8 @@ export default function ConfigurationPage() {
                     marginTop: 20,
                     padding: 14,
                     borderRadius: 10,
-                    background: '#f8fafc',
+                    background:
+                      '#f8fafc',
                     fontSize: 12,
                   }}
                 >
@@ -1257,23 +1009,25 @@ export default function ConfigurationPage() {
                     Bilan financier
                   </div>
 
-                  <div
-                    style={{
-                      display: 'grid',
-                      gridTemplateColumns: 'repeat(3, 1fr)',
-                      gap: 10,
-                    }}
-                  >
+                  <div className="configuration-finance-grid">
                     <div>
-                      <div className="stat-label">Recettes</div>
+                      <div className="stat-label">
+                        Recettes
+                      </div>
                       <strong>—</strong>
                     </div>
+
                     <div>
-                      <div className="stat-label">Dépenses</div>
+                      <div className="stat-label">
+                        Dépenses
+                      </div>
                       <strong>—</strong>
                     </div>
+
                     <div>
-                      <div className="stat-label">Solde</div>
+                      <div className="stat-label">
+                        Solde
+                      </div>
                       <strong>—</strong>
                     </div>
                   </div>
@@ -1289,7 +1043,6 @@ export default function ConfigurationPage() {
                 </div>
 
                 <div style={{ marginTop: 22 }}>
-
                   <label
                     htmlFor="new-school-year"
                     style={{
@@ -1307,64 +1060,48 @@ export default function ConfigurationPage() {
                     type="text"
                     value={newYearLabel}
                     onChange={(event) =>
-                      setNewYearLabel(event.target.value)
+                      setNewYearLabel(
+                        event.target.value
+                      )
                     }
                     placeholder="2027-2028"
                     className="input"
                     autoFocus
                     disabled={closing}
                   />
-
                 </div>
 
                 {confirmClosure && (
+                  <div className="configuration-confirm">
+                    <strong>
+                      Dernière vérification
+                    </strong>
 
-                  <div
-                    style={{
-                      marginTop: 16,
-                      padding: 14,
-                      borderRadius: 10,
-                      background: '#fff7ed',
-                      border: '1px solid #fed7aa',
-                      color: '#9a3412',
-                      fontSize: 13,
-                      lineHeight: 1.5,
-                    }}
-                  >
-                    <strong>Dernière vérification</strong>
                     <br />
-                    Tu vas clôturer <strong>{closurePreview.schoolYear}</strong> et créer l’année <strong>{newYearLabel || '—'}</strong>.
-                    <br /><br />
+
+                    Tu vas clôturer{' '}
+                    <strong>
+                      {closurePreview.schoolYear}
+                    </strong>{' '}
+                    et créer l’année{' '}
+                    <strong>
+                      {newYearLabel || '—'}
+                    </strong>.
+
+                    <br />
+                    <br />
+
                     Le bilan sera enregistré et l’ancienne année passera dans l’historique.
                   </div>
-
                 )}
 
                 {error && (
-
-                  <div
-                    style={{
-                      marginTop: 14,
-                      padding: 12,
-                      borderRadius: 10,
-                      background: '#fef2f2',
-                      color: '#b91c1c',
-                      fontSize: 13,
-                    }}
-                  >
+                  <div className="configuration-error">
                     {error}
                   </div>
-
                 )}
 
-                <div
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'flex-end',
-                    gap: 10,
-                    marginTop: 24,
-                  }}
-                >
+                <div className="configuration-modal-actions">
                   <button
                     type="button"
                     className="btn"
@@ -1387,17 +1124,248 @@ export default function ConfigurationPage() {
                         : 'Continuer vers la confirmation'}
                   </button>
                 </div>
-
               </>
-
             ) : null}
-
           </div>
-
         </div>
-
       )}
 
+      <style jsx>{`
+        .configuration-grid {
+          display: grid;
+          grid-template-columns:
+            minmax(0, 1fr)
+            minmax(0, 1fr);
+          gap: 18px;
+          min-width: 0;
+        }
+
+        .configuration-grid-second {
+          margin-top: 18px;
+        }
+
+        .configuration-card {
+          min-width: 0;
+          box-sizing: border-box;
+        }
+
+        .configuration-card-action {
+          display: flex;
+          justify-content: flex-start;
+        }
+
+        .configuration-year-footer {
+          margin-top: 18px;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          gap: 12px;
+        }
+
+        .configuration-import-action {
+          margin-top: 18px;
+          display: flex;
+          justify-content: flex-end;
+        }
+
+        .configuration-result-grid {
+          display: grid;
+          grid-template-columns:
+            minmax(0, 1fr)
+            minmax(0, 1fr);
+          gap: 14px;
+          margin-top: 18px;
+        }
+
+        .configuration-class-grid {
+          display: grid;
+          grid-template-columns:
+            repeat(
+              auto-fit,
+              minmax(145px, 1fr)
+            );
+          gap: 10px;
+        }
+
+        .configuration-finance-grid {
+          display: grid;
+          grid-template-columns:
+            repeat(3, minmax(0, 1fr));
+          gap: 10px;
+        }
+
+        .configuration-modal-overlay {
+          position: fixed;
+          inset: 0;
+          background: rgba(
+            15,
+            23,
+            42,
+            0.45
+          );
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 20px;
+          z-index: 1000;
+          box-sizing: border-box;
+        }
+
+        .configuration-modal {
+          width: 100%;
+          max-width: 620px;
+          max-height: 90vh;
+          overflow-y: auto;
+          padding: 18px 20px 20px;
+          box-sizing: border-box;
+          background: #fff;
+          box-shadow:
+            0 20px 50px
+            rgba(
+              15,
+              23,
+              42,
+              0.20
+            );
+        }
+
+        .configuration-modal-head {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+        }
+
+        .configuration-modal-actions {
+          display: flex;
+          justify-content: flex-end;
+          gap: 10px;
+          margin-top: 24px;
+        }
+
+        .configuration-error {
+          margin-top: 18px;
+          padding: 12px;
+          border-radius: 10px;
+          background: #fef2f2;
+          color: #b91c1c;
+          font-size: 13px;
+        }
+
+        .configuration-confirm {
+          margin-top: 16px;
+          padding: 14px;
+          border-radius: 10px;
+          background: #fff7ed;
+          border: 1px solid #fed7aa;
+          color: #9a3412;
+          font-size: 13px;
+          line-height: 1.5;
+        }
+
+        @media (max-width: 700px) {
+          .configuration-grid {
+            grid-template-columns:
+              minmax(0, 1fr);
+            gap: 14px;
+          }
+
+          .configuration-grid-second {
+            margin-top: 14px;
+          }
+
+          .configuration-card-action {
+            width: 100%;
+          }
+
+          .configuration-card-action .btn {
+            width: auto;
+            max-width: 100%;
+          }
+
+          .configuration-year-footer {
+            flex-direction: column;
+            align-items: stretch;
+          }
+
+          .configuration-year-footer
+            .btn {
+            width: 100%;
+            justify-content: center;
+          }
+
+          .configuration-import-action {
+            justify-content: flex-start;
+          }
+
+          .configuration-import-action .btn {
+            width: auto;
+            max-width: 100%;
+          }
+
+          .configuration-result-grid {
+            grid-template-columns:
+              minmax(0, 1fr);
+            gap: 12px;
+          }
+
+          .configuration-finance-grid {
+            grid-template-columns:
+              minmax(0, 1fr);
+            gap: 12px;
+          }
+
+          .configuration-modal-overlay {
+            align-items: flex-start;
+            justify-content: center;
+            padding: 12px;
+            min-height: 100dvh;
+            height: 100dvh;
+            overflow: hidden;
+          }
+
+          .configuration-modal {
+            width: 100%;
+            max-width: none;
+            max-height:
+              calc(100dvh - 24px);
+            margin-top: 12px;
+            padding: 18px 16px 18px;
+            border-radius: 22px;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+          }
+
+          .configuration-modal-head {
+            align-items: flex-start;
+          }
+
+          .configuration-modal-actions {
+            flex-direction: column-reverse;
+            gap: 10px;
+          }
+
+          .configuration-modal-actions
+            .btn {
+            width: 100%;
+            justify-content: center;
+          }
+
+          .configuration-class-grid {
+            grid-template-columns:
+              minmax(0, 1fr);
+          }
+        }
+
+        @media (max-width: 420px) {
+          .configuration-card-action
+            .btn,
+          .configuration-import-action
+            .btn {
+            white-space: normal;
+            text-align: center;
+          }
+        }
+      `}</style>
     </>
   );
 }
