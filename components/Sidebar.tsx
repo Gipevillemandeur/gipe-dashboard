@@ -46,7 +46,7 @@ const items = [
     icon: Globe2,
   },
   {
-    href: '#',
+    href: '/agenda',
     label: 'Agenda',
     icon: CalendarDays,
   },
