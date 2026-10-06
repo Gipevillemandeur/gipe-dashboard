@@ -361,98 +361,8 @@ export default function ConfigurationPage() {
       </div>
 
       <div className="configuration-grid configuration-grid-second">
-        <div className="card section-card configuration-card">
-          <div className="stat-top">
-            <div className="stat-label">
-              Année scolaire
-            </div>
 
-            <div className="stat-icon">
-              <CalendarDays size={17} />
-            </div>
-          </div>
-
-          <h2
-            className="section-title"
-            style={{
-              marginTop: 14,
-            }}
-          >
-            Gestion de l’année scolaire
-          </h2>
-
-          <p
-            className="section-sub"
-            style={{
-              marginTop: 8,
-            }}
-          >
-            L’année active contient les classes,
-            élèves et adhésions actuellement utilisés
-            par le GIPE.
-          </p>
-
-          <div
-            style={{
-              marginTop: 20,
-              padding: '14px 16px',
-              border: '1px solid #eee2d7',
-              borderRadius: 10,
-              background: '#fffaf3',
-            }}
-          >
-            <div
-              style={{
-                fontSize: 10,
-                textTransform: 'uppercase',
-                letterSpacing: '.08em',
-                fontWeight: 700,
-                color: '#756a67',
-              }}
-            >
-              Année en cours
-            </div>
-
-            <div
-              style={{
-                fontSize: 25,
-                fontWeight: 800,
-                marginTop: 5,
-                color: '#7d201a',
-              }}
-            >
-              {schoolYear || '—'}
-            </div>
-          </div>
-
-          <div className="configuration-year-footer">
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 7,
-                color: '#64748b',
-                fontSize: 12,
-              }}
-            >
-              <LockKeyhole size={14} />
-
-              <span>
-                Historique conservé
-              </span>
-            </div>
-
-            <button
-              type="button"
-              className="btn btn-primary"
-              onClick={openClosure}
-              disabled={!schoolYear}
-            >
-              Clôturer l’année
-            </button>
-          </div>
-        </div>
-
+        {/* LISTING COLLÈGE */}
         <div className="card section-card configuration-card">
           <div className="stat-top">
             <div className="stat-label">
@@ -605,6 +515,99 @@ export default function ConfigurationPage() {
 
               Importer le listing →
             </Link>
+          </div>
+        </div>
+
+        {/* ANNÉE SCOLAIRE / CLÔTURE */}
+        <div className="card section-card configuration-card">
+          <div className="stat-top">
+            <div className="stat-label">
+              Année scolaire
+            </div>
+
+            <div className="stat-icon">
+              <CalendarDays size={17} />
+            </div>
+          </div>
+
+          <h2
+            className="section-title"
+            style={{
+              marginTop: 14,
+            }}
+          >
+            Gestion de l’année scolaire
+          </h2>
+
+          <p
+            className="section-sub"
+            style={{
+              marginTop: 8,
+            }}
+          >
+            L’année active contient les classes,
+            élèves et adhésions actuellement utilisés
+            par le GIPE.
+          </p>
+
+          <div
+            style={{
+              marginTop: 20,
+              padding: '14px 16px',
+              border: '1px solid #eee2d7',
+              borderRadius: 10,
+              background: '#fffaf3',
+            }}
+          >
+            <div
+              style={{
+                fontSize: 10,
+                textTransform: 'uppercase',
+                letterSpacing: '.08em',
+                fontWeight: 700,
+                color: '#756a67',
+              }}
+            >
+              Année en cours
+            </div>
+
+            <div
+              style={{
+                fontSize: 25,
+                fontWeight: 800,
+                marginTop: 5,
+                color: '#7d201a',
+              }}
+            >
+              {schoolYear || '—'}
+            </div>
+          </div>
+
+          <div className="configuration-year-footer">
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 7,
+                color: '#64748b',
+                fontSize: 12,
+              }}
+            >
+              <LockKeyhole size={14} />
+
+              <span>
+                Historique conservé
+              </span>
+            </div>
+
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={openClosure}
+              disabled={!schoolYear}
+            >
+              Clôturer l’année
+            </button>
           </div>
         </div>
       </div>
