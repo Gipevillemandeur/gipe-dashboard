@@ -586,9 +586,7 @@ export default function InstanceDetailPage({
                       rel="noreferrer"
                       className="document-action"
                     >
-                      <ExternalLink
-                        size={15}
-                      />
+                      <ExternalLink size={15} />
                       Ouvrir
                     </a>
                   )}
@@ -723,6 +721,8 @@ export default function InstanceDetailPage({
           border-radius: 16px;
           background: #fff;
           box-shadow: 0 4px 16px rgba(15, 23, 42, 0.04);
+          min-width: 0;
+          box-sizing: border-box;
         }
 
         .section-title {
@@ -730,6 +730,7 @@ export default function InstanceDetailPage({
           align-items: flex-start;
           gap: 12px;
           color: #302b27;
+          min-width: 0;
         }
 
         .section-title > svg {
@@ -765,6 +766,7 @@ export default function InstanceDetailPage({
           border-radius: 11px;
           background: #fffaf4;
           border: 1px solid #f0e5d8;
+          box-sizing: border-box;
         }
 
         .info-grid .full {
@@ -853,6 +855,12 @@ export default function InstanceDetailPage({
           align-items: flex-start;
           justify-content: space-between;
           gap: 18px;
+          min-width: 0;
+        }
+
+        .documents-header > .section-title {
+          min-width: 0;
+          flex: 1 1 auto;
         }
 
         .upload-button {
@@ -869,6 +877,7 @@ export default function InstanceDetailPage({
           font-weight: 700;
           cursor: pointer;
           white-space: nowrap;
+          flex: 0 0 auto;
         }
 
         .upload-button:hover {
@@ -894,6 +903,7 @@ export default function InstanceDetailPage({
           display: grid;
           gap: 10px;
           margin-top: 18px;
+          min-width: 0;
         }
 
         .document-row {
@@ -905,6 +915,7 @@ export default function InstanceDetailPage({
           border: 1px solid #eadfd5;
           border-radius: 11px;
           background: #fffaf4;
+          box-sizing: border-box;
         }
 
         .document-icon {
@@ -930,6 +941,7 @@ export default function InstanceDetailPage({
           color: #0f172a;
           font-size: 14px;
           overflow-wrap: anywhere;
+          word-break: break-word;
         }
 
         .document-info span {
@@ -942,6 +954,7 @@ export default function InstanceDetailPage({
           align-items: center;
           gap: 8px;
           flex: 0 0 auto;
+          min-width: 0;
         }
 
         .document-action,
@@ -957,6 +970,8 @@ export default function InstanceDetailPage({
           font-weight: 700;
           cursor: pointer;
           text-decoration: none;
+          box-sizing: border-box;
+          min-width: 0;
         }
 
         .document-action {
@@ -1006,6 +1021,7 @@ export default function InstanceDetailPage({
           .page {
             gap: 16px;
             padding: 18px 14px;
+            min-width: 0;
           }
 
           .topbar {
@@ -1016,6 +1032,7 @@ export default function InstanceDetailPage({
           .back-link {
             width: 100%;
             justify-content: center;
+            box-sizing: border-box;
           }
 
           .status {
@@ -1025,6 +1042,8 @@ export default function InstanceDetailPage({
           .info-card,
           .content-card {
             padding: 18px;
+            width: 100%;
+            min-width: 0;
           }
 
           .info-grid {
@@ -1047,6 +1066,7 @@ export default function InstanceDetailPage({
 
           .primary-button {
             width: 100%;
+            box-sizing: border-box;
           }
 
           .meta {
@@ -1060,25 +1080,47 @@ export default function InstanceDetailPage({
 
           .upload-button {
             width: 100%;
+            box-sizing: border-box;
           }
 
           .document-row {
-            align-items: flex-start;
-            flex-wrap: wrap;
+            display: grid;
+            grid-template-columns: 38px minmax(0, 1fr);
+            align-items: start;
+            gap: 10px;
+            width: 100%;
+            box-sizing: border-box;
+          }
+
+          .document-icon {
+            grid-column: 1;
+            grid-row: 1;
           }
 
           .document-info {
-            min-width: calc(100% - 52px);
+            grid-column: 2;
+            grid-row: 1;
+            width: 100%;
+            min-width: 0;
           }
 
           .document-actions {
+            grid-column: 1 / -1;
+            grid-row: 2;
+            display: grid;
+            grid-template-columns: minmax(0, 1fr);
+            gap: 8px;
             width: 100%;
-            margin-left: 50px;
+            min-width: 0;
+            margin: 0;
           }
 
           .document-action,
           .document-delete {
-            flex: 1 1 0;
+            width: 100%;
+            min-width: 0;
+            max-width: 100%;
+            box-sizing: border-box;
           }
         }
       `}</style>
