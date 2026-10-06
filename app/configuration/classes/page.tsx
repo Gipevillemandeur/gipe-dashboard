@@ -124,11 +124,11 @@ export default function ConfigurationClassesPage() {
 
         <div className="topbar-right">
           <Link className="btn" href="/configuration">
-            <ArrowLeft size={14} /> Configuration
+            <ArrowLeft size={14} />
+            Configuration
           </Link>
         </div>
       </div>
-
 
       {(message || error) && (
         <div
@@ -144,7 +144,6 @@ export default function ConfigurationClassesPage() {
           </div>
         </div>
       )}
-
 
       <section className="card section-card">
 
@@ -182,7 +181,6 @@ export default function ConfigurationClassesPage() {
 
         </div>
 
-
         {loading ? (
           <p className="kicker">
             Chargement…
@@ -198,7 +196,6 @@ export default function ConfigurationClassesPage() {
               <tr>
                 <th>Classe</th>
                 <th>Niveau</th>
-                <th>Type</th>
                 <th>Code de déverrouillage</th>
               </tr>
             </thead>
@@ -216,12 +213,6 @@ export default function ConfigurationClassesPage() {
 
                   <td>
                     {item.level || '—'}
-                  </td>
-
-                  <td>
-                    {item.kind === 'demo'
-                      ? 'Démonstration'
-                      : 'Réelle'}
                   </td>
 
                   <td>
