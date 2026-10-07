@@ -1,6 +1,18 @@
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 
+function getParisDate() {
+  return new Intl.DateTimeFormat(
+    'en-CA',
+    {
+      timeZone: 'Europe/Paris',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }
+  ).format(new Date());
+}
+
 async function deleteSupabaseImage(
   admin: ReturnType<typeof createAdminClient>,
   imageUrl: string | null | undefined
@@ -50,13 +62,6 @@ export async function GET(
   request: Request
 ) {
   try {
-    /*
-     * Vercel Cron envoie une requête GET avec
-     * l'en-tête Authorization.
-     *
-     * Vercel recommande de protéger les Cron Jobs
-     * avec CRON_SECRET.
-     */
     const authHeader =
       request.headers.get(
         'authorization'
@@ -83,18 +88,17 @@ export async function GET(
       createAdminClient();
 
     /*
-     * Un événement daté avant aujourd'hui
-     * est considéré comme expiré.
+     * La date utilisée pour le nettoyage est
+     * toujours celle de la France.
      *
      * Exemple :
-     * aujourd'hui = 06/10/2026
-     * date < 06/10/2026 => suppression
-     * date = 06/10/2026 => conservation
+     * à 00:01 le 07/10/2026 en France,
+     * today vaut bien 2026-10-07,
+     * même si le serveur fonctionne encore
+     * sur la date UTC du 06/10.
      */
     const today =
-      new Date()
-        .toISOString()
-        .slice(0, 10);
+      getParisDate();
 
     // ---------------------------------------------------------
     // 1. Événements publics expirés
@@ -220,7 +224,7 @@ export async function GET(
     }
 
     console.log(
-      `Nettoyage Agenda : ${deletedPublic} événement(s) public(s), ${deletedInternal} événement(s) interne(s).`
+      `Nettoyage Agenda : ${deletedPublic} événement(s) public(s), ${deletedInternal} événement(s) interne(s), date France : ${today}.`
     );
 
     return NextResponse.json({
