@@ -20,48 +20,18 @@ import { useEffect, useState } from 'react';
 import LogoutButton from '@/components/LogoutButton';
 
 const items = [
-  {
-    href: '/',
-    label: 'Tableau de bord',
-    icon: Home,
-  },
-  {
-    href: '/conseils',
-    label: 'Scolarité',
-    icon: Users,
-  },
-  {
-    href: '/adherents',
-    label: 'Adhérents',
-    icon: UserRoundPlus,
-  },
-  {
-    href: '/tresorerie',
-    label: 'Trésorerie',
-    icon: WalletCards,
-  },
-  {
-    href: '/site',
-    label: 'Site internet',
-    icon: Globe2,
-  },
-  {
-    href: '/agenda',
-    label: 'Agenda',
-    icon: CalendarDays,
-  },
-  {
-    href: '/documents',
-    label: 'Docs Drive',
-    icon: FileText,
-  },
+  { href: '/', label: 'Tableau de bord', icon: Home },
+  { href: '/conseils', label: 'Scolarité', icon: Users },
+  { href: '/adherents', label: 'Adhérents', icon: UserRoundPlus },
+  { href: '/tresorerie', label: 'Trésorerie', icon: WalletCards },
+  { href: '/site', label: 'Site internet', icon: Globe2 },
+  { href: '/agenda', label: 'Agenda', icon: CalendarDays },
+  { href: '/documents', label: 'Docs Drive', icon: FileText },
 ];
 
 export default function Sidebar() {
   const pathname = usePathname();
-
-  const [mobileOpen, setMobileOpen] =
-    useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   useEffect(() => {
     setMobileOpen(false);
@@ -82,54 +52,48 @@ export default function Sidebar() {
 
   return (
     <>
-      {/* Barre mobile */}
       <header className="mobile-header">
         <button
           type="button"
           className="mobile-menu-button"
-          onClick={() =>
-            setMobileOpen(true)
-          }
+          onClick={() => setMobileOpen(true)}
           aria-label="Ouvrir le menu"
         >
           <Menu size={22} />
         </button>
 
         <div className="mobile-brand">
-          <div className="mobile-brand-mark">
-            G
-          </div>
+          <img
+            src="/images/Logo GIPE.png"
+            alt="Logo GIPE Villemandeur"
+            style={{
+              width: '48px',
+              height: '48px',
+              objectFit: 'contain',
+              display: 'block',
+              flexShrink: 0,
+            }}
+          />
 
           <div>
-            <strong>
-              GIPE Villemandeur
-            </strong>
-
-            <span>
-              Centre de gestion
-            </span>
+            <strong>GIPE Villemandeur</strong>
+            <span>Centre de gestion</span>
           </div>
         </div>
       </header>
 
-      {/* Fond derrière le menu */}
       {mobileOpen && (
         <button
           type="button"
           className="mobile-overlay"
-          onClick={() =>
-            setMobileOpen(false)
-          }
+          onClick={() => setMobileOpen(false)}
           aria-label="Fermer le menu"
         />
       )}
 
-      {/* Menu */}
       <aside
         className={`sidebar ${
-          mobileOpen
-            ? 'sidebar-mobile-open'
-            : ''
+          mobileOpen ? 'sidebar-mobile-open' : ''
         }`}
       >
         <div
@@ -146,8 +110,8 @@ export default function Sidebar() {
             src="/images/Logo GIPE.png"
             alt="Logo GIPE Villemandeur"
             style={{
-              width: '112px',
-              height: '112px',
+              width: '110px',
+              height: '110px',
               objectFit: 'contain',
               display: 'block',
             }}
@@ -159,21 +123,14 @@ export default function Sidebar() {
               textAlign: 'center',
             }}
           >
-            <strong>
-              GIPE Villemandeur
-            </strong>
-
-            <span>
-              Centre de gestion
-            </span>
+            <strong>GIPE Villemandeur</strong>
+            <span>Centre de gestion</span>
           </div>
 
           <button
             type="button"
             className="mobile-close-button"
-            onClick={() =>
-              setMobileOpen(false)
-            }
+            onClick={() => setMobileOpen(false)}
             aria-label="Fermer le menu"
           >
             <X size={22} />
@@ -187,15 +144,11 @@ export default function Sidebar() {
             const active =
               item.href !== '#' &&
               (pathname === item.href ||
-                pathname.startsWith(
-                  `${item.href}/`
-                ));
+                pathname.startsWith(`${item.href}/`));
 
             return (
               <Link
-                className={
-                  active ? 'active' : ''
-                }
+                className={active ? 'active' : ''}
                 href={item.href}
                 key={item.label}
               >
@@ -209,13 +162,9 @@ export default function Sidebar() {
 
           <Link
             className={
-              pathname ===
-                '/configuration' ||
-              pathname.startsWith(
-                '/configuration/'
-              ) ||
-              pathname ===
-                '/import-college'
+              pathname === '/configuration' ||
+              pathname.startsWith('/configuration/') ||
+              pathname === '/import-college'
                 ? 'active'
                 : ''
             }
