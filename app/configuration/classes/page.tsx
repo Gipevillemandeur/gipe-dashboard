@@ -69,22 +69,45 @@ export default function ConfigurationClassesPage() {
 
   const [saving, setSaving] = useState(false);
 
+  /*
+   * IDs conservés pendant les modifications.
+   * C'est important si le nom/prénom est modifié.
+   */
+  const [editingStudentId, setEditingStudentId] =
+    useState<string | null>(null);
+
+  const [editingTeacherId, setEditingTeacherId] =
+    useState<string | null>(null);
+
   const [formName, setFormName] = useState('');
   const [formLevel, setFormLevel] = useState('');
-  const [formLastName, setFormLastName] = useState('');
-  const [formFirstName, setFormFirstName] = useState('');
-  const [formDisplayName, setFormDisplayName] = useState('');
-  const [formSubject, setFormSubject] = useState('');
-  const [formIsPP, setFormIsPP] = useState(false);
+
+  const [formLastName, setFormLastName] =
+    useState('');
+
+  const [formFirstName, setFormFirstName] =
+    useState('');
+
+  const [formDisplayName, setFormDisplayName] =
+    useState('');
+
+  const [formSubject, setFormSubject] =
+    useState('');
+
+  const [formIsPP, setFormIsPP] =
+    useState(false);
 
   async function load() {
     setLoading(true);
     setError('');
 
     try {
-      const response = await fetch('/api/configuration', {
-        cache: 'no-store',
-      });
+      const response = await fetch(
+        '/api/configuration',
+        {
+          cache: 'no-store',
+        }
+      );
 
       const data = await response.json();
 
@@ -112,7 +135,10 @@ export default function ConfigurationClassesPage() {
     void load();
   }, []);
 
-  function updateCode(id: string, value: string) {
+  function updateCode(
+    id: string,
+    value: string
+  ) {
     setClasses((current) =>
       current.map((item) =>
         item.id === id
@@ -205,6 +231,7 @@ export default function ConfigurationClassesPage() {
           ? e.message
           : 'Impossible de charger la classe.'
       );
+
       setSelectedClass(null);
     } finally {
       setLoadingClass(false);
@@ -217,11 +244,16 @@ export default function ConfigurationClassesPage() {
     setSelectedClass(null);
     setStudents([]);
     setTeachers([]);
+
     closeForm();
   }
 
   function closeForm() {
     setModalMode(null);
+
+    setEditingStudentId(null);
+    setEditingTeacherId(null);
+
     setFormName('');
     setFormLevel('');
     setFormLastName('');
@@ -236,32 +268,59 @@ export default function ConfigurationClassesPage() {
 
     setFormName(selectedClass.name);
     setFormLevel(selectedClass.level || '');
+
     setModalMode('class');
   }
 
-  function openEditStudent(student: Student) {
+  function openEditStudent(
+    student: Student
+  ) {
+    setEditingStudentId(student.id);
+
     setFormLastName(student.last_name);
     setFormFirstName(student.first_name);
+
     setModalMode('student');
   }
 
-  function openEditTeacher(teacher: Teacher) {
-    setFormDisplayName(teacher.displayName);
-    setFormSubject(teacher.subject);
-    setFormIsPP(teacher.isPP);
+  function openEditTeacher(
+    teacher: Teacher
+  ) {
+    setEditingTeacherId(
+      teacher.teacherId
+    );
+
+    setFormDisplayName(
+      teacher.displayName
+    );
+
+    setFormSubject(
+      teacher.subject
+    );
+
+    setFormIsPP(
+      teacher.isPP
+    );
+
     setModalMode('teacher');
   }
 
   function openAddStudent() {
+    setEditingStudentId(null);
+
     setFormLastName('');
     setFormFirstName('');
+
     setModalMode('add-student');
   }
 
   function openAddTeacher() {
+    setEditingTeacherId(null);
+
     setFormDisplayName('');
     setFormSubject('');
     setFormIsPP(false);
+
     setModalMode('add-teacher');
   }
 
@@ -283,7 +342,7 @@ export default function ConfigurationClassesPage() {
     });
   }
 
-  async function saveStudent(studentId?: string) {
+  async function saveStudent() {
     if (!selectedClass) return;
 
     if (
@@ -296,10 +355,13 @@ export default function ConfigurationClassesPage() {
       return;
     }
 
-    if (modalMode === 'student' && studentId) {
+    if (
+      modalMode === 'student' &&
+      editingStudentId
+    ) {
       await runSave({
         type: 'student',
-        studentId,
+        studentId: editingStudentId,
         lastName: formLastName.trim(),
         firstName: formFirstName.trim(),
       });
@@ -315,9 +377,7 @@ export default function ConfigurationClassesPage() {
     });
   }
 
-  async function saveTeacher(
-    teacherId?: string
-  ) {
+  async function saveTeacher() {
     if (!selectedClass) return;
 
     if (!formDisplayName.trim()) {
@@ -329,12 +389,12 @@ export default function ConfigurationClassesPage() {
 
     if (
       modalMode === 'teacher' &&
-      teacherId
+      editingTeacherId
     ) {
       await runSave({
         type: 'teacher',
         classId: selectedClass.id,
-        teacherId,
+        teacherId: editingTeacherId,
         displayName:
           formDisplayName.trim(),
         subject: formSubject.trim(),
@@ -354,7 +414,9 @@ export default function ConfigurationClassesPage() {
     });
   }
 
-  async function runSave(payload: any) {
+  async function runSave(
+    payload: Record<string, unknown>
+  ) {
     setSaving(true);
     setError('');
     setMessage('');
@@ -380,7 +442,9 @@ export default function ConfigurationClassesPage() {
         );
       }
 
-      setMessage('Modification enregistrée.');
+      setMessage(
+        'Modification enregistrée.'
+      );
 
       closeForm();
 
@@ -400,7 +464,9 @@ export default function ConfigurationClassesPage() {
     }
   }
 
-  async function deleteStudent(student: Student) {
+  async function deleteStudent(
+    student: Student
+  ) {
     if (
       !window.confirm(
         `Supprimer ${student.last_name} ${student.first_name} ?`
@@ -411,6 +477,7 @@ export default function ConfigurationClassesPage() {
 
     setSaving(true);
     setError('');
+    setMessage('');
 
     try {
       const response = await fetch(
@@ -433,11 +500,14 @@ export default function ConfigurationClassesPage() {
 
       setStudents((current) =>
         current.filter(
-          (item) => item.id !== student.id
+          (item) =>
+            item.id !== student.id
         )
       );
 
-      setMessage('Élève supprimé.');
+      setMessage(
+        'Élève supprimé.'
+      );
     } catch (e) {
       setError(
         e instanceof Error
@@ -464,6 +534,7 @@ export default function ConfigurationClassesPage() {
 
     setSaving(true);
     setError('');
+    setMessage('');
 
     try {
       const response = await fetch(
@@ -511,14 +582,16 @@ export default function ConfigurationClassesPage() {
   async function deleteClass() {
     if (!selectedClass) return;
 
-    const confirmed = window.confirm(
-      `Supprimer définitivement la classe « ${selectedClass.name} » ?\n\nLes élèves et les rattachements des professeurs de cette classe seront également supprimés.`
-    );
+    const confirmed =
+      window.confirm(
+        `Supprimer définitivement la classe « ${selectedClass.name} » ?\n\nLes élèves et les rattachements des professeurs de cette classe seront également supprimés.`
+      );
 
     if (!confirmed) return;
 
     setSaving(true);
     setError('');
+    setMessage('');
 
     try {
       const response = await fetch(
@@ -565,7 +638,9 @@ export default function ConfigurationClassesPage() {
             Configuration · Classes
           </div>
 
-          <h1>Gestion des classes</h1>
+          <h1>
+            Gestion des classes
+          </h1>
 
           <div className="kicker">
             Année active :{' '}
@@ -589,7 +664,9 @@ export default function ConfigurationClassesPage() {
       {(message || error) && (
         <div
           className={`notice ${
-            error ? 'notice-error' : ''
+            error
+              ? 'notice-error'
+              : ''
           }`}
           style={{
             marginBottom: 18,
@@ -632,7 +709,8 @@ export default function ConfigurationClassesPage() {
             className="btn btn-primary"
             onClick={saveCodes}
             disabled={
-              savingCodes || loading
+              savingCodes ||
+              loading
             }
           >
             <Save size={14} />
@@ -647,7 +725,8 @@ export default function ConfigurationClassesPage() {
           <p className="kicker">
             Chargement…
           </p>
-        ) : classes.length === 0 ? (
+        ) : classes.length ===
+          0 ? (
           <p className="kicker">
             Aucune classe active.
           </p>
@@ -657,115 +736,159 @@ export default function ConfigurationClassesPage() {
               <table className="table">
                 <thead>
                   <tr>
-                    <th>Classe</th>
-                    <th>Niveau</th>
+                    <th>
+                      Classe
+                    </th>
+
+                    <th>
+                      Niveau
+                    </th>
+
                     <th>
                       Code de déverrouillage
                     </th>
-                    <th>Gestion</th>
+
+                    <th>
+                      Gestion
+                    </th>
                   </tr>
                 </thead>
 
                 <tbody>
-                  {classes.map((item) => (
-                    <tr key={item.id}>
-                      <td>
-                        <strong>
-                          {item.name}
-                        </strong>
-                      </td>
+                  {classes.map(
+                    (item) => (
+                      <tr
+                        key={
+                          item.id
+                        }
+                      >
+                        <td>
+                          <strong>
+                            {
+                              item.name
+                            }
+                          </strong>
+                        </td>
 
-                      <td>
-                        {item.level || '—'}
-                      </td>
+                        <td>
+                          {item.level ||
+                            '—'}
+                        </td>
 
-                      <td>
-                        <input
-                          className="input"
-                          style={{
-                            maxWidth: 220,
-                          }}
-                          value={
-                            item.access_code ||
-                            ''
-                          }
-                          onChange={(e) =>
-                            updateCode(
-                              item.id,
-                              e.target.value
-                            )
-                          }
-                          placeholder="Code"
-                          inputMode="numeric"
-                        />
-                      </td>
+                        <td>
+                          <input
+                            className="input"
+                            style={{
+                              maxWidth:
+                                220,
+                            }}
+                            value={
+                              item.access_code ||
+                              ''
+                            }
+                            onChange={(
+                              e
+                            ) =>
+                              updateCode(
+                                item.id,
+                                e.target
+                                  .value
+                              )
+                            }
+                            placeholder="Code"
+                            inputMode="numeric"
+                          />
+                        </td>
 
-                      <td>
-                        <button
-                          type="button"
-                          className="btn btn-secondary"
-                          onClick={() =>
-                            openClass(item)
-                          }
-                        >
-                          <Pencil size={14} />
-                          Modifier
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+                        <td>
+                          <button
+                            type="button"
+                            className="btn btn-secondary"
+                            onClick={() =>
+                              openClass(
+                                item
+                              )
+                            }
+                          >
+                            <Pencil
+                              size={
+                                14
+                              }
+                            />
+                            Modifier
+                          </button>
+                        </td>
+                      </tr>
+                    )
+                  )}
                 </tbody>
               </table>
             </div>
 
             <div className="mobile-list">
-              {classes.map((item) => (
-                <article
-                  className="class-mobile-card"
-                  key={item.id}
-                >
-                  <div>
-                    <strong>
-                      {item.name}
-                    </strong>
-
-                    <span>
-                      {item.level ||
-                        'Niveau non renseigné'}
-                    </span>
-                  </div>
-
-                  <label>
-                    Code de déverrouillage
-
-                    <input
-                      className="input"
-                      value={
-                        item.access_code || ''
-                      }
-                      onChange={(e) =>
-                        updateCode(
-                          item.id,
-                          e.target.value
-                        )
-                      }
-                      placeholder="Code"
-                      inputMode="numeric"
-                    />
-                  </label>
-
-                  <button
-                    type="button"
-                    className="btn btn-secondary"
-                    onClick={() =>
-                      openClass(item)
+              {classes.map(
+                (item) => (
+                  <article
+                    className="class-mobile-card"
+                    key={
+                      item.id
                     }
                   >
-                    <Pencil size={14} />
-                    Modifier la classe
-                  </button>
-                </article>
-              ))}
+                    <div>
+                      <strong>
+                        {
+                          item.name
+                        }
+                      </strong>
+
+                      <span>
+                        {item.level ||
+                          'Niveau non renseigné'}
+                      </span>
+                    </div>
+
+                    <label>
+                      Code de déverrouillage
+
+                      <input
+                        className="input"
+                        value={
+                          item.access_code ||
+                          ''
+                        }
+                        onChange={(
+                          e
+                        ) =>
+                          updateCode(
+                            item.id,
+                            e.target
+                              .value
+                          )
+                        }
+                        placeholder="Code"
+                        inputMode="numeric"
+                      />
+                    </label>
+
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      onClick={() =>
+                        openClass(
+                          item
+                        )
+                      }
+                    >
+                      <Pencil
+                        size={
+                          14
+                        }
+                      />
+                      Modifier la classe
+                    </button>
+                  </article>
+                )
+              )}
             </div>
           </>
         )}
@@ -774,7 +897,9 @@ export default function ConfigurationClassesPage() {
       {selectedClass && (
         <div
           className="modal-overlay"
-          onMouseDown={(event) => {
+          onMouseDown={(
+            event
+          ) => {
             if (
               event.target ===
               event.currentTarget
@@ -791,7 +916,9 @@ export default function ConfigurationClassesPage() {
                 </div>
 
                 <h2>
-                  {selectedClass.name}
+                  {
+                    selectedClass.name
+                  }
                 </h2>
 
                 <p>
@@ -803,7 +930,9 @@ export default function ConfigurationClassesPage() {
               <button
                 type="button"
                 className="icon-button"
-                onClick={closeClass}
+                onClick={
+                  closeClass
+                }
                 aria-label="Fermer"
               >
                 <X size={20} />
@@ -835,14 +964,20 @@ export default function ConfigurationClassesPage() {
                         openEditClass
                       }
                     >
-                      <Pencil size={14} />
+                      <Pencil
+                        size={
+                          14
+                        }
+                      />
                       Modifier
                     </button>
                   </div>
 
                   <div className="class-summary">
                     <strong>
-                      {selectedClass.name}
+                      {
+                        selectedClass.name
+                      }
                     </strong>
 
                     <span>
@@ -857,9 +992,15 @@ export default function ConfigurationClassesPage() {
                     onClick={
                       deleteClass
                     }
-                    disabled={saving}
+                    disabled={
+                      saving
+                    }
                   >
-                    <Trash2 size={15} />
+                    <Trash2
+                      size={
+                        15
+                      }
+                    />
                     Supprimer la classe
                   </button>
                 </section>
@@ -868,12 +1009,18 @@ export default function ConfigurationClassesPage() {
                   <div className="manage-section-head">
                     <div>
                       <h3>
-                        <Users size={17} />
+                        <Users
+                          size={
+                            17
+                          }
+                        />
                         Élèves
                       </h3>
 
                       <p>
-                        {students.length}{' '}
+                        {
+                          students.length
+                        }{' '}
                         élève
                         {students.length >
                         1
@@ -890,7 +1037,11 @@ export default function ConfigurationClassesPage() {
                         openAddStudent
                       }
                     >
-                      <Plus size={14} />
+                      <Plus
+                        size={
+                          14
+                        }
+                      />
                       Ajouter un élève
                     </button>
                   </div>
@@ -898,13 +1049,15 @@ export default function ConfigurationClassesPage() {
                   {students.length ===
                   0 ? (
                     <div className="empty-management">
-                      Aucun élève dans cette
-                      classe.
+                      Aucun élève dans
+                      cette classe.
                     </div>
                   ) : (
                     <div className="management-list">
                       {students.map(
-                        (student) => (
+                        (
+                          student
+                        ) => (
                           <div
                             className="management-row"
                             key={
@@ -913,7 +1066,9 @@ export default function ConfigurationClassesPage() {
                           >
                             <div className="person-icon">
                               <UserRound
-                                size={16}
+                                size={
+                                  16
+                                }
                               />
                             </div>
 
@@ -977,12 +1132,18 @@ export default function ConfigurationClassesPage() {
                   <div className="manage-section-head">
                     <div>
                       <h3>
-                        <UserRound size={17} />
+                        <UserRound
+                          size={
+                            17
+                          }
+                        />
                         Professeurs
                       </h3>
 
                       <p>
-                        {teachers.length}{' '}
+                        {
+                          teachers.length
+                        }{' '}
                         professeur
                         {teachers.length >
                         1
@@ -1004,7 +1165,11 @@ export default function ConfigurationClassesPage() {
                         openAddTeacher
                       }
                     >
-                      <Plus size={14} />
+                      <Plus
+                        size={
+                          14
+                        }
+                      />
                       Ajouter un professeur
                     </button>
                   </div>
@@ -1018,14 +1183,18 @@ export default function ConfigurationClassesPage() {
                   ) : (
                     <div className="management-list">
                       {teachers.map(
-                        (teacher) => (
+                        (
+                          teacher
+                        ) => (
                           <div
                             className="management-row"
                             key={`${teacher.teacherId}-${teacher.subject}`}
                           >
                             <div className="person-icon">
                               <UserRound
-                                size={16}
+                                size={
+                                  16
+                                }
                               />
                             </div>
 
@@ -1097,7 +1266,9 @@ export default function ConfigurationClassesPage() {
               <button
                 type="button"
                 className="btn btn-secondary"
-                onClick={closeClass}
+                onClick={
+                  closeClass
+                }
               >
                 Fermer
               </button>
@@ -1116,9 +1287,9 @@ export default function ConfigurationClassesPage() {
                   'class'
                     ? 'Classe'
                     : modalMode ===
-                        'student' ||
-                      modalMode ===
-                        'add-student'
+                          'student' ||
+                        modalMode ===
+                          'add-student'
                     ? 'Élève'
                     : 'Professeur'}
                 </div>
@@ -1146,7 +1317,9 @@ export default function ConfigurationClassesPage() {
                 onClick={
                   closeForm
                 }
-                disabled={saving}
+                disabled={
+                  saving
+                }
               >
                 <X size={20} />
               </button>
@@ -1161,10 +1334,15 @@ export default function ConfigurationClassesPage() {
 
                     <input
                       className="input"
-                      value={formName}
-                      onChange={(e) =>
+                      value={
+                        formName
+                      }
+                      onChange={(
+                        e
+                      ) =>
                         setFormName(
-                          e.target.value
+                          e.target
+                            .value
                         )
                       }
                       autoFocus
@@ -1176,10 +1354,15 @@ export default function ConfigurationClassesPage() {
 
                     <input
                       className="input"
-                      value={formLevel}
-                      onChange={(e) =>
+                      value={
+                        formLevel
+                      }
+                      onChange={(
+                        e
+                      ) =>
                         setFormLevel(
-                          e.target.value
+                          e.target
+                            .value
                         )
                       }
                     />
@@ -1200,9 +1383,12 @@ export default function ConfigurationClassesPage() {
                       value={
                         formLastName
                       }
-                      onChange={(e) =>
+                      onChange={(
+                        e
+                      ) =>
                         setFormLastName(
-                          e.target.value
+                          e.target
+                            .value
                         )
                       }
                       autoFocus
@@ -1217,9 +1403,12 @@ export default function ConfigurationClassesPage() {
                       value={
                         formFirstName
                       }
-                      onChange={(e) =>
+                      onChange={(
+                        e
+                      ) =>
                         setFormFirstName(
-                          e.target.value
+                          e.target
+                            .value
                         )
                       }
                     />
@@ -1240,9 +1429,12 @@ export default function ConfigurationClassesPage() {
                       value={
                         formDisplayName
                       }
-                      onChange={(e) =>
+                      onChange={(
+                        e
+                      ) =>
                         setFormDisplayName(
-                          e.target.value
+                          e.target
+                            .value
                         )
                       }
                       autoFocus
@@ -1257,9 +1449,12 @@ export default function ConfigurationClassesPage() {
                       value={
                         formSubject
                       }
-                      onChange={(e) =>
+                      onChange={(
+                        e
+                      ) =>
                         setFormSubject(
-                          e.target.value
+                          e.target
+                            .value
                         )
                       }
                     />
@@ -1268,8 +1463,12 @@ export default function ConfigurationClassesPage() {
                   <label className="checkbox-label">
                     <input
                       type="checkbox"
-                      checked={formIsPP}
-                      onChange={(e) =>
+                      checked={
+                        formIsPP
+                      }
+                      onChange={(
+                        e
+                      ) =>
                         setFormIsPP(
                           e.target
                             .checked
@@ -1301,7 +1500,9 @@ export default function ConfigurationClassesPage() {
                 onClick={
                   closeForm
                 }
-                disabled={saving}
+                disabled={
+                  saving
+                }
               >
                 Annuler
               </button>
@@ -1309,7 +1510,9 @@ export default function ConfigurationClassesPage() {
               <button
                 type="button"
                 className="btn btn-primary"
-                disabled={saving}
+                disabled={
+                  saving
+                }
                 onClick={() => {
                   if (
                     modalMode ===
@@ -1318,62 +1521,16 @@ export default function ConfigurationClassesPage() {
                     void saveClass();
                   } else if (
                     modalMode ===
-                    'student'
-                  ) {
-                    const student =
-                      students.find(
-                        (item) =>
-                          item.last_name ===
-                            formLastName &&
-                          item.first_name ===
-                            formFirstName
-                      );
-
-                    /*
-                     * Le bouton Modifier est ouvert
-                     * depuis la ligne concernée.
-                     * Le traitement réel est géré
-                     * plus bas avec l'état courant.
-                     */
-                    if (student) {
-                      void saveStudent(
-                        student.id
-                      );
-                    } else {
-                      setError(
-                        'Élève introuvable.'
-                      );
-                    }
-                  } else if (
+                      'student' ||
                     modalMode ===
-                    'add-student'
+                      'add-student'
                   ) {
                     void saveStudent();
                   } else if (
                     modalMode ===
-                    'teacher'
-                  ) {
-                    const teacher =
-                      teachers.find(
-                        (item) =>
-                          item.displayName ===
-                            formDisplayName &&
-                          item.subject ===
-                            formSubject
-                      );
-
-                    if (teacher) {
-                      void saveTeacher(
-                        teacher.teacherId
-                      );
-                    } else {
-                      setError(
-                        'Professeur introuvable.'
-                      );
-                    }
-                  } else if (
+                      'teacher' ||
                     modalMode ===
-                    'add-teacher'
+                      'add-teacher'
                   ) {
                     void saveTeacher();
                   }
@@ -1679,7 +1836,6 @@ export default function ConfigurationClassesPage() {
 
         .checkbox-label {
           display: flex !important;
-          grid-template-columns: none;
           align-items: center;
           gap: 8px !important;
           cursor: pointer;
