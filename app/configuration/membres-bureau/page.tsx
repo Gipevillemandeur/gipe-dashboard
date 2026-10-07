@@ -1,11 +1,12 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
   ArrowLeft,
   Check,
   KeyRound,
+  Mail,
   Save,
   ShieldCheck,
   UserRoundCog,
@@ -26,21 +27,33 @@ type Position = {
   permissions: string[];
 };
 
-type BureauData = {
-  positions: Position[];
-  permissions: Permission[];
-  superAdminEmail: string | null;
-};
-
 export default function MembresBureauPage() {
-  const [positions, setPositions] = useState<Position[]>([]);
-  const [permissions, setPermissions] = useState<Permission[]>([]);
-  const [superAdminEmail, setSuperAdminEmail] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [savingId, setSavingId] = useState<string | null>(null);
-  const [savingSuperAdmin, setSavingSuperAdmin] = useState(false);
-  const [error, setError] = useState('');
-  const [message, setMessage] = useState('');
+  const [positions, setPositions] =
+    useState<Position[]>([]);
+
+  const [permissions, setPermissions] =
+    useState<Permission[]>([]);
+
+  const [superAdminEmail, setSuperAdminEmail] =
+    useState('');
+
+  const [loading, setLoading] =
+    useState(true);
+
+  const [savingId, setSavingId] =
+    useState<string | null>(null);
+
+  const [savingSuperAdmin, setSavingSuperAdmin] =
+    useState(false);
+
+  const [invitingId, setInvitingId] =
+    useState<string | null>(null);
+
+  const [error, setError] =
+    useState('');
+
+  const [message, setMessage] =
+    useState('');
 
   async function load() {
     setLoading(true);
@@ -54,7 +67,8 @@ export default function MembresBureauPage() {
         }
       );
 
-      const data = await response.json();
+      const data =
+        await response.json();
 
       if (!response.ok) {
         throw new Error(
@@ -63,8 +77,14 @@ export default function MembresBureauPage() {
         );
       }
 
-      setPositions(data.positions || []);
-      setPermissions(data.permissions || []);
+      setPositions(
+        data.positions || []
+      );
+
+      setPermissions(
+        data.permissions || []
+      );
+
       setSuperAdminEmail(
         data.superAdminEmail || ''
       );
@@ -105,12 +125,16 @@ export default function MembresBureauPage() {
   ) {
     setPositions((current) =>
       current.map((position) => {
-        if (position.id !== positionId) {
+        if (
+          position.id !== positionId
+        ) {
           return position;
         }
 
         const hasPermission =
-          position.permissions.includes(code);
+          position.permissions.includes(
+            code
+          );
 
         return {
           ...position,
@@ -140,20 +164,24 @@ export default function MembresBureauPage() {
         {
           method: 'PUT',
           headers: {
-            'Content-Type': 'application/json',
+            'Content-Type':
+              'application/json',
           },
           body: JSON.stringify({
             type: 'position',
-            positionId: position.id,
+            positionId:
+              position.id,
             email:
-              position.email?.trim() || null,
+              position.email?.trim() ||
+              null,
             permissions:
               position.permissions,
           }),
         }
       );
 
-      const data = await response.json();
+      const data =
+        await response.json();
 
       if (!response.ok) {
         throw new Error(
@@ -178,6 +206,63 @@ export default function MembresBureauPage() {
     }
   }
 
+  async function invitePosition(
+    position: Position
+  ) {
+    if (!position.email?.trim()) {
+      setError(
+        'Renseigne d’abord une adresse e-mail pour ce poste.'
+      );
+      setMessage('');
+      return;
+    }
+
+    setInvitingId(position.id);
+    setError('');
+    setMessage('');
+
+    try {
+      const response = await fetch(
+        '/api/configuration/membres-bureau',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type':
+              'application/json',
+          },
+          body: JSON.stringify({
+            positionId:
+              position.id,
+          }),
+        }
+      );
+
+      const data =
+        await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data?.error ||
+            'Impossible d’envoyer l’invitation.'
+        );
+      }
+
+      setMessage(
+        `Invitation envoyée à ${position.email}.`
+      );
+
+      await load();
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'Impossible d’envoyer l’invitation.'
+      );
+    } finally {
+      setInvitingId(null);
+    }
+  }
+
   async function saveSuperAdmin() {
     setSavingSuperAdmin(true);
     setError('');
@@ -189,17 +274,20 @@ export default function MembresBureauPage() {
         {
           method: 'PUT',
           headers: {
-            'Content-Type': 'application/json',
+            'Content-Type':
+              'application/json',
           },
           body: JSON.stringify({
             type: 'super-admin',
             email:
-              superAdminEmail.trim() || null,
+              superAdminEmail.trim() ||
+              null,
           }),
         }
       );
 
-      const data = await response.json();
+      const data =
+        await response.json();
 
       if (!response.ok) {
         throw new Error(
@@ -232,7 +320,11 @@ export default function MembresBureauPage() {
             <div className="eyebrow">
               Configuration · Membres du bureau
             </div>
-            <h1>Membres du bureau</h1>
+
+            <h1>
+              Membres du bureau
+            </h1>
+
             <div className="kicker">
               Chargement de la configuration…
             </div>
@@ -259,7 +351,6 @@ export default function MembresBureauPage() {
           <h1>
             Membres du bureau
           </h1>
-
         </div>
 
         <div className="topbar-right">
@@ -276,7 +367,9 @@ export default function MembresBureauPage() {
       {(error || message) && (
         <div
           className={`notice ${
-            error ? 'notice-error' : ''
+            error
+              ? 'notice-error'
+              : ''
           }`}
           style={{
             marginBottom: 18,
@@ -307,7 +400,6 @@ export default function MembresBureauPage() {
               />
               Compte SUPER ADMIN
             </h2>
-
           </div>
         </div>
 
@@ -329,16 +421,18 @@ export default function MembresBureauPage() {
               }
               placeholder="adresse de récupération de l’association"
             />
-
           </div>
 
           <button
             type="button"
             className="btn btn-primary"
             onClick={saveSuperAdmin}
-            disabled={savingSuperAdmin}
+            disabled={
+              savingSuperAdmin
+            }
           >
             <Save size={14} />
+
             {savingSuperAdmin
               ? 'Enregistrement…'
               : 'Enregistrer'}
@@ -354,130 +448,184 @@ export default function MembresBureauPage() {
         </div>
 
         <div className="bureau-grid">
-          {positions.map((position) => (
-            <article
-              className="card section-card bureau-position-card"
-              key={position.id}
-            >
-              <div className="bureau-position-head">
-                <div>
-                  <div className="stat-label">
-                    Poste
-                  </div>
-
-                  <h3 className="bureau-position-name">
-                    {position.name}
-                  </h3>
-                </div>
-
-                <div className="bureau-position-icon">
-                  <UserRoundCog size={18} />
-                </div>
-              </div>
-
-              <div className="bureau-field">
-                <label
-                  htmlFor={`email-${position.id}`}
-                >
-                  Titulaire / adresse e-mail
-                </label>
-
-                <input
-                  id={`email-${position.id}`}
-                  className="input"
-                  type="email"
-                  value={position.email || ''}
-                  onChange={(event) =>
-                    updatePositionEmail(
-                      position.id,
-                      event.target.value
-                    )
-                  }
-                  placeholder="adresse e-mail"
-                />
-
-              </div>
-
-              <div className="bureau-permissions">
-                <div className="bureau-permissions-head">
+          {positions.map(
+            (position) => (
+              <article
+                className="card section-card bureau-position-card"
+                key={position.id}
+              >
+                <div className="bureau-position-head">
                   <div>
-                    <strong>
-                      Autorisations
-                    </strong>
+                    <div className="stat-label">
+                      Poste
+                    </div>
 
-                    <span>
-                      {position.permissions.length}{' '}
-                      sélectionnée
-                      {position.permissions.length > 1
-                        ? 's'
-                        : ''}
-                    </span>
+                    <h3 className="bureau-position-name">
+                      {position.name}
+                    </h3>
+                  </div>
+
+                  <div className="bureau-position-icon">
+                    <UserRoundCog
+                      size={18}
+                    />
                   </div>
                 </div>
 
-                <div className="bureau-permission-list">
-                  {permissions.map((permission) => {
-                    const checked =
-                      position.permissions.includes(
-                        permission.code
-                      );
+                <div className="bureau-field">
+                  <label
+                    htmlFor={`email-${position.id}`}
+                  >
+                    Titulaire / adresse e-mail
+                  </label>
 
-                    return (
-                      <label
-                        className={`bureau-permission ${
-                          checked
-                            ? 'bureau-permission-active'
-                            : ''
-                        }`}
-                        key={permission.id}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          onChange={() =>
-                            togglePermission(
-                              position.id,
-                              permission.code
-                            )
-                          }
-                        />
-
-                        <span>
-                          {permission.label}
-                        </span>
-                      </label>
-                    );
-                  })}
+                  <input
+                    id={`email-${position.id}`}
+                    className="input"
+                    type="email"
+                    value={
+                      position.email ||
+                      ''
+                    }
+                    onChange={(event) =>
+                      updatePositionEmail(
+                        position.id,
+                        event.target.value
+                      )
+                    }
+                    placeholder="adresse e-mail"
+                  />
                 </div>
 
-              </div>
+                <div className="bureau-permissions">
+                  <div className="bureau-permissions-head">
+                    <div>
+                      <strong>
+                        Autorisations
+                      </strong>
 
-              <div className="bureau-position-footer">
-                <span className="bureau-position-status">
-                  {position.email
-                    ? 'Titulaire renseigné'
-                    : 'Aucun titulaire renseigné'}
-                </span>
+                      <span>
+                        {
+                          position
+                            .permissions
+                            .length
+                        }{' '}
+                        sélectionnée
+                        {position.permissions
+                          .length > 1
+                          ? 's'
+                          : ''}
+                      </span>
+                    </div>
+                  </div>
 
-                <button
-                  type="button"
-                  className="btn btn-primary"
-                  onClick={() =>
-                    savePosition(position)
-                  }
-                  disabled={
-                    savingId === position.id
-                  }
-                >
-                  <Save size={14} />
+                  <div className="bureau-permission-list">
+                    {permissions.map(
+                      (
+                        permission
+                      ) => {
+                        const checked =
+                          position.permissions.includes(
+                            permission.code
+                          );
 
-                  {savingId === position.id
-                    ? 'Enregistrement…'
-                    : 'Enregistrer'}
-                </button>
-              </div>
-            </article>
-          ))}
+                        return (
+                          <label
+                            className={`bureau-permission ${
+                              checked
+                                ? 'bureau-permission-active'
+                                : ''
+                            }`}
+                            key={
+                              permission.id
+                            }
+                          >
+                            <input
+                              type="checkbox"
+                              checked={
+                                checked
+                              }
+                              onChange={() =>
+                                togglePermission(
+                                  position.id,
+                                  permission.code
+                                )
+                              }
+                            />
+
+                            <span>
+                              {
+                                permission.label
+                              }
+                            </span>
+                          </label>
+                        );
+                      }
+                    )}
+                  </div>
+                </div>
+
+                <div className="bureau-position-footer">
+                  <span className="bureau-position-status">
+                    {position.email
+                      ? 'Titulaire renseigné'
+                      : 'Aucun titulaire renseigné'}
+                  </span>
+
+                  <div className="bureau-position-actions">
+                    <button
+                      type="button"
+                      className="btn"
+                      onClick={() =>
+                        invitePosition(
+                          position
+                        )
+                      }
+                      disabled={
+                        !position.email ||
+                        savingId ===
+                          position.id ||
+                        invitingId ===
+                          position.id
+                      }
+                    >
+                      <Mail
+                        size={14}
+                      />
+
+                      {invitingId ===
+                      position.id
+                        ? 'Envoi…'
+                        : 'Inviter'}
+                    </button>
+
+                    <button
+                      type="button"
+                      className="btn btn-primary"
+                      onClick={() =>
+                        savePosition(
+                          position
+                        )
+                      }
+                      disabled={
+                        savingId ===
+                        position.id
+                      }
+                    >
+                      <Save
+                        size={14}
+                      />
+
+                      {savingId ===
+                      position.id
+                        ? 'Enregistrement…'
+                        : 'Enregistrer'}
+                    </button>
+                  </div>
+                </div>
+              </article>
+            )
+          )}
         </div>
       </section>
 
@@ -496,7 +644,8 @@ export default function MembresBureauPage() {
 
         .bureau-super-admin-form {
           display: grid;
-          grid-template-columns: minmax(0, 1fr) auto;
+          grid-template-columns:
+            minmax(0, 1fr) auto;
           align-items: end;
           gap: 16px;
           margin-top: 20px;
@@ -511,12 +660,6 @@ export default function MembresBureauPage() {
         .bureau-field label {
           font-size: 12px;
           font-weight: 700;
-        }
-
-        .bureau-field small {
-          color: #64748b;
-          font-size: 11px;
-          line-height: 1.4;
         }
 
         .bureau-positions {
@@ -626,7 +769,6 @@ export default function MembresBureauPage() {
           flex-shrink: 0;
         }
 
-
         .bureau-position-footer {
           margin-top: 20px;
           padding-top: 16px;
@@ -635,6 +777,14 @@ export default function MembresBureauPage() {
           align-items: center;
           justify-content: space-between;
           gap: 12px;
+        }
+
+        .bureau-position-actions {
+          display: flex;
+          align-items: center;
+          justify-content: flex-end;
+          gap: 8px;
+          flex-wrap: wrap;
         }
 
         .bureau-position-status {
@@ -665,7 +815,14 @@ export default function MembresBureauPage() {
             align-items: stretch;
           }
 
-          .bureau-position-footer .btn {
+          .bureau-position-actions {
+            display: grid;
+            grid-template-columns:
+              repeat(2, minmax(0, 1fr));
+            width: 100%;
+          }
+
+          .bureau-position-actions .btn {
             width: 100%;
             justify-content: center;
           }
