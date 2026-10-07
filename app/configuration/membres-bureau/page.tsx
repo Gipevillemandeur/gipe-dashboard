@@ -260,9 +260,6 @@ export default function MembresBureauPage() {
             Membres du bureau
           </h1>
 
-          <div className="kicker">
-            Les droits sont attachés aux postes, pas aux personnes.
-          </div>
         </div>
 
         <div className="topbar-right">
@@ -311,11 +308,6 @@ export default function MembresBureauPage() {
               Compte SUPER ADMIN
             </h2>
 
-            <p className="section-sub">
-              Compte de récupération de l’association.
-              Il possède tous les droits et ne pourra pas
-              être supprimé depuis le tableau de bord.
-            </p>
           </div>
         </div>
 
@@ -338,10 +330,6 @@ export default function MembresBureauPage() {
               placeholder="adresse de récupération de l’association"
             />
 
-            <small>
-              L’invitation et la création du mot de passe
-              seront branchées dans l’étape suivante.
-            </small>
           </div>
 
           <button
@@ -365,9 +353,6 @@ export default function MembresBureauPage() {
               Postes du bureau
             </h2>
 
-            <p className="section-sub">
-              Les six postes permanents de l’association.
-            </p>
           </div>
         </div>
 
@@ -414,10 +399,6 @@ export default function MembresBureauPage() {
                   placeholder="adresse e-mail"
                 />
 
-                <small>
-                  Le poste reste en place même lorsque
-                  son titulaire change.
-                </small>
               </div>
 
               <div className="bureau-permissions">
@@ -473,10 +454,6 @@ export default function MembresBureauPage() {
                 </div>
 
                 {position.name === 'Président' && (
-                  <div className="bureau-president-note">
-                    Le Président doit disposer des mêmes
-                    droits fonctionnels que le SUPER ADMIN.
-                  </div>
                 )}
               </div>
 
@@ -654,16 +631,6 @@ export default function MembresBureauPage() {
           flex-shrink: 0;
         }
 
-        .bureau-president-note {
-          margin-top: 10px;
-          padding: 10px 12px;
-          border-radius: 9px;
-          background: #fff7ed;
-          border: 1px solid #fed7aa;
-          color: #9a3412;
-          font-size: 11px;
-          line-height: 1.45;
-        }
 
         .bureau-position-footer {
           margin-top: 20px;
