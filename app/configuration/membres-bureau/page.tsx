@@ -191,7 +191,7 @@ export default function MembresBureauPage() {
       }
 
       setMessage(
-        `Le poste « ${position.name} » a été enregistré.`
+        `Les autorisations du poste « ${position.name} » ont été enregistrées.`
       );
 
       await load();
@@ -222,6 +222,47 @@ export default function MembresBureauPage() {
     setMessage('');
 
     try {
+      /*
+       * Le bouton Inviter enregistre d'abord
+       * l'adresse et les autorisations actuelles.
+       */
+      const saveResponse = await fetch(
+        '/api/configuration/membres-bureau',
+        {
+          method: 'PUT',
+          headers: {
+            'Content-Type':
+              'application/json',
+          },
+          body: JSON.stringify({
+            type: 'position',
+            positionId:
+              position.id,
+            email:
+              position.email.trim(),
+            permissions:
+              position.permissions,
+          }),
+        }
+      );
+
+      const saveData =
+        await saveResponse.json();
+
+      if (!saveResponse.ok) {
+        throw new Error(
+          saveData?.error ||
+            'Impossible d’enregistrer le titulaire.'
+        );
+      }
+
+      /*
+       * Une fois les données enregistrées,
+       * on envoie l'accès.
+       *
+       * L'API décide automatiquement s'il s'agit
+       * d'un nouveau compte ou d'un compte existant.
+       */
       const response = await fetch(
         '/api/configuration/membres-bureau',
         {
@@ -243,12 +284,12 @@ export default function MembresBureauPage() {
       if (!response.ok) {
         throw new Error(
           data?.error ||
-            'Impossible d’envoyer l’invitation.'
+            'Impossible d’envoyer l’accès.'
         );
       }
 
       setMessage(
-        `Invitation envoyée à ${position.email}.`
+        `Accès envoyé à ${position.email}.`
       );
 
       await load();
@@ -256,7 +297,7 @@ export default function MembresBureauPage() {
       setError(
         err instanceof Error
           ? err.message
-          : 'Impossible d’envoyer l’invitation.'
+          : 'Impossible d’envoyer l’accès.'
       );
     } finally {
       setInvitingId(null);
@@ -497,6 +538,28 @@ export default function MembresBureauPage() {
                   />
                 </div>
 
+                <button
+                  type="button"
+                  className="btn bureau-invite-button"
+                  onClick={() =>
+                    invitePosition(
+                      position
+                    )
+                  }
+                  disabled={
+                    !position.email?.trim() ||
+                    invitingId ===
+                      position.id
+                  }
+                >
+                  <Mail size={14} />
+
+                  {invitingId ===
+                  position.id
+                    ? 'Envoi…'
+                    : 'Inviter / Envoyer l’accès'}
+                </button>
+
                 <div className="bureau-permissions">
                   <div className="bureau-permissions-head">
                     <div>
@@ -572,56 +635,30 @@ export default function MembresBureauPage() {
                       : 'Aucun titulaire renseigné'}
                   </span>
 
-                  <div className="bureau-position-actions">
-                    <button
-                      type="button"
-                      className="btn"
-                      onClick={() =>
-                        invitePosition(
-                          position
-                        )
-                      }
-                      disabled={
-                        !position.email ||
-                        savingId ===
-                          position.id ||
-                        invitingId ===
-                          position.id
-                      }
-                    >
-                      <Mail
-                        size={14}
-                      />
-
-                      {invitingId ===
-                      position.id
-                        ? 'Envoi…'
-                        : 'Inviter'}
-                    </button>
-
-                    <button
-                      type="button"
-                      className="btn btn-primary"
-                      onClick={() =>
-                        savePosition(
-                          position
-                        )
-                      }
-                      disabled={
-                        savingId ===
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={() =>
+                      savePosition(
+                        position
+                      )
+                    }
+                    disabled={
+                      savingId ===
+                      position.id ||
+                      invitingId ===
                         position.id
-                      }
-                    >
-                      <Save
-                        size={14}
-                      />
+                    }
+                  >
+                    <Save
+                      size={14}
+                    />
 
-                      {savingId ===
-                      position.id
-                        ? 'Enregistrement…'
-                        : 'Enregistrer'}
-                    </button>
-                  </div>
+                    {savingId ===
+                    position.id
+                      ? 'Enregistrement…'
+                      : 'Enregistrer'}
+                  </button>
                 </div>
               </article>
             )
@@ -714,6 +751,13 @@ export default function MembresBureauPage() {
           flex-shrink: 0;
         }
 
+        .bureau-invite-button {
+          width: 100%;
+          justify-content: center;
+          margin-top: 14px;
+          box-sizing: border-box;
+        }
+
         .bureau-permissions {
           margin-top: 20px;
           padding-top: 18px;
@@ -775,21 +819,14 @@ export default function MembresBureauPage() {
           border-top: 1px solid #eee2d7;
           display: flex;
           align-items: center;
-          justify-content: space-between;
-          gap: 12px;
-        }
-
-        .bureau-position-actions {
-          display: flex;
-          align-items: center;
           justify-content: flex-end;
-          gap: 8px;
-          flex-wrap: wrap;
+          gap: 12px;
         }
 
         .bureau-position-status {
           color: #64748b;
           font-size: 11px;
+          margin-right: auto;
         }
 
         @media (max-width: 800px) {
@@ -815,14 +852,7 @@ export default function MembresBureauPage() {
             align-items: stretch;
           }
 
-          .bureau-position-actions {
-            display: grid;
-            grid-template-columns:
-              repeat(2, minmax(0, 1fr));
-            width: 100%;
-          }
-
-          .bureau-position-actions .btn {
+          .bureau-position-footer .btn {
             width: 100%;
             justify-content: center;
           }
