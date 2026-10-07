@@ -146,8 +146,8 @@ export default function Sidebar() {
             src="/images/Logo GIPE.png"
             alt="Logo GIPE Villemandeur"
             style={{
-              width: '82px',
-              height: '82px',
+              width: '95px',
+              height: '95px',
               objectFit: 'contain',
               display: 'block',
             }}
