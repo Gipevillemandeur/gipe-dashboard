@@ -35,44 +35,28 @@ function isFolder(file: DriveFile) {
   return file.mimeType === FOLDER_MIME;
 }
 
-function formatDate(
-  value?: string
-) {
+function formatDate(value?: string) {
   if (!value) return '—';
 
-  const date =
-    new Date(value);
+  const date = new Date(value);
 
-  if (
-    Number.isNaN(
-      date.getTime()
-    )
-  ) {
+  if (Number.isNaN(date.getTime())) {
     return '—';
   }
 
-  return date.toLocaleDateString(
-    'fr-FR',
-    {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-    }
-  );
+  return date.toLocaleDateString('fr-FR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  });
 }
 
-function formatSize(
-  value?: string
-) {
+function formatSize(value?: string) {
   if (!value) return '';
 
-  const bytes =
-    Number(value);
+  const bytes = Number(value);
 
-  if (
-    Number.isNaN(bytes) ||
-    bytes < 0
-  ) {
+  if (Number.isNaN(bytes) || bytes < 0) {
     return '';
   }
 
@@ -81,19 +65,11 @@ function formatSize(
   }
 
   if (bytes < 1024 * 1024) {
-    return `${Math.round(
-      bytes / 1024
-    )} Ko`;
+    return `${Math.round(bytes / 1024)} Ko`;
   }
 
-  if (
-    bytes <
-    1024 * 1024 * 1024
-  ) {
-    return `${(
-      bytes /
-      (1024 * 1024)
-    ).toFixed(1)} Mo`;
+  if (bytes < 1024 * 1024 * 1024) {
+    return `${(bytes / (1024 * 1024)).toFixed(1)} Mo`;
   }
 
   return `${(
@@ -102,94 +78,53 @@ function formatSize(
   ).toFixed(1)} Go`;
 }
 
-function getFileIcon(
-  file: DriveFile
-) {
+function getFileIcon(file: DriveFile) {
   if (isFolder(file)) {
-    return (
-      <Folder
-        size={23}
-      />
-    );
+    return <Folder size={23} />;
   }
 
   if (
-    file.mimeType ===
-      'application/pdf' ||
-    file.mimeType.includes(
-      'document'
-    )
+    file.mimeType === 'application/pdf' ||
+    file.mimeType.includes('document')
   ) {
-    return (
-      <FileText
-        size={23}
-      />
-    );
+    return <FileText size={23} />;
   }
 
-  return (
-    <File
-      size={23}
-    />
-  );
+  return <File size={23} />;
 }
 
 export default function DocumentsPage() {
-  const [files, setFiles] =
-    useState<DriveFile[]>(
-      []
-    );
-
-  const [loading, setLoading] =
-    useState(true);
-
-  const [error, setError] =
+  const [files, setFiles] = useState<DriveFile[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [search, setSearch] = useState('');
+  const [connectionMessage, setConnectionMessage] =
     useState('');
 
-  const [search, setSearch] =
-    useState('');
+  const [currentFolderId, setCurrentFolderId] =
+    useState('root');
 
-  const [
-    connectionMessage,
-    setConnectionMessage,
-  ] = useState('');
+  const [currentFolderName, setCurrentFolderName] =
+    useState('Mon Drive');
 
-  const [
-    currentFolderId,
-    setCurrentFolderId,
-  ] = useState('root');
+  const [folderHistory, setFolderHistory] =
+    useState<FolderHistoryItem[]>([]);
 
-  const [
-    currentFolderName,
-    setCurrentFolderName,
-  ] = useState('Mon Drive');
-
-  const [
-    folderHistory,
-    setFolderHistory,
-  ] = useState<
-    FolderHistoryItem[]
-  >([]);
-
-  async function loadFiles(
-    folderId: string
-  ) {
+  async function loadFiles(folderId: string) {
     setLoading(true);
     setError('');
 
     try {
-      const response =
-        await fetch(
-          `/api/google/drive/files?folderId=${encodeURIComponent(
-            folderId
-          )}`,
-          {
-            cache: 'no-store',
-          }
-        );
+      const response = await fetch(
+        `/api/google/drive/files?folderId=${encodeURIComponent(
+          folderId
+        )}`,
+        {
+          cache: 'no-store',
+        }
+      );
 
-      const data =
-        await response.json();
+      const data = await response.json();
 
       if (!response.ok) {
         throw new Error(
@@ -198,9 +133,7 @@ export default function DocumentsPage() {
         );
       }
 
-      setFiles(
-        data.files || []
-      );
+      setFiles(data.files || []);
     } catch (err) {
       setError(
         err instanceof Error
@@ -213,23 +146,17 @@ export default function DocumentsPage() {
   }
 
   useEffect(() => {
-    const params =
-      new URLSearchParams(
-        window.location.search
-      );
+    const params = new URLSearchParams(
+      window.location.search
+    );
 
-    if (
-      params.get('google') ===
-      'connected'
-    ) {
+    if (params.get('google') === 'connected') {
       setConnectionMessage(
         'La connexion Google Drive est bien enregistrée.'
       );
     }
 
-    if (
-      params.get('google')
-    ) {
+    if (params.get('google')) {
       window.history.replaceState(
         {},
         '',
@@ -240,109 +167,63 @@ export default function DocumentsPage() {
     void loadFiles('root');
   }, []);
 
-  const filteredFiles =
-    useMemo(() => {
-      const value =
-        search
-          .trim()
-          .toLowerCase();
+  const filteredFiles = useMemo(() => {
+    const value = search.trim().toLowerCase();
 
-      if (!value) {
-        return files;
-      }
+    if (!value) {
+      return files;
+    }
 
-      return files.filter(
-        (file) =>
-          file.name
-            .toLowerCase()
-            .includes(value)
-      );
-    }, [
-      files,
-      search,
+    return files.filter((file) =>
+      file.name.toLowerCase().includes(value)
+    );
+  }, [files, search]);
+
+  const folders = filteredFiles.filter(isFolder);
+
+  const regularFiles = filteredFiles.filter(
+    (file) => !isFolder(file)
+  );
+
+  function openFolder(folder: DriveFile) {
+    setFolderHistory((previous) => [
+      ...previous,
+      {
+        id: currentFolderId,
+        name: currentFolderName,
+      },
     ]);
 
-  const folders =
-    filteredFiles.filter(
-      isFolder
-    );
-
-  const regularFiles =
-    filteredFiles.filter(
-      (file) =>
-        !isFolder(file)
-    );
-
-  function openFolder(
-    folder: DriveFile
-  ) {
-    setFolderHistory(
-      (previous) => [
-        ...previous,
-        {
-          id: currentFolderId,
-          name: currentFolderName,
-        },
-      ]
-    );
-
-    setCurrentFolderId(
-      folder.id
-    );
-
-    setCurrentFolderName(
-      folder.name
-    );
-
+    setCurrentFolderId(folder.id);
+    setCurrentFolderName(folder.name);
     setSearch('');
 
-    void loadFiles(
-      folder.id
-    );
+    void loadFiles(folder.id);
   }
 
   function goBack() {
-    if (
-      folderHistory.length ===
-      0
-    ) {
+    if (folderHistory.length === 0) {
       return;
     }
 
     const previousFolder =
-      folderHistory[
-        folderHistory.length - 1
-      ];
+      folderHistory[folderHistory.length - 1];
 
-    setFolderHistory(
-      (previous) =>
-        previous.slice(
-          0,
-          -1
-        )
+    setFolderHistory((previous) =>
+      previous.slice(0, -1)
     );
 
-    setCurrentFolderId(
-      previousFolder.id
-    );
-
-    setCurrentFolderName(
-      previousFolder.name
-    );
-
+    setCurrentFolderId(previousFolder.id);
+    setCurrentFolderName(previousFolder.name);
     setSearch('');
 
-    void loadFiles(
-      previousFolder.id
-    );
+    void loadFiles(previousFolder.id);
   }
 
   function goToRoot() {
     setFolderHistory([]);
     setCurrentFolderId('root');
-    setCurrentFolderName(
-      'Mon Drive'
-    );
+    setCurrentFolderName('Mon Drive');
     setSearch('');
 
     void loadFiles('root');
@@ -356,13 +237,10 @@ export default function DocumentsPage() {
             Gestion de l’association
           </div>
 
-          <h1>
-            Documents
-          </h1>
+          <h1>Documents</h1>
 
           <div className="kicker">
-            Gestion du Google Drive
-            de l’association.
+            Gestion du Google Drive de l’association.
           </div>
         </div>
 
@@ -371,9 +249,7 @@ export default function DocumentsPage() {
             className="btn"
             type="button"
             onClick={() =>
-              void loadFiles(
-                currentFolderId
-              )
+              void loadFiles(currentFolderId)
             }
             disabled={loading}
           >
@@ -383,9 +259,7 @@ export default function DocumentsPage() {
                 className="documents-spin"
               />
             ) : (
-              <RefreshCw
-                size={15}
-              />
+              <RefreshCw size={15} />
             )}
 
             Actualiser
@@ -401,13 +275,9 @@ export default function DocumentsPage() {
 
       {error && (
         <div className="notice notice-error documents-notice documents-error">
-          <AlertCircle
-            size={17}
-          />
+          <AlertCircle size={17} />
 
-          <span>
-            {error}
-          </span>
+          <span>{error}</span>
         </div>
       )}
 
@@ -415,9 +285,7 @@ export default function DocumentsPage() {
         <div className="documents-drive-header">
           <div className="documents-drive-title">
             <div className="documents-drive-icon">
-              <Cloud
-                size={27}
-              />
+              <Cloud size={27} />
             </div>
 
             <div>
@@ -425,13 +293,10 @@ export default function DocumentsPage() {
                 Google Drive
               </div>
 
-              <h2>
-                {currentFolderName}
-              </h2>
+              <h2>{currentFolderName}</h2>
 
               <p>
-                {currentFolderId ===
-                'root'
+                {currentFolderId === 'root'
                   ? 'Contenu à la racine du Drive de l’association.'
                   : 'Contenu de ce dossier.'}
               </p>
@@ -445,9 +310,7 @@ export default function DocumentsPage() {
               placeholder="Rechercher..."
               value={search}
               onChange={(event) =>
-                setSearch(
-                  event.target.value
-                )
+                setSearch(event.target.value)
               }
             />
           </div>
@@ -457,65 +320,40 @@ export default function DocumentsPage() {
           <button
             className="documents-root-button"
             type="button"
-            onClick={
-              goToRoot
-            }
+            onClick={goToRoot}
           >
-            <Cloud
-              size={16}
-            />
-
+            <Cloud size={16} />
             Mon Drive
           </button>
 
-          {folderHistory.map(
-            (
-              item,
-              index
-            ) => (
-              <div
-                className="documents-navigation-item"
-                key={`${item.id}-${index}`}
-              >
-                <ChevronRight
-                  size={15}
-                />
+          {folderHistory.map((item, index) => (
+            <div
+              className="documents-navigation-item"
+              key={`${item.id}-${index}`}
+            >
+              <ChevronRight size={15} />
 
-                <span>
-                  {item.name}
-                </span>
-              </div>
-            )
-          )}
+              <span>{item.name}</span>
+            </div>
+          ))}
 
-          {currentFolderId !==
-            'root' && (
+          {currentFolderId !== 'root' && (
             <div className="documents-navigation-current">
-              <ChevronRight
-                size={15}
-              />
+              <ChevronRight size={15} />
 
-              <span>
-                {currentFolderName}
-              </span>
+              <span>{currentFolderName}</span>
             </div>
           )}
         </div>
 
-        {currentFolderId !==
-          'root' && (
+        {currentFolderId !== 'root' && (
           <div className="documents-back-bar">
             <button
               className="btn"
               type="button"
-              onClick={
-                goBack
-              }
+              onClick={goBack}
             >
-              <ArrowLeft
-                size={15}
-              />
-
+              <ArrowLeft size={15} />
               Retour
             </button>
           </div>
@@ -529,18 +367,14 @@ export default function DocumentsPage() {
             />
 
             <span>
-              Chargement du
-              Google Drive…
+              Chargement du Google Drive…
             </span>
           </div>
         ) : (
           <>
-            {filteredFiles.length ===
-            0 ? (
+            {filteredFiles.length === 0 ? (
               <div className="documents-empty">
-                <FolderOpen
-                  size={40}
-                />
+                <FolderOpen size={40} />
 
                 <strong>
                   {search
@@ -556,108 +390,78 @@ export default function DocumentsPage() {
               </div>
             ) : (
               <div className="documents-list">
-                {folders.map(
-                  (file) => (
-                    <button
-                      className="documents-row documents-folder-row"
-                      type="button"
-                      key={
-                        file.id
-                      }
-                      onClick={() =>
-                        openFolder(
-                          file
-                        )
-                      }
-                    >
-                      <div className="documents-row-icon documents-folder-icon">
-                        {getFileIcon(
-                          file
-                        )}
-                      </div>
-
-                      <div className="documents-row-main">
-                        <strong>
-                          {file.name}
-                        </strong>
-
-                        <span>
-                          Dossier
-                        </span>
-                      </div>
-
-                      <div className="documents-row-date">
-                        —
-                      </div>
-
-                      <div className="documents-row-action">
-                        <ChevronRight
-                          size={18}
-                        />
-                      </div>
-                    </button>
-                  )
-                )}
-
-                {regularFiles.map(
-                  (file) => (
-                    <div
-                      className="documents-row"
-                      key={
-                        file.id
-                      }
-                    >
-                      <div className="documents-row-icon">
-                        {getFileIcon(
-                          file
-                        )}
-                      </div>
-
-                      <div className="documents-row-main">
-                        <strong>
-                          {file.name}
-                        </strong>
-
-                        <span>
-                          {file.mimeType}
-                          {formatSize(
-                            file.size
-                          )
-                            ? ` · ${formatSize(
-                                file.size
-                              )}`
-                            : ''}
-                        </span>
-                      </div>
-
-                      <div className="documents-row-date">
-                        {formatDate(
-                          file.modifiedTime
-                        )}
-                      </div>
-
-                      <div className="documents-row-action">
-                        {file.webViewLink ? (
-                          <a
-                            href={
-                              file.webViewLink
-                            }
-                            target="_blank"
-                            rel="noreferrer"
-                            className="btn documents-open-button"
-                            onClick={(
-                              event
-                            ) =>
-                              event.stopPropagation()
-                            }
-                          >
-                            Ouvrir
-                          </a>
-                        ) : null}
-                      </div>
+                {folders.map((file) => (
+                  <button
+                    className="documents-row documents-folder-row"
+                    type="button"
+                    key={file.id}
+                    onClick={() =>
+                      openFolder(file)
+                    }
+                  >
+                    <div className="documents-row-icon documents-folder-icon">
+                      {getFileIcon(file)}
                     </div>
-                  )
-                )}
+
+                    <div className="documents-row-main">
+                      <strong>{file.name}</strong>
+
+                      <span>Dossier</span>
+                    </div>
+
+                    <div className="documents-row-date">
+                      —
+                    </div>
+
+                    <div className="documents-row-action">
+                      <ChevronRight size={18} />
+                    </div>
+                  </button>
+                ))}
+
+                {regularFiles.map((file) => (
+                  <div
+                    className="documents-row documents-file-row"
+                    key={file.id}
+                  >
+                    <div className="documents-row-icon">
+                      {getFileIcon(file)}
+                    </div>
+
+                    <div className="documents-row-main">
+                      <strong>{file.name}</strong>
+
+                      <span>
+                        {file.mimeType}
+
+                        {formatSize(file.size)
+                          ? ` · ${formatSize(
+                              file.size
+                            )}`
+                          : ''}
+                      </span>
+                    </div>
+
+                    <div className="documents-row-date">
+                      {formatDate(
+                        file.modifiedTime
+                      )}
+                    </div>
+
+                    <div className="documents-row-action">
+                      {file.webViewLink ? (
+                        <a
+                          href={file.webViewLink}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="documents-open-button"
+                        >
+                          Ouvrir
+                        </a>
+                      ) : null}
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
           </>
@@ -813,11 +617,8 @@ export default function DocumentsPage() {
           font-family: inherit;
         }
 
-        .documents-folder-row:hover {
-          background: #fffaf3;
-        }
-
-        .documents-row:not(.documents-folder-row):hover {
+        .documents-folder-row:hover,
+        .documents-file-row:hover {
           background: #fffaf3;
         }
 
@@ -867,12 +668,36 @@ export default function DocumentsPage() {
         .documents-row-action {
           display: flex;
           justify-content: flex-end;
+          align-items: center;
         }
 
         .documents-open-button {
-          min-width: 78px;
-          min-height: 36px;
+          display: inline-flex;
+          align-items: center;
           justify-content: center;
+          min-width: 78px;
+          height: 36px;
+          padding: 0 15px;
+          box-sizing: border-box;
+          border-radius: 8px;
+          border: 1px solid #8f211c;
+          background: #8f211c;
+          color: #ffffff;
+          font-size: 13px;
+          font-weight: 700;
+          line-height: 1;
+          text-decoration: none;
+          transition:
+            background 0.15s ease,
+            border-color 0.15s ease,
+            transform 0.15s ease;
+        }
+
+        .documents-open-button:hover {
+          background: #7a1c18;
+          border-color: #7a1c18;
+          color: #ffffff;
+          transform: translateY(-1px);
         }
 
         .documents-loading {
@@ -917,6 +742,13 @@ export default function DocumentsPage() {
           }
         }
 
+        @media (min-width: 701px) {
+          .documents-drive-card {
+            margin-left: 12px;
+            margin-right: 12px;
+          }
+        }
+
         @media (max-width: 700px) {
           .documents-drive-header {
             flex-direction: column;
@@ -933,27 +765,53 @@ export default function DocumentsPage() {
           }
 
           .documents-row {
-            grid-template-columns: 42px minmax(0, 1fr);
-            gap: 10px;
-            padding: 13px 4px;
+            grid-template-columns: 42px minmax(0, 1fr) auto;
+            grid-template-rows: auto auto;
+            column-gap: 10px;
+            row-gap: 3px;
+            padding: 13px 8px;
+          }
+
+          .documents-row-icon {
+            grid-column: 1;
+            grid-row: 1 / span 2;
+          }
+
+          .documents-row-main {
+            grid-column: 2;
+            grid-row: 1;
+            min-width: 0;
           }
 
           .documents-row-date {
             grid-column: 2;
             grid-row: 2;
             text-align: left;
-            margin-top: -7px;
+            margin: 0;
+            font-size: 12px;
           }
 
           .documents-row-action {
-            grid-column: 2;
-            grid-row: 3;
-            justify-content: flex-start;
+            grid-column: 3;
+            grid-row: 1 / span 2;
+            justify-content: flex-end;
+            align-items: center;
+          }
+
+          .documents-file-row .documents-row-action {
+            padding-left: 4px;
           }
 
           .documents-open-button {
-            width: 100%;
-            justify-content: center;
+            min-width: 72px;
+            width: auto;
+            height: 36px;
+            padding: 0 12px;
+            font-size: 13px;
+          }
+
+          .documents-folder-row .documents-row-action {
+            padding-left: 8px;
           }
 
           .documents-back-bar .btn {
