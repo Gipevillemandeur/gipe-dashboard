@@ -59,7 +59,9 @@ const items = [
 
 export default function Sidebar() {
   const pathname = usePathname();
-  const [mobileOpen, setMobileOpen] = useState(false);
+
+  const [mobileOpen, setMobileOpen] =
+    useState(false);
 
   useEffect(() => {
     setMobileOpen(false);
@@ -80,105 +82,137 @@ export default function Sidebar() {
 
   return (
     <>
-      {/* Bouton hamburger mobile */}
-      <button
-        type="button"
-        className="sidebar-mobile-toggle"
-        onClick={() => setMobileOpen(true)}
-        aria-label="Ouvrir le menu"
-      >
-        <Menu size={24} />
-      </button>
+      {/* Barre mobile */}
+      <header className="mobile-header">
+        <button
+          type="button"
+          className="mobile-menu-button"
+          onClick={() =>
+            setMobileOpen(true)
+          }
+          aria-label="Ouvrir le menu"
+        >
+          <Menu size={22} />
+        </button>
 
-      {/* Fond sombre mobile */}
+        <div className="mobile-brand">
+          <div className="mobile-brand-mark">
+            G
+          </div>
+
+          <div>
+            <strong>
+              GIPE Villemandeur
+            </strong>
+
+            <span>
+              Centre de gestion
+            </span>
+          </div>
+        </div>
+      </header>
+
+      {/* Fond derrière le menu */}
       {mobileOpen && (
         <button
           type="button"
-          className="sidebar-overlay"
-          onClick={() => setMobileOpen(false)}
+          className="mobile-overlay"
+          onClick={() =>
+            setMobileOpen(false)
+          }
           aria-label="Fermer le menu"
         />
       )}
 
+      {/* Menu */}
       <aside
         className={`sidebar ${
-          mobileOpen ? 'sidebar-mobile-open' : ''
+          mobileOpen
+            ? 'sidebar-mobile-open'
+            : ''
         }`}
       >
-        <div className="sidebar-header">
-          <div className="sidebar-brand">
-            <div className="sidebar-logo">G</div>
+        <div className="brand">
+          <div className="brand-mark">
+            G
+          </div>
 
-            <div>
-              <div className="sidebar-title">GIPE</div>
-              <div className="sidebar-subtitle">Villemandeur</div>
-            </div>
+          <div className="brand-text">
+            <strong>
+              GIPE Villemandeur
+            </strong>
+
+            <span>
+              Centre de gestion
+            </span>
           </div>
 
           <button
             type="button"
-            className="sidebar-mobile-close"
-            onClick={() => setMobileOpen(false)}
+            className="mobile-close-button"
+            onClick={() =>
+              setMobileOpen(false)
+            }
             aria-label="Fermer le menu"
           >
             <X size={22} />
           </button>
         </div>
 
-        <nav className="sidebar-nav">
+        <nav className="nav">
           {items.map((item) => {
             const Icon = item.icon;
 
-            const isActive =
-              item.href === '/'
-                ? pathname === '/'
-                : pathname === item.href ||
-                  pathname.startsWith(`${item.href}/`);
+            const active =
+              item.href !== '#' &&
+              (pathname === item.href ||
+                pathname.startsWith(
+                  `${item.href}/`
+                ));
 
             return (
               <Link
-                key={item.href}
+                className={
+                  active ? 'active' : ''
+                }
                 href={item.href}
-                className={`sidebar-link ${
-                  isActive ? 'sidebar-link-active' : ''
-                }`}
+                key={item.label}
               >
-                <Icon size={20} strokeWidth={2} />
-                <span>{item.label}</span>
+                <Icon size={18} />
+                {item.label}
               </Link>
             );
           })}
-        </nav>
 
-        <div className="sidebar-bottom">
+          <div className="nav-sep" />
+
           <Link
+            className={
+              pathname ===
+                '/configuration' ||
+              pathname.startsWith(
+                '/configuration/'
+              ) ||
+              pathname ===
+                '/import-college'
+                ? 'active'
+                : ''
+            }
             href="/configuration"
-            className={`sidebar-link ${
-              pathname === '/configuration' ||
-              pathname.startsWith('/configuration/')
-                ? 'sidebar-link-active'
-                : ''
-            }`}
           >
-            <Settings size={20} strokeWidth={2} />
-            <span>Configuration</span>
+            <Settings size={18} />
+            Configuration
           </Link>
 
-          <Link
-            href="/guide"
-            className={`sidebar-link ${
-              pathname === '/guide' ||
-              pathname.startsWith('/guide/')
-                ? 'sidebar-link-active'
-                : ''
-            }`}
-          >
-            <BookOpen size={20} strokeWidth={2} />
-            <span>Guide de passation</span>
+          <Link href="#">
+            <BookOpen size={18} />
+            Guide de passation
           </Link>
+
+          <div className="nav-sep" />
 
           <LogoutButton />
-        </div>
+        </nav>
       </aside>
     </>
   );
