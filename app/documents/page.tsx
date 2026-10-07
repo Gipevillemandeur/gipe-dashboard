@@ -16,7 +16,12 @@ import {
   Upload,
   X,
 } from 'lucide-react';
-import { ChangeEvent, useRef, useState } from 'react';
+import {
+  ChangeEvent,
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
 
 type DriveFile = {
   id: string;
@@ -33,7 +38,9 @@ function formatFileSize(size?: string) {
 
   const bytes = Number(size);
 
-  if (!Number.isFinite(bytes)) return '';
+  if (!Number.isFinite(bytes)) {
+    return '';
+  }
 
   if (bytes < 1024) {
     return `${bytes} o`;
@@ -72,7 +79,9 @@ export default function DocumentsPage() {
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
 
-  const [currentFolderId, setCurrentFolderId] = useState('root');
+  const [currentFolderId, setCurrentFolderId] =
+    useState('root');
+
   const [currentFolderName, setCurrentFolderName] =
     useState('Mon Drive');
 
@@ -82,17 +91,22 @@ export default function DocumentsPage() {
 
   const [showCreateFolder, setShowCreateFolder] =
     useState(false);
+
   const [newFolderName, setNewFolderName] =
     useState('');
+
   const [creatingFolder, setCreatingFolder] =
     useState(false);
+
   const [createFolderError, setCreateFolderError] =
     useState('');
 
   const [uploadingFile, setUploadingFile] =
     useState(false);
+
   const [uploadError, setUploadError] =
     useState('');
+
   const [uploadSuccess, setUploadSuccess] =
     useState('');
 
@@ -138,9 +152,16 @@ export default function DocumentsPage() {
     }
   }
 
-  function openFolder(
-    folder: DriveFile
-  ) {
+  /*
+   * Chargement initial du Google Drive.
+   * Cette partie est indispensable pour afficher
+   * le contenu dès l'ouverture de la page.
+   */
+  useEffect(() => {
+    loadFiles('root');
+  }, []);
+
+  function openFolder(folder: DriveFile) {
     setFolderHistory((previous) => [
       ...previous,
       {
@@ -263,13 +284,15 @@ export default function DocumentsPage() {
   function openFilePicker() {
     setUploadError('');
     setUploadSuccess('');
+
     fileInputRef.current?.click();
   }
 
   async function uploadFile(
     event: ChangeEvent<HTMLInputElement>
   ) {
-    const file = event.target.files?.[0];
+    const file =
+      event.target.files?.[0];
 
     event.target.value = '';
 
@@ -285,6 +308,7 @@ export default function DocumentsPage() {
       const formData = new FormData();
 
       formData.append('file', file);
+
       formData.append(
         'parentId',
         currentFolderId
@@ -354,11 +378,15 @@ export default function DocumentsPage() {
         <div className="documents-drive-header">
           <div className="documents-drive-title">
             <div className="documents-drive-icon">
-              <Cloud size={24} strokeWidth={2} />
+              <Cloud
+                size={24}
+                strokeWidth={2}
+              />
             </div>
 
             <div>
               <h1>Google Drive</h1>
+
               <p>
                 Gestion des fichiers et dossiers
                 de l’association
@@ -374,7 +402,10 @@ export default function DocumentsPage() {
               disabled={uploadingFile}
             >
               <Plus size={17} />
-              <span>Nouveau dossier</span>
+
+              <span>
+                Nouveau dossier
+              </span>
             </button>
 
             <button
@@ -412,7 +443,10 @@ export default function DocumentsPage() {
           {uploadSuccess && (
             <div className="documents-message documents-message-success">
               <Check size={18} />
-              <span>{uploadSuccess}</span>
+
+              <span>
+                {uploadSuccess}
+              </span>
 
               <button
                 type="button"
@@ -429,7 +463,10 @@ export default function DocumentsPage() {
           {uploadError && (
             <div className="documents-message documents-message-error">
               <AlertCircle size={18} />
-              <span>{uploadError}</span>
+
+              <span>
+                {uploadError}
+              </span>
 
               <button
                 type="button"
@@ -483,7 +520,9 @@ export default function DocumentsPage() {
                 type="search"
                 value={search}
                 onChange={(event) =>
-                  setSearch(event.target.value)
+                  setSearch(
+                    event.target.value
+                  )
                 }
                 placeholder="Rechercher dans ce dossier..."
               />
@@ -493,7 +532,9 @@ export default function DocumentsPage() {
               type="button"
               className="documents-refresh-button"
               onClick={() =>
-                loadFiles(currentFolderId)
+                loadFiles(
+                  currentFolderId
+                )
               }
               disabled={loading}
               title="Actualiser"
@@ -515,6 +556,7 @@ export default function DocumentsPage() {
                 size={30}
                 className="documents-spin"
               />
+
               <p>
                 Chargement du Google Drive...
               </p>
@@ -522,12 +564,15 @@ export default function DocumentsPage() {
           ) : error ? (
             <div className="documents-state documents-state-error">
               <AlertCircle size={30} />
+
               <p>{error}</p>
 
               <button
                 type="button"
                 onClick={() =>
-                  loadFiles(currentFolderId)
+                  loadFiles(
+                    currentFolderId
+                  )
                 }
               >
                 Réessayer
@@ -561,42 +606,47 @@ export default function DocumentsPage() {
                   </div>
 
                   <div className="documents-items">
-                    {folders.map((folder) => (
-                      <div
-                        key={folder.id}
-                        className="documents-item documents-folder-item"
-                      >
-                        <div className="documents-item-icon documents-folder-icon">
-                          <Folder
-                            size={21}
-                            strokeWidth={2}
-                          />
-                        </div>
-
-                        <div className="documents-item-info">
-                          <div className="documents-item-name">
-                            {folder.name}
-                          </div>
-
-                          <div className="documents-item-meta">
-                            Dossier
-                          </div>
-                        </div>
-
-                        <button
-                          type="button"
-                          className="documents-open-button"
-                          onClick={() =>
-                            openFolder(folder)
-                          }
+                    {folders.map(
+                      (folder) => (
+                        <div
+                          key={folder.id}
+                          className="documents-item documents-folder-item"
                         >
-                          Ouvrir
-                          <ChevronRight
-                            size={16}
-                          />
-                        </button>
-                      </div>
-                    ))}
+                          <div className="documents-item-icon documents-folder-icon">
+                            <Folder
+                              size={21}
+                              strokeWidth={2}
+                            />
+                          </div>
+
+                          <div className="documents-item-info">
+                            <div className="documents-item-name">
+                              {folder.name}
+                            </div>
+
+                            <div className="documents-item-meta">
+                              Dossier
+                            </div>
+                          </div>
+
+                          <button
+                            type="button"
+                            className="documents-open-button"
+                            onClick={() =>
+                              openFolder(
+                                folder
+                              )
+                            }
+                          >
+                            Ouvrir
+
+                            <ChevronRight
+                              size={16}
+                            />
+                          </button>
+                        </div>
+                      )
+                    )}
                   </div>
                 </div>
               )}
@@ -608,65 +658,68 @@ export default function DocumentsPage() {
                   </div>
 
                   <div className="documents-items">
-                    {regularFiles.map((file) => (
-                      <div
-                        key={file.id}
-                        className="documents-item"
-                      >
-                        <div className="documents-item-icon documents-file-icon">
-                          {file.mimeType.includes(
-                            'google-apps'
-                          ) ? (
-                            <FileText
-                              size={21}
-                              strokeWidth={2}
-                            />
-                          ) : (
-                            <File
-                              size={21}
-                              strokeWidth={2}
-                            />
+                    {regularFiles.map(
+                      (file) => (
+                        <div
+                          key={file.id}
+                          className="documents-item"
+                        >
+                          <div className="documents-item-icon documents-file-icon">
+                            {file.mimeType.includes(
+                              'google-apps'
+                            ) ? (
+                              <FileText
+                                size={21}
+                                strokeWidth={2}
+                              />
+                            ) : (
+                              <File
+                                size={21}
+                                strokeWidth={2}
+                              />
+                            )}
+                          </div>
+
+                          <div className="documents-item-info">
+                            <div className="documents-item-name">
+                              {file.name}
+                            </div>
+
+                            <div className="documents-item-meta">
+                              {formatFileSize(
+                                file.size
+                              )}
+
+                              {file.size &&
+                              file.modifiedTime
+                                ? ' • '
+                                : ''}
+
+                              {formatDate(
+                                file.modifiedTime
+                              )}
+                            </div>
+                          </div>
+
+                          {file.webViewLink && (
+                            <a
+                              href={
+                                file.webViewLink
+                              }
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="documents-open-button"
+                            >
+                              Ouvrir
+
+                              <ChevronRight
+                                size={16}
+                              />
+                            </a>
                           )}
                         </div>
-
-                        <div className="documents-item-info">
-                          <div className="documents-item-name">
-                            {file.name}
-                          </div>
-
-                          <div className="documents-item-meta">
-                            {formatFileSize(
-                              file.size
-                            )}
-
-                            {file.size &&
-                            file.modifiedTime
-                              ? ' • '
-                              : ''}
-
-                            {formatDate(
-                              file.modifiedTime
-                            )}
-                          </div>
-                        </div>
-
-                        {file.webViewLink && (
-                          <a
-                            href={
-                              file.webViewLink
-                            }
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="documents-open-button"
-                          >
-                            Ouvrir
-                            <ChevronRight
-                              size={16}
-                            />
-                          </a>
-                        )}
-                      </div>
-                    ))}
+                      )
+                    )}
                   </div>
                 </div>
               )}
@@ -708,7 +761,9 @@ export default function DocumentsPage() {
               <button
                 type="button"
                 className="documents-modal-close"
-                onClick={closeCreateFolder}
+                onClick={
+                  closeCreateFolder
+                }
                 disabled={creatingFolder}
                 aria-label="Fermer"
               >
@@ -735,7 +790,8 @@ export default function DocumentsPage() {
                 }
                 onKeyDown={(event) => {
                   if (
-                    event.key === 'Enter' &&
+                    event.key ===
+                      'Enter' &&
                     !creatingFolder
                   ) {
                     createFolder();
@@ -747,13 +803,16 @@ export default function DocumentsPage() {
               />
 
               <p className="documents-modal-help">
-                Le dossier sera créé dans «{' '}
-                {currentFolderName} ».
+                Le dossier sera créé dans
+                « {currentFolderName} ».
               </p>
 
               {createFolderError && (
                 <div className="documents-modal-error">
-                  <AlertCircle size={17} />
+                  <AlertCircle
+                    size={17}
+                  />
+
                   <span>
                     {createFolderError}
                   </span>
@@ -765,7 +824,9 @@ export default function DocumentsPage() {
               <button
                 type="button"
                 className="documents-modal-button documents-modal-button-secondary"
-                onClick={closeCreateFolder}
+                onClick={
+                  closeCreateFolder
+                }
                 disabled={creatingFolder}
               >
                 Annuler
@@ -896,7 +957,9 @@ export default function DocumentsPage() {
           color: #8f211c;
         }
 
-        .documents-action-secondary:hover:not(:disabled) {
+        .documents-action-secondary:hover:not(
+            :disabled
+          ) {
           background: #fff0df;
           border-color: #d8c0aa;
         }
@@ -907,7 +970,9 @@ export default function DocumentsPage() {
           color: #ffffff;
         }
 
-        .documents-action-primary:hover:not(:disabled) {
+        .documents-action-primary:hover:not(
+            :disabled
+          ) {
           background: #7a1c18;
           border-color: #7a1c18;
         }
@@ -1059,7 +1124,9 @@ export default function DocumentsPage() {
           cursor: pointer;
         }
 
-        .documents-refresh-button:hover:not(:disabled) {
+        .documents-refresh-button:hover:not(
+            :disabled
+          ) {
           color: #8f211c;
           border-color: #cdb9aa;
           background: #fff7ee;
@@ -1378,7 +1445,9 @@ export default function DocumentsPage() {
           color: #5d544e;
         }
 
-        .documents-modal-button-secondary:hover:not(:disabled) {
+        .documents-modal-button-secondary:hover:not(
+            :disabled
+          ) {
           background: #fff8f2;
         }
 
@@ -1388,7 +1457,9 @@ export default function DocumentsPage() {
           color: #ffffff;
         }
 
-        .documents-modal-button-primary:hover:not(:disabled) {
+        .documents-modal-button-primary:hover:not(
+            :disabled
+          ) {
           background: #7a1c18;
           border-color: #7a1c18;
         }
