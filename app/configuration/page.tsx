@@ -360,15 +360,21 @@ export default function ConfigurationPage() {
           </div>
         </Link>
 
+
+      </div>
+
+      <div className="configuration-office-wrapper">
         <Link
           href="/configuration/membres-bureau"
-          className="card section-card configuration-card"
+          className="card section-card configuration-card configuration-office-card"
           style={{
             textDecoration: 'none',
             color: 'inherit',
           }}
         >
-          <div className="stat-top">
+          <div className="configuration-office-card-content">
+            <div className="configuration-office-card-main">
+              <div className="stat-top">
             <div className="stat-label">
               Membres du bureau
             </div>
@@ -406,6 +412,7 @@ export default function ConfigurationPage() {
             <span className="btn btn-primary">
               Ouvrir la gestion du bureau →
             </span>
+          </div>
           </div>
         </Link>
       </div>
@@ -1202,6 +1209,33 @@ export default function ConfigurationPage() {
           box-sizing: border-box;
         }
 
+        .configuration-office-wrapper {
+          margin-top: 18px;
+        }
+
+        .configuration-office-card {
+          width: 100%;
+          min-width: 0;
+          box-sizing: border-box;
+        }
+
+        .configuration-office-card-content {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 24px;
+          min-width: 0;
+        }
+
+        .configuration-office-card-main {
+          flex: 1;
+          min-width: 0;
+        }
+
+        .configuration-office-card .configuration-card-action {
+          flex-shrink: 0;
+        }
+
         .configuration-card-action {
           display: flex;
           justify-content: flex-start;
@@ -1328,6 +1362,20 @@ export default function ConfigurationPage() {
 
           .configuration-card-action {
             width: 100%;
+          }
+
+          .configuration-office-wrapper {
+            margin-top: 14px;
+          }
+
+          .configuration-office-card-content {
+            flex-direction: column;
+            align-items: stretch;
+            gap: 0;
+          }
+
+          .configuration-office-card .configuration-card-action {
+            margin-top: 18px !important;
           }
 
           .configuration-card-action .btn {
