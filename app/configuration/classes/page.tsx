@@ -986,23 +986,26 @@ export default function ConfigurationClassesPage() {
                     </span>
                   </div>
 
-                  <button
-                    type="button"
-                    className="danger-button"
-                    onClick={
-                      deleteClass
-                    }
-                    disabled={
-                      saving
-                    }
-                  >
-                    <Trash2
-                      size={
-                        15
+                  {(selectedClass.kind !== 'demo' &&
+                    selectedClass.name.trim().toUpperCase() !== 'TEST') && (
+                    <button
+                      type="button"
+                      className="danger-button"
+                      onClick={
+                        deleteClass
                       }
-                    />
-                    Supprimer la classe
-                  </button>
+                      disabled={
+                        saving
+                      }
+                    >
+                      <Trash2
+                        size={
+                          15
+                        }
+                      />
+                      Supprimer la classe
+                    </button>
+                  )}
                 </section>
 
                 <section className="manage-section">
