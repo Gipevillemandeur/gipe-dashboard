@@ -9,6 +9,7 @@ import {
   LockKeyhole,
   CheckCircle2,
   FileSpreadsheet,
+  UserRoundCog,
 } from 'lucide-react';
 
 type ClosureResult = {
@@ -355,6 +356,55 @@ export default function ConfigurationPage() {
           >
             <span className="btn btn-primary">
               Ouvrir la gestion de la direction →
+            </span>
+          </div>
+        </Link>
+
+        <Link
+          href="/configuration/membres-bureau"
+          className="card section-card configuration-card"
+          style={{
+            textDecoration: 'none',
+            color: 'inherit',
+          }}
+        >
+          <div className="stat-top">
+            <div className="stat-label">
+              Membres du bureau
+            </div>
+
+            <div className="stat-icon">
+              <UserRoundCog size={17} />
+            </div>
+          </div>
+
+          <h2
+            className="section-title"
+            style={{
+              marginTop: 14,
+            }}
+          >
+            Gérer les membres du bureau
+          </h2>
+
+          <p
+            className="section-sub"
+            style={{
+              marginTop: 8,
+            }}
+          >
+            Gérer les postes, les titulaires, les adresses
+            e-mail et les autorisations du bureau.
+          </p>
+
+          <div
+            className="configuration-card-action"
+            style={{
+              marginTop: 18,
+            }}
+          >
+            <span className="btn btn-primary">
+              Ouvrir la gestion du bureau →
             </span>
           </div>
         </Link>
