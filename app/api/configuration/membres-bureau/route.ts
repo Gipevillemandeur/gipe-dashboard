@@ -604,7 +604,7 @@ export async function POST(
       await supabase
         .from('office_position_members')
         .select(
-          'id, email, active'
+          'id, email, active, user_id'
         )
         .eq('position_id', positionId)
         .eq('active', true)
@@ -635,6 +635,9 @@ export async function POST(
       );
     }
 
+    const email =
+      member.email.trim().toLowerCase();
+
     const adminClient =
       createAdminClient();
 
@@ -644,13 +647,155 @@ export async function POST(
     const redirectTo =
       `${origin}/auth/callback?next=/set-password`;
 
+    /*
+     * On recherche d'abord si cette adresse possède
+     * déjà un compte Supabase.
+     *
+     * Cela permet à un même compte de changer de poste
+     * sans créer un deuxième utilisateur.
+     */
+    let existingUser:
+      | {
+          id: string;
+          email?: string | null;
+        }
+      | null = null;
+
+    let page = 1;
+    const perPage = 1000;
+
+    while (!existingUser) {
+      const {
+        data: usersData,
+        error: usersError,
+      } =
+        await adminClient.auth.admin.listUsers({
+          page,
+          perPage,
+        });
+
+      if (usersError) {
+        console.error(
+          'Erreur recherche utilisateur Supabase:',
+          usersError
+        );
+
+        return NextResponse.json(
+          {
+            error:
+              'Impossible de rechercher le compte utilisateur.',
+          },
+          { status: 500 }
+        );
+      }
+
+      const found =
+        usersData.users.find(
+          (candidate) =>
+            candidate.email
+              ?.trim()
+              .toLowerCase() === email
+        );
+
+      if (found) {
+        existingUser = {
+          id: found.id,
+          email: found.email,
+        };
+        break;
+      }
+
+      if (
+        !usersData.users ||
+        usersData.users.length < perPage
+      ) {
+        break;
+      }
+
+      page += 1;
+    }
+
+    /*
+     * CAS 1 :
+     * Le compte existe déjà.
+     *
+     * On ne recrée surtout pas le compte.
+     * On rattache simplement l'utilisateur au poste
+     * et on lui envoie un mail de récupération
+     * pour lui permettre de définir son mot de passe.
+     */
+    if (existingUser) {
+      const {
+        error: resetError,
+      } =
+        await supabase.auth.resetPasswordForEmail(
+          email,
+          {
+            redirectTo,
+          }
+        );
+
+      if (resetError) {
+        console.error(
+          'Erreur envoi récupération mot de passe:',
+          resetError
+        );
+
+        return NextResponse.json(
+          {
+            error:
+              resetError.message ||
+              'Impossible d’envoyer le mail d’accès.',
+          },
+          { status: 400 }
+        );
+      }
+
+      const { error: updateMemberError } =
+        await supabase
+          .from('office_position_members')
+          .update({
+            user_id:
+              existingUser.id,
+            updated_at:
+              new Date().toISOString(),
+          })
+          .eq('id', member.id);
+
+      if (updateMemberError) {
+        console.error(
+          'Erreur association utilisateur / poste:',
+          updateMemberError
+        );
+
+        return NextResponse.json(
+          {
+            error:
+              'Le mail a été envoyé mais l’association du compte au poste a échoué.',
+          },
+          { status: 500 }
+        );
+      }
+
+      return NextResponse.json({
+        success: true,
+        mode: 'existing',
+      });
+    }
+
+    /*
+     * CAS 2 :
+     * Aucun compte n'existe encore pour cette adresse.
+     *
+     * On crée alors le compte via l'invitation Supabase.
+     */
     const {
       data: invitationData,
       error: invitationError,
     } =
       await adminClient.auth.admin
         .inviteUserByEmail(
-          member.email,
+          email,
           {
             data: {
               office_position_id:
@@ -664,7 +809,7 @@ export async function POST(
 
     if (invitationError) {
       console.error(
-        'Erreur invitation titulaire:',
+        'Erreur invitation nouveau titulaire:',
         invitationError
       );
 
@@ -681,7 +826,9 @@ export async function POST(
     if (
       invitationData?.user?.id
     ) {
-      const { error: updateMemberError } =
+      const {
+        error: updateMemberError,
+      } =
         await supabase
           .from('office_position_members')
           .update({
@@ -702,10 +849,11 @@ export async function POST(
 
     return NextResponse.json({
       success: true,
+      mode: 'new',
     });
   } catch (error) {
     console.error(
-      'Erreur POST invitation bureau:',
+      'Erreur POST accès bureau:',
       error
     );
 
