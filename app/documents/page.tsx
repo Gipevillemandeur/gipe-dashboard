@@ -743,13 +743,16 @@ export default function DocumentsPage() {
         }
 
         @media (min-width: 701px) {
-          .documents-drive-card {
-            margin-left: 12px;
-            margin-right: 12px;
-          }
-        }
+  .documents-drive-card {
+    margin: 12px 12px 20px 12px;
+  }
+}
 
         @media (max-width: 700px) {
+          .documents-drive-card {
+            margin: 12px 12px 20px 12px;
+          }
+
           .documents-drive-header {
             flex-direction: column;
             align-items: stretch;
