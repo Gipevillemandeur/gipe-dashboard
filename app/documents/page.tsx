@@ -288,7 +288,7 @@ export default function DocumentsPage() {
               <Cloud size={27} />
             </div>
 
-            <div>
+            <div className="documents-drive-heading">
               <div className="eyebrow">
                 Google Drive
               </div>
@@ -487,44 +487,57 @@ export default function DocumentsPage() {
           display: flex;
           align-items: center;
           justify-content: space-between;
-          gap: 20px;
-          padding-bottom: 20px;
+          gap: 24px;
+          padding: 20px;
           border-bottom: 1px solid var(--gipe-line);
         }
 
         .documents-drive-title {
           display: flex;
           align-items: center;
-          gap: 15px;
+          gap: 18px;
           min-width: 0;
+          flex: 1;
         }
 
         .documents-drive-icon {
-          width: 52px;
-          height: 52px;
+          width: 56px;
+          height: 56px;
           flex-shrink: 0;
           display: flex;
           align-items: center;
           justify-content: center;
-          border-radius: 13px;
+          border-radius: 14px;
           background: #fff0d9;
           color: #8f211c;
         }
 
+        .documents-drive-heading {
+          min-width: 0;
+        }
+
         .documents-drive-title h2 {
-          margin: 3px 0 3px;
+          margin: 5px 0 5px;
           font-size: 21px;
+          line-height: 1.2;
         }
 
         .documents-drive-title p {
           margin: 0;
           color: var(--gipe-muted);
           font-size: 13px;
+          line-height: 1.45;
         }
 
         .documents-search {
           width: 280px;
           max-width: 100%;
+          flex-shrink: 0;
+        }
+
+        .documents-search .input {
+          width: 100%;
+          box-sizing: border-box;
         }
 
         .documents-navigation {
@@ -742,20 +755,25 @@ export default function DocumentsPage() {
           }
         }
 
-        @media (min-width: 701px) {
-  .documents-drive-card {
-    margin: 12px 12px 20px 12px;
-  }
-}
-
         @media (max-width: 700px) {
-          .documents-drive-card {
-            margin: 12px 12px 20px 12px;
-          }
-
           .documents-drive-header {
             flex-direction: column;
             align-items: stretch;
+            gap: 18px;
+            padding: 18px;
+          }
+
+          .documents-drive-title {
+            gap: 15px;
+          }
+
+          .documents-drive-icon {
+            width: 52px;
+            height: 52px;
+          }
+
+          .documents-drive-title h2 {
+            font-size: 21px;
           }
 
           .documents-search {
