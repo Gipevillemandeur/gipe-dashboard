@@ -363,7 +363,7 @@ export default function ConfigurationPage() {
 
       </div>
 
-      <div className="configuration-office-grid">
+      <div className="configuration-grid configuration-grid-second">
         <Link
           href="/configuration/membres-bureau"
           className="card section-card configuration-card configuration-office-card"
@@ -412,10 +412,6 @@ export default function ConfigurationPage() {
             </span>
           </div>
         </Link>
-      </div>
-
-      <div className="configuration-grid configuration-grid-second">
-
         {/* LISTING COLLÈGE */}
         <div className="card section-card configuration-card">
           <div className="stat-top">
@@ -1206,23 +1202,6 @@ export default function ConfigurationPage() {
           box-sizing: border-box;
         }
 
-        .configuration-office-grid {
-          display: grid;
-          grid-template-columns:
-            minmax(0, 1fr)
-            minmax(0, 1fr);
-          gap: 18px;
-          margin-top: 18px;
-          min-width: 0;
-        }
-
-        .configuration-office-card {
-          grid-column: 1 / -1;
-          width: 100%;
-          min-width: 0;
-          box-sizing: border-box;
-        }
-
         .configuration-card-action {
           display: flex;
           justify-content: flex-start;
@@ -1349,17 +1328,6 @@ export default function ConfigurationPage() {
 
           .configuration-card-action {
             width: 100%;
-          }
-
-          .configuration-office-grid {
-            grid-template-columns:
-              minmax(0, 1fr);
-            gap: 14px;
-            margin-top: 14px;
-          }
-
-          .configuration-office-card {
-            grid-column: auto;
           }
 
           .configuration-card-action .btn {
