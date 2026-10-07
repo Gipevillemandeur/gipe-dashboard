@@ -157,6 +157,14 @@ export async function GET(
         userId
       );
 
+    const requestUrl =
+      new URL(request.url);
+
+    const folderId =
+      requestUrl.searchParams.get(
+        'folderId'
+      ) || 'root';
+
     const url =
       new URL(
         'https://www.googleapis.com/drive/v3/files'
@@ -164,7 +172,7 @@ export async function GET(
 
     url.searchParams.set(
       'q',
-      "'root' in parents and trashed = false"
+      `'${folderId}' in parents and trashed = false`
     );
 
     url.searchParams.set(
@@ -183,13 +191,16 @@ export async function GET(
     );
 
     const driveResponse =
-      await fetch(url.toString(), {
-        headers: {
-          Authorization:
-            `Bearer ${accessToken}`,
-        },
-        cache: 'no-store',
-      });
+      await fetch(
+        url.toString(),
+        {
+          headers: {
+            Authorization:
+              `Bearer ${accessToken}`,
+          },
+          cache: 'no-store',
+        }
+      );
 
     const driveData =
       (await driveResponse.json()) as GoogleDriveResponse;
