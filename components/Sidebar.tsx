@@ -132,12 +132,33 @@ export default function Sidebar() {
             : ''
         }`}
       >
-        <div className="brand">
-          <div className="brand-mark">
-            G
-          </div>
+        <div
+          className="brand"
+          style={{
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px',
+            textAlign: 'center',
+          }}
+        >
+          <img
+            src="/images/Logo GIPE.png"
+            alt="Logo GIPE Villemandeur"
+            style={{
+              width: '82px',
+              height: '82px',
+              objectFit: 'contain',
+              display: 'block',
+            }}
+          />
 
-          <div className="brand-text">
+          <div
+            className="brand-text"
+            style={{
+              textAlign: 'center',
+            }}
+          >
             <strong>
               GIPE Villemandeur
             </strong>
