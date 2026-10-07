@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 
 async function getAuthenticatedClient() {
   const supabase = await createClient();
@@ -123,10 +124,13 @@ export async function GET() {
 
     const positions =
       positionsResult.data || [];
+
     const permissions =
       permissionsResult.data || [];
+
     const members =
       membersResult.data || [];
+
     const links =
       linksResult.data || [];
 
@@ -536,6 +540,181 @@ export async function PUT(
       {
         error:
           'Une erreur est survenue.',
+      },
+      { status: 500 }
+    );
+  }
+}
+
+export async function POST(
+  request: Request
+) {
+  try {
+    const { supabase, user } =
+      await getAuthenticatedClient();
+
+    if (!user) {
+      return NextResponse.json(
+        { error: 'Accès non autorisé.' },
+        { status: 401 }
+      );
+    }
+
+    const body = await request.json();
+
+    const positionId =
+      typeof body?.positionId === 'string'
+        ? body.positionId
+        : '';
+
+    if (!positionId) {
+      return NextResponse.json(
+        {
+          error:
+            'Le poste est obligatoire.',
+        },
+        { status: 400 }
+      );
+    }
+
+    const { data: position, error: positionError } =
+      await supabase
+        .from('office_positions')
+        .select(
+          'id, name, active'
+        )
+        .eq('id', positionId)
+        .maybeSingle();
+
+    if (
+      positionError ||
+      !position ||
+      !position.active
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            'Poste introuvable.',
+        },
+        { status: 404 }
+      );
+    }
+
+    const { data: member, error: memberError } =
+      await supabase
+        .from('office_position_members')
+        .select(
+          'id, email, active'
+        )
+        .eq('position_id', positionId)
+        .eq('active', true)
+        .maybeSingle();
+
+    if (memberError) {
+      console.error(
+        'Erreur recherche titulaire:',
+        memberError
+      );
+
+      return NextResponse.json(
+        {
+          error:
+            'Impossible de retrouver le titulaire.',
+        },
+        { status: 500 }
+      );
+    }
+
+    if (!member?.email) {
+      return NextResponse.json(
+        {
+          error:
+            'Aucune adresse e-mail n’est renseignée pour ce poste.',
+        },
+        { status: 400 }
+      );
+    }
+
+    const adminClient =
+      createAdminClient();
+
+    const origin =
+      new URL(request.url).origin;
+
+    const redirectTo =
+      `${origin}/auth/callback?next=/set-password`;
+
+    const {
+      data: invitationData,
+      error: invitationError,
+    } =
+      await adminClient.auth.admin
+        .inviteUserByEmail(
+          member.email,
+          {
+            data: {
+              office_position_id:
+                position.id,
+              office_position_name:
+                position.name,
+            },
+            redirectTo,
+          }
+        );
+
+    if (invitationError) {
+      console.error(
+        'Erreur invitation titulaire:',
+        invitationError
+      );
+
+      return NextResponse.json(
+        {
+          error:
+            invitationError.message ||
+            'Impossible d’envoyer l’invitation.',
+        },
+        { status: 400 }
+      );
+    }
+
+    if (
+      invitationData?.user?.id
+    ) {
+      const { error: updateMemberError } =
+        await supabase
+          .from('office_position_members')
+          .update({
+            user_id:
+              invitationData.user.id,
+            updated_at:
+              new Date().toISOString(),
+          })
+          .eq('id', member.id);
+
+      if (updateMemberError) {
+        console.error(
+          'Erreur association utilisateur / poste:',
+          updateMemberError
+        );
+      }
+    }
+
+    return NextResponse.json({
+      success: true,
+    });
+  } catch (error) {
+    console.error(
+      'Erreur POST invitation bureau:',
+      error
+    );
+
+    return NextResponse.json(
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : 'Une erreur est survenue.',
       },
       { status: 500 }
     );
