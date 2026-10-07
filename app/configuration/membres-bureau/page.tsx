@@ -348,12 +348,9 @@ export default function MembresBureauPage() {
 
       <section className="bureau-positions">
         <div className="bureau-section-title">
-          <div>
-            <h2 className="section-title">
-              Postes du bureau
-            </h2>
-
-          </div>
+          <h2 className="section-title">
+            Postes du bureau
+          </h2>
         </div>
 
         <div className="bureau-grid">
@@ -453,8 +450,6 @@ export default function MembresBureauPage() {
                   })}
                 </div>
 
-                {position.name === 'Président' && (
-                )}
               </div>
 
               <div className="bureau-position-footer">
