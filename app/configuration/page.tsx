@@ -363,7 +363,7 @@ export default function ConfigurationPage() {
 
       </div>
 
-      <div className="configuration-office-wrapper">
+      <div className="configuration-office-grid">
         <Link
           href="/configuration/membres-bureau"
           className="card section-card configuration-card configuration-office-card"
@@ -372,9 +372,7 @@ export default function ConfigurationPage() {
             color: 'inherit',
           }}
         >
-          <div className="configuration-office-card-content">
-            <div className="configuration-office-card-main">
-              <div className="stat-top">
+          <div className="stat-top">
             <div className="stat-label">
               Membres du bureau
             </div>
@@ -412,8 +410,6 @@ export default function ConfigurationPage() {
             <span className="btn btn-primary">
               Ouvrir la gestion du bureau →
             </span>
-          </div>
-          </div>
           </div>
         </Link>
       </div>
@@ -1210,31 +1206,21 @@ export default function ConfigurationPage() {
           box-sizing: border-box;
         }
 
-        .configuration-office-wrapper {
+        .configuration-office-grid {
+          display: grid;
+          grid-template-columns:
+            minmax(0, 1fr)
+            minmax(0, 1fr);
+          gap: 18px;
           margin-top: 18px;
+          min-width: 0;
         }
 
         .configuration-office-card {
+          grid-column: 1 / -1;
           width: 100%;
           min-width: 0;
           box-sizing: border-box;
-        }
-
-        .configuration-office-card-content {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 24px;
-          min-width: 0;
-        }
-
-        .configuration-office-card-main {
-          flex: 1;
-          min-width: 0;
-        }
-
-        .configuration-office-card .configuration-card-action {
-          flex-shrink: 0;
         }
 
         .configuration-card-action {
@@ -1365,18 +1351,15 @@ export default function ConfigurationPage() {
             width: 100%;
           }
 
-          .configuration-office-wrapper {
+          .configuration-office-grid {
+            grid-template-columns:
+              minmax(0, 1fr);
+            gap: 14px;
             margin-top: 14px;
           }
 
-          .configuration-office-card-content {
-            flex-direction: column;
-            align-items: stretch;
-            gap: 0;
-          }
-
-          .configuration-office-card .configuration-card-action {
-            margin-top: 18px !important;
+          .configuration-office-card {
+            grid-column: auto;
           }
 
           .configuration-card-action .btn {
