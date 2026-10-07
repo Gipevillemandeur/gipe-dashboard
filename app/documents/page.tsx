@@ -6,6 +6,7 @@ import {
   Check,
   ChevronRight,
   Cloud,
+  Download,
   File,
   FileText,
   Folder,
@@ -13,9 +14,11 @@ import {
   Loader2,
   Plus,
   RefreshCw,
+  Trash2,
   Upload,
   X,
 } from 'lucide-react';
+
 import {
   ChangeEvent,
   useEffect,
@@ -110,6 +113,15 @@ export default function DocumentsPage() {
   const [uploadSuccess, setUploadSuccess] =
     useState('');
 
+  const [deletingItem, setDeletingItem] =
+    useState<DriveFile | null>(null);
+
+  const [deleting, setDeleting] =
+    useState(false);
+
+  const [deleteError, setDeleteError] =
+    useState('');
+
   const fileInputRef =
     useRef<HTMLInputElement | null>(null);
 
@@ -152,11 +164,6 @@ export default function DocumentsPage() {
     }
   }
 
-  /*
-   * Chargement initial du Google Drive.
-   * Cette partie est indispensable pour afficher
-   * le contenu dès l'ouverture de la page.
-   */
   useEffect(() => {
     loadFiles('root');
   }, []);
@@ -347,6 +354,81 @@ export default function DocumentsPage() {
     } finally {
       setUploadingFile(false);
     }
+  }
+
+  function askDelete(file: DriveFile) {
+    setDeleteError('');
+    setDeletingItem(file);
+  }
+
+  function closeDelete() {
+    if (deleting) return;
+
+    setDeletingItem(null);
+    setDeleteError('');
+  }
+
+  async function confirmDelete() {
+    if (!deletingItem) {
+      return;
+    }
+
+    try {
+      setDeleting(true);
+      setDeleteError('');
+
+      const response = await fetch(
+        `/api/google/drive/delete?id=${encodeURIComponent(
+          deletingItem.id
+        )}`,
+        {
+          method: 'DELETE',
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data?.error ||
+            'Impossible de supprimer cet élément.'
+        );
+      }
+
+      /*
+       * On retire immédiatement l'élément
+       * de la liste affichée.
+       */
+      setFiles((currentFiles) =>
+        currentFiles.filter(
+          (file) =>
+            file.id !== deletingItem.id
+        )
+      );
+
+      setDeletingItem(null);
+      setDeleteError('');
+    } catch (err) {
+      console.error(err);
+
+      setDeleteError(
+        err instanceof Error
+          ? err.message
+          : 'Impossible de supprimer cet élément.'
+      );
+    } finally {
+      setDeleting(false);
+    }
+  }
+
+  function getDownloadUrl(file: DriveFile) {
+    const params = new URLSearchParams({
+      id: file.id,
+      name: file.name,
+      mimeType: file.mimeType,
+    });
+
+    return `/api/google/drive/download?${params.toString()}`;
   }
 
   const filteredFiles = files.filter(
@@ -610,7 +692,7 @@ export default function DocumentsPage() {
                       (folder) => (
                         <div
                           key={folder.id}
-                          className="documents-item documents-folder-item"
+                          className="documents-item"
                         >
                           <div className="documents-item-icon documents-folder-icon">
                             <Folder
@@ -629,21 +711,37 @@ export default function DocumentsPage() {
                             </div>
                           </div>
 
-                          <button
-                            type="button"
-                            className="documents-open-button"
-                            onClick={() =>
-                              openFolder(
-                                folder
-                              )
-                            }
-                          >
-                            Ouvrir
+                          <div className="documents-item-actions">
+                            <button
+                              type="button"
+                              className="documents-open-button"
+                              onClick={() =>
+                                openFolder(
+                                  folder
+                                )
+                              }
+                            >
+                              Ouvrir
+                              <ChevronRight
+                                size={15}
+                              />
+                            </button>
 
-                            <ChevronRight
-                              size={16}
-                            />
-                          </button>
+                            <button
+                              type="button"
+                              className="documents-delete-button"
+                              onClick={() =>
+                                askDelete(
+                                  folder
+                                )
+                              }
+                              title="Supprimer le dossier"
+                            >
+                              <Trash2
+                                size={16}
+                              />
+                            </button>
+                          </div>
                         </div>
                       )
                     )}
@@ -701,22 +799,52 @@ export default function DocumentsPage() {
                             </div>
                           </div>
 
-                          {file.webViewLink && (
-                            <a
-                              href={
-                                file.webViewLink
-                              }
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="documents-open-button"
-                            >
-                              Ouvrir
+                          <div className="documents-item-actions">
+                            {file.webViewLink && (
+                              <a
+                                href={
+                                  file.webViewLink
+                                }
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="documents-open-button"
+                              >
+                                Ouvrir
+                                <ChevronRight
+                                  size={15}
+                                />
+                              </a>
+                            )}
 
-                              <ChevronRight
+                            <a
+                              href={getDownloadUrl(
+                                file
+                              )}
+                              className="documents-download-button"
+                              title="Télécharger"
+                              aria-label={`Télécharger ${file.name}`}
+                            >
+                              <Download
                                 size={16}
                               />
                             </a>
-                          )}
+
+                            <button
+                              type="button"
+                              className="documents-delete-button"
+                              onClick={() =>
+                                askDelete(
+                                  file
+                                )
+                              }
+                              title="Supprimer le fichier"
+                              aria-label={`Supprimer ${file.name}`}
+                            >
+                              <Trash2
+                                size={16}
+                              />
+                            </button>
+                          </div>
                         </div>
                       )
                     )}
@@ -859,6 +987,126 @@ export default function DocumentsPage() {
         </div>
       )}
 
+      {deletingItem && (
+        <div
+          className="documents-modal-overlay"
+          onMouseDown={(event) => {
+            if (
+              event.target ===
+              event.currentTarget
+            ) {
+              closeDelete();
+            }
+          }}
+        >
+          <div
+            className="documents-modal documents-delete-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-title"
+          >
+            <div className="documents-modal-header">
+              <div>
+                <h2 id="delete-title">
+                  Supprimer{' '}
+                  {deletingItem.mimeType ===
+                  'application/vnd.google-apps.folder'
+                    ? 'le dossier'
+                    : 'le fichier'}
+                </h2>
+
+                <p>
+                  Cette action sera effectuée
+                  directement dans Google Drive.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                className="documents-modal-close"
+                onClick={closeDelete}
+                disabled={deleting}
+                aria-label="Fermer"
+              >
+                <X size={19} />
+              </button>
+            </div>
+
+            <div className="documents-modal-body">
+              <div className="documents-delete-warning">
+                <AlertCircle size={20} />
+
+                <div>
+                  <strong>
+                    {deletingItem.name}
+                  </strong>
+
+                  {deletingItem.mimeType ===
+                    'application/vnd.google-apps.folder' && (
+                    <p>
+                      Attention : la suppression
+                      d’un dossier peut également
+                      supprimer son contenu.
+                    </p>
+                  )}
+
+                  {deletingItem.mimeType !==
+                    'application/vnd.google-apps.folder' && (
+                    <p>
+                      Ce fichier sera supprimé
+                      de Google Drive.
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {deleteError && (
+                <div className="documents-modal-error">
+                  <AlertCircle
+                    size={17}
+                  />
+
+                  <span>
+                    {deleteError}
+                  </span>
+                </div>
+              )}
+            </div>
+
+            <div className="documents-modal-actions">
+              <button
+                type="button"
+                className="documents-modal-button documents-modal-button-secondary"
+                onClick={closeDelete}
+                disabled={deleting}
+              >
+                Annuler
+              </button>
+
+              <button
+                type="button"
+                className="documents-modal-button documents-modal-button-danger"
+                onClick={confirmDelete}
+                disabled={deleting}
+              >
+                {deleting ? (
+                  <Loader2
+                    size={17}
+                    className="documents-spin"
+                  />
+                ) : (
+                  <Trash2 size={17} />
+                )}
+
+                {deleting
+                  ? 'Suppression...'
+                  : 'Supprimer'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <style jsx>{`
         .documents-page {
           width: 100%;
@@ -939,10 +1187,6 @@ export default function DocumentsPage() {
           font-size: 13px;
           font-weight: 700;
           cursor: pointer;
-          transition:
-            background 0.15s ease,
-            border-color 0.15s ease,
-            opacity 0.15s ease;
           white-space: nowrap;
         }
 
@@ -957,13 +1201,6 @@ export default function DocumentsPage() {
           color: #8f211c;
         }
 
-        .documents-action-secondary:hover:not(
-            :disabled
-          ) {
-          background: #fff0df;
-          border-color: #d8c0aa;
-        }
-
         .documents-action-primary {
           background: #8f211c;
           border-color: #8f211c;
@@ -974,7 +1211,6 @@ export default function DocumentsPage() {
             :disabled
           ) {
           background: #7a1c18;
-          border-color: #7a1c18;
         }
 
         .documents-hidden-file-input {
@@ -993,7 +1229,6 @@ export default function DocumentsPage() {
           padding: 11px 13px;
           border-radius: 9px;
           font-size: 13px;
-          line-height: 1.4;
         }
 
         .documents-message span {
@@ -1002,18 +1237,17 @@ export default function DocumentsPage() {
         }
 
         .documents-message button {
-          flex: 0 0 auto;
+          width: 28px;
+          height: 28px;
           display: inline-flex;
           align-items: center;
           justify-content: center;
-          width: 28px;
-          height: 28px;
+          flex: 0 0 auto;
           padding: 0;
           border: 0;
           background: transparent;
-          cursor: pointer;
           color: inherit;
-          border-radius: 6px;
+          cursor: pointer;
         }
 
         .documents-message-success {
@@ -1081,12 +1315,6 @@ export default function DocumentsPage() {
           cursor: pointer;
         }
 
-        .documents-back-button:hover {
-          background: #fff7ee;
-          color: #8f211c;
-          border-color: #d8c5b5;
-        }
-
         .documents-search {
           min-width: 0;
         }
@@ -1105,11 +1333,6 @@ export default function DocumentsPage() {
           outline: none;
         }
 
-        .documents-search input:focus {
-          border-color: #8f211c;
-          box-shadow: 0 0 0 2px rgba(143, 33, 28, 0.08);
-        }
-
         .documents-refresh-button {
           width: 40px;
           height: 38px;
@@ -1122,19 +1345,6 @@ export default function DocumentsPage() {
           background: #ffffff;
           color: #554b45;
           cursor: pointer;
-        }
-
-        .documents-refresh-button:hover:not(
-            :disabled
-          ) {
-          color: #8f211c;
-          border-color: #cdb9aa;
-          background: #fff7ee;
-        }
-
-        .documents-refresh-button:disabled {
-          opacity: 0.6;
-          cursor: not-allowed;
         }
 
         .documents-state {
@@ -1225,11 +1435,6 @@ export default function DocumentsPage() {
           background: #ffffff;
         }
 
-        .documents-item:hover {
-          background: #fffcf9;
-          border-color: #e3d5ca;
-        }
-
         .documents-item-icon {
           width: 40px;
           height: 40px;
@@ -1271,27 +1476,69 @@ export default function DocumentsPage() {
           font-size: 11px;
         }
 
-        .documents-open-button {
+        .documents-item-actions {
+          display: flex;
+          align-items: center;
+          justify-content: flex-end;
+          gap: 6px;
+          flex: 0 0 auto;
+        }
+
+        .documents-open-button,
+        .documents-download-button,
+        .documents-delete-button {
           min-height: 34px;
           display: inline-flex;
           align-items: center;
           justify-content: center;
           gap: 4px;
+          border-radius: 7px;
+          font: inherit;
+          cursor: pointer;
+          text-decoration: none;
+        }
+
+        .documents-open-button {
           padding: 7px 11px;
           border: 0;
-          border-radius: 7px;
           background: #8f211c;
           color: #ffffff;
-          font: inherit;
           font-size: 12px;
           font-weight: 700;
-          text-decoration: none;
-          cursor: pointer;
           white-space: nowrap;
         }
 
         .documents-open-button:hover {
           background: #7a1c18;
+        }
+
+        .documents-download-button,
+        .documents-delete-button {
+          width: 34px;
+          padding: 0;
+        }
+
+        .documents-download-button {
+          border: 1px solid #ddd2c9;
+          background: #ffffff;
+          color: #655b54;
+        }
+
+        .documents-download-button:hover {
+          background: #fff7ee;
+          border-color: #cdb9aa;
+          color: #8f211c;
+        }
+
+        .documents-delete-button {
+          border: 1px solid #ecd0cb;
+          background: #fff5f3;
+          color: #8f211c;
+        }
+
+        .documents-delete-button:hover {
+          background: #ffe8e4;
+          border-color: #dca9a2;
         }
 
         .documents-modal-overlay {
@@ -1353,11 +1600,6 @@ export default function DocumentsPage() {
           cursor: pointer;
         }
 
-        .documents-modal-close:hover {
-          background: #fff7ee;
-          color: #8f211c;
-        }
-
         .documents-modal-body {
           padding: 22px;
           overflow-y: auto;
@@ -1385,11 +1627,6 @@ export default function DocumentsPage() {
           outline: none;
         }
 
-        .documents-modal-body input:focus {
-          border-color: #8f211c;
-          box-shadow: 0 0 0 2px rgba(143, 33, 28, 0.08);
-        }
-
         .documents-modal-help {
           margin: 7px 0 0;
           color: #8a7f77;
@@ -1409,6 +1646,31 @@ export default function DocumentsPage() {
           color: #8f211c;
           font-size: 12px;
           line-height: 1.4;
+        }
+
+        .documents-delete-warning {
+          display: flex;
+          align-items: flex-start;
+          gap: 12px;
+          padding: 13px;
+          border: 1px solid #efd0cb;
+          border-radius: 9px;
+          background: #fff5f3;
+          color: #8f211c;
+        }
+
+        .documents-delete-warning strong {
+          display: block;
+          overflow-wrap: anywhere;
+          color: #4d332e;
+          font-size: 13px;
+        }
+
+        .documents-delete-warning p {
+          margin: 5px 0 0;
+          color: #75645f;
+          font-size: 12px;
+          line-height: 1.45;
         }
 
         .documents-modal-actions {
@@ -1445,23 +1707,22 @@ export default function DocumentsPage() {
           color: #5d544e;
         }
 
-        .documents-modal-button-secondary:hover:not(
-            :disabled
-          ) {
-          background: #fff8f2;
-        }
-
         .documents-modal-button-primary {
           border: 1px solid #8f211c;
           background: #8f211c;
           color: #ffffff;
         }
 
-        .documents-modal-button-primary:hover:not(
+        .documents-modal-button-danger {
+          border: 1px solid #8f211c;
+          background: #8f211c;
+          color: #ffffff;
+        }
+
+        .documents-modal-button-danger:hover:not(
             :disabled
           ) {
           background: #7a1c18;
-          border-color: #7a1c18;
         }
 
         .documents-spin {
@@ -1537,7 +1798,7 @@ export default function DocumentsPage() {
           }
 
           .documents-item {
-            grid-template-columns: 38px minmax(0, 1fr) auto;
+            grid-template-columns: 38px minmax(0, 1fr);
             gap: 9px;
             padding: 10px;
           }
@@ -1547,8 +1808,10 @@ export default function DocumentsPage() {
             height: 38px;
           }
 
-          .documents-open-button {
-            padding: 7px 9px;
+          .documents-item-actions {
+            grid-column: 2;
+            justify-content: flex-start;
+            flex-wrap: wrap;
           }
 
           .documents-modal-overlay {
@@ -1581,8 +1844,6 @@ export default function DocumentsPage() {
 
           .documents-modal-button {
             width: 100%;
-            padding-left: 10px;
-            padding-right: 10px;
           }
         }
 
@@ -1608,13 +1869,12 @@ export default function DocumentsPage() {
             grid-template-columns: minmax(0, 1fr);
           }
 
-          .documents-item {
-            grid-template-columns: 38px minmax(0, 1fr);
+          .documents-item-actions {
+            width: 100%;
           }
 
           .documents-open-button {
-            grid-column: 2;
-            justify-self: start;
+            flex: 0 0 auto;
           }
 
           .documents-modal-actions {
