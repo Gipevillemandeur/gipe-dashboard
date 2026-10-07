@@ -247,6 +247,8 @@ export async function PUT(
             .from('office_super_admin')
             .update({
               email,
+              updated_at:
+                new Date().toISOString(),
             })
             .eq('id', existing.id);
 
@@ -369,50 +371,91 @@ export async function PUT(
     const { data: existingMember } =
       await supabase
         .from('office_position_members')
-        .select('id')
+        .select('id, email')
         .eq('position_id', positionId)
         .eq('active', true)
         .maybeSingle();
 
+    const currentEmail =
+      existingMember?.email
+        ?.trim()
+        .toLowerCase() || null;
+
     if (existingMember) {
-      const { error } =
-        await supabase
-          .from('office_position_members')
-          .update({
-            email,
-            updated_at:
-              new Date().toISOString(),
-          })
-          .eq('id', existingMember.id);
+      if (currentEmail !== email) {
+        const { error: deactivateError } =
+          await supabase
+            .from('office_position_members')
+            .update({
+              active: false,
+              deactivated_at:
+                new Date().toISOString(),
+              updated_at:
+                new Date().toISOString(),
+            })
+            .eq('id', existingMember.id);
 
-      if (error) {
-        console.error(
-          'Erreur mise à jour titulaire:',
-          error
-        );
+        if (deactivateError) {
+          console.error(
+            'Erreur désactivation ancien titulaire:',
+            deactivateError
+          );
 
-        return NextResponse.json(
-          {
-            error:
-              'Impossible d’enregistrer le titulaire.',
-          },
-          { status: 500 }
-        );
+          return NextResponse.json(
+            {
+              error:
+                'Impossible de désactiver l’ancien titulaire.',
+            },
+            { status: 500 }
+          );
+        }
+
+        if (email) {
+          const { error: insertError } =
+            await supabase
+              .from('office_position_members')
+              .insert({
+                position_id: positionId,
+                email,
+                active: true,
+                assigned_at:
+                  new Date().toISOString(),
+                deactivated_at: null,
+              });
+
+          if (insertError) {
+            console.error(
+              'Erreur création nouveau titulaire:',
+              insertError
+            );
+
+            return NextResponse.json(
+              {
+                error:
+                  'Impossible d’enregistrer le nouveau titulaire.',
+              },
+              { status: 500 }
+            );
+          }
+        }
       }
     } else if (email) {
-      const { error } =
+      const { error: insertError } =
         await supabase
           .from('office_position_members')
           .insert({
             position_id: positionId,
             email,
             active: true,
+            assigned_at:
+              new Date().toISOString(),
+            deactivated_at: null,
           });
 
-      if (error) {
+      if (insertError) {
         console.error(
           'Erreur création titulaire:',
-          error
+          insertError
         );
 
         return NextResponse.json(
