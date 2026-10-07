@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   AlertCircle,
   ArrowLeft,
+  Check,
   ChevronRight,
   Cloud,
   File,
@@ -11,7 +12,9 @@ import {
   Folder,
   FolderOpen,
   Loader2,
+  Plus,
   RefreshCw,
+  X,
 } from 'lucide-react';
 
 type DriveFile = {
@@ -109,6 +112,18 @@ export default function DocumentsPage() {
 
   const [folderHistory, setFolderHistory] =
     useState<FolderHistoryItem[]>([]);
+
+  const [showCreateFolder, setShowCreateFolder] =
+    useState(false);
+
+  const [newFolderName, setNewFolderName] =
+    useState('');
+
+  const [creatingFolder, setCreatingFolder] =
+    useState(false);
+
+  const [createFolderError, setCreateFolderError] =
+    useState('');
 
   async function loadFiles(folderId: string) {
     setLoading(true);
@@ -229,6 +244,80 @@ export default function DocumentsPage() {
     void loadFiles('root');
   }
 
+  function openCreateFolder() {
+    setNewFolderName('');
+    setCreateFolderError('');
+    setShowCreateFolder(true);
+  }
+
+  function closeCreateFolder() {
+    if (creatingFolder) {
+      return;
+    }
+
+    setShowCreateFolder(false);
+    setNewFolderName('');
+    setCreateFolderError('');
+  }
+
+  async function createFolder() {
+    const name =
+      newFolderName.trim();
+
+    if (!name) {
+      setCreateFolderError(
+        'Indique le nom du dossier.'
+      );
+      return;
+    }
+
+    setCreatingFolder(true);
+    setCreateFolderError('');
+
+    try {
+      const response = await fetch(
+        '/api/google/drive/folders',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type':
+              'application/json',
+          },
+          body: JSON.stringify({
+            name,
+            parentId:
+              currentFolderId,
+          }),
+        }
+      );
+
+      const data =
+        await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data?.error ||
+            'Impossible de créer le dossier.'
+        );
+      }
+
+      setShowCreateFolder(false);
+      setNewFolderName('');
+
+      await loadFiles(
+        currentFolderId
+      );
+    } catch (err) {
+      setCreateFolderError(
+        err instanceof Error
+          ? err.message
+          : 'Impossible de créer le dossier.'
+      );
+    } finally {
+      setCreatingFolder(false);
+    }
+  }
+
   return (
     <>
       <div className="topbar">
@@ -249,7 +338,9 @@ export default function DocumentsPage() {
             className="btn"
             type="button"
             onClick={() =>
-              void loadFiles(currentFolderId)
+              void loadFiles(
+                currentFolderId
+              )
             }
             disabled={loading}
           >
@@ -310,10 +401,26 @@ export default function DocumentsPage() {
               placeholder="Rechercher..."
               value={search}
               onChange={(event) =>
-                setSearch(event.target.value)
+                setSearch(
+                  event.target.value
+                )
               }
             />
           </div>
+        </div>
+
+        <div className="documents-toolbar">
+          <button
+            className="btn btn-primary"
+            type="button"
+            onClick={
+              openCreateFolder
+            }
+          >
+            <Plus size={16} />
+
+            Nouveau dossier
+          </button>
         </div>
 
         <div className="documents-navigation">
@@ -323,37 +430,55 @@ export default function DocumentsPage() {
             onClick={goToRoot}
           >
             <Cloud size={16} />
+
             Mon Drive
           </button>
 
-          {folderHistory.map((item, index) => (
-            <div
-              className="documents-navigation-item"
-              key={`${item.id}-${index}`}
-            >
-              <ChevronRight size={15} />
+          {folderHistory.map(
+            (item, index) => (
+              <div
+                className="documents-navigation-item"
+                key={`${item.id}-${index}`}
+              >
+                <ChevronRight
+                  size={15}
+                />
 
-              <span>{item.name}</span>
-            </div>
-          ))}
+                <span>
+                  {item.name}
+                </span>
+              </div>
+            )
+          )}
 
-          {currentFolderId !== 'root' && (
+          {currentFolderId !==
+            'root' && (
             <div className="documents-navigation-current">
-              <ChevronRight size={15} />
+              <ChevronRight
+                size={15}
+              />
 
-              <span>{currentFolderName}</span>
+              <span>
+                {currentFolderName}
+              </span>
             </div>
           )}
         </div>
 
-        {currentFolderId !== 'root' && (
+        {currentFolderId !==
+          'root' && (
           <div className="documents-back-bar">
             <button
               className="btn"
               type="button"
-              onClick={goBack}
+              onClick={
+                goBack
+              }
             >
-              <ArrowLeft size={15} />
+              <ArrowLeft
+                size={15}
+              />
+
               Retour
             </button>
           </div>
@@ -367,14 +492,18 @@ export default function DocumentsPage() {
             />
 
             <span>
-              Chargement du Google Drive…
+              Chargement du
+              Google Drive…
             </span>
           </div>
         ) : (
           <>
-            {filteredFiles.length === 0 ? (
+            {filteredFiles.length ===
+            0 ? (
               <div className="documents-empty">
-                <FolderOpen size={40} />
+                <FolderOpen
+                  size={40}
+                />
 
                 <strong>
                   {search
@@ -390,83 +519,267 @@ export default function DocumentsPage() {
               </div>
             ) : (
               <div className="documents-list">
-                {folders.map((file) => (
-                  <button
-                    className="documents-row documents-folder-row"
-                    type="button"
-                    key={file.id}
-                    onClick={() =>
-                      openFolder(file)
-                    }
-                  >
-                    <div className="documents-row-icon documents-folder-icon">
-                      {getFileIcon(file)}
+                {folders.map(
+                  (file) => (
+                    <button
+                      className="documents-row documents-folder-row"
+                      type="button"
+                      key={
+                        file.id
+                      }
+                      onClick={() =>
+                        openFolder(
+                          file
+                        )
+                      }
+                    >
+                      <div className="documents-row-icon documents-folder-icon">
+                        {getFileIcon(
+                          file
+                        )}
+                      </div>
+
+                      <div className="documents-row-main">
+                        <strong>
+                          {file.name}
+                        </strong>
+
+                        <span>
+                          Dossier
+                        </span>
+                      </div>
+
+                      <div className="documents-row-date">
+                        —
+                      </div>
+
+                      <div className="documents-row-action">
+                        <ChevronRight
+                          size={18}
+                        />
+                      </div>
+                    </button>
+                  )
+                )}
+
+                {regularFiles.map(
+                  (file) => (
+                    <div
+                      className="documents-row documents-file-row"
+                      key={
+                        file.id
+                      }
+                    >
+                      <div className="documents-row-icon">
+                        {getFileIcon(
+                          file
+                        )}
+                      </div>
+
+                      <div className="documents-row-main">
+                        <strong>
+                          {file.name}
+                        </strong>
+
+                        <span>
+                          {file.mimeType}
+
+                          {formatSize(
+                            file.size
+                          )
+                            ? ` · ${formatSize(
+                                file.size
+                              )}`
+                            : ''}
+                        </span>
+                      </div>
+
+                      <div className="documents-row-date">
+                        {formatDate(
+                          file.modifiedTime
+                        )}
+                      </div>
+
+                      <div className="documents-row-action">
+                        {file.webViewLink ? (
+                          <a
+                            href={
+                              file.webViewLink
+                            }
+                            target="_blank"
+                            rel="noreferrer"
+                            className="documents-open-button"
+                          >
+                            Ouvrir
+                          </a>
+                        ) : null}
+                      </div>
                     </div>
-
-                    <div className="documents-row-main">
-                      <strong>{file.name}</strong>
-
-                      <span>Dossier</span>
-                    </div>
-
-                    <div className="documents-row-date">
-                      —
-                    </div>
-
-                    <div className="documents-row-action">
-                      <ChevronRight size={18} />
-                    </div>
-                  </button>
-                ))}
-
-                {regularFiles.map((file) => (
-                  <div
-                    className="documents-row documents-file-row"
-                    key={file.id}
-                  >
-                    <div className="documents-row-icon">
-                      {getFileIcon(file)}
-                    </div>
-
-                    <div className="documents-row-main">
-                      <strong>{file.name}</strong>
-
-                      <span>
-                        {file.mimeType}
-
-                        {formatSize(file.size)
-                          ? ` · ${formatSize(
-                              file.size
-                            )}`
-                          : ''}
-                      </span>
-                    </div>
-
-                    <div className="documents-row-date">
-                      {formatDate(
-                        file.modifiedTime
-                      )}
-                    </div>
-
-                    <div className="documents-row-action">
-                      {file.webViewLink ? (
-                        <a
-                          href={file.webViewLink}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="documents-open-button"
-                        >
-                          Ouvrir
-                        </a>
-                      ) : null}
-                    </div>
-                  </div>
-                ))}
+                  )
+                )}
               </div>
             )}
           </>
         )}
       </section>
+
+      {showCreateFolder && (
+        <div
+          className="documents-modal-overlay"
+          onMouseDown={(
+            event
+          ) => {
+            if (
+              event.target ===
+              event.currentTarget
+            ) {
+              closeCreateFolder();
+            }
+          }}
+        >
+          <div
+            className="documents-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="create-folder-title"
+          >
+            <div className="documents-modal-header">
+              <div>
+                <div className="eyebrow">
+                  Google Drive
+                </div>
+
+                <h2 id="create-folder-title">
+                  Nouveau dossier
+                </h2>
+              </div>
+
+              <button
+                className="documents-modal-close"
+                type="button"
+                onClick={
+                  closeCreateFolder
+                }
+                disabled={
+                  creatingFolder
+                }
+                aria-label="Fermer"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="documents-modal-body">
+              <label
+                className="documents-modal-label"
+                htmlFor="new-folder-name"
+              >
+                Nom du dossier
+              </label>
+
+              <input
+                id="new-folder-name"
+                className="input"
+                type="text"
+                value={
+                  newFolderName
+                }
+                onChange={(
+                  event
+                ) =>
+                  setNewFolderName(
+                    event.target
+                      .value
+                  )
+                }
+                onKeyDown={(
+                  event
+                ) => {
+                  if (
+                    event.key ===
+                    'Enter'
+                  ) {
+                    void createFolder();
+                  }
+
+                  if (
+                    event.key ===
+                    'Escape'
+                  ) {
+                    closeCreateFolder();
+                  }
+                }}
+                placeholder="Ex. Réunions 2026"
+                autoFocus
+                maxLength={150}
+                disabled={
+                  creatingFolder
+                }
+              />
+
+              {createFolderError && (
+                <div className="documents-form-error">
+                  <AlertCircle
+                    size={16}
+                  />
+
+                  <span>
+                    {
+                      createFolderError
+                    }
+                  </span>
+                </div>
+              )}
+
+              <p className="documents-modal-help">
+                Le dossier sera créé
+                dans «{' '}
+                {
+                  currentFolderName
+                } ».
+              </p>
+            </div>
+
+            <div className="documents-modal-footer">
+              <button
+                className="btn"
+                type="button"
+                onClick={
+                  closeCreateFolder
+                }
+                disabled={
+                  creatingFolder
+                }
+              >
+                Annuler
+              </button>
+
+              <button
+                className="btn btn-primary"
+                type="button"
+                onClick={() =>
+                  void createFolder()
+                }
+                disabled={
+                  creatingFolder ||
+                  !newFolderName.trim()
+                }
+              >
+                {creatingFolder ? (
+                  <Loader2
+                    size={15}
+                    className="documents-spin"
+                  />
+                ) : (
+                  <Check size={15} />
+                )}
+
+                Créer le dossier
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <style jsx>{`
         .documents-notice {
@@ -538,6 +851,17 @@ export default function DocumentsPage() {
         .documents-search .input {
           width: 100%;
           box-sizing: border-box;
+        }
+
+        .documents-toolbar {
+          display: flex;
+          align-items: center;
+          justify-content: flex-end;
+          padding: 14px 4px 0;
+        }
+
+        .documents-toolbar .btn {
+          min-height: 38px;
         }
 
         .documents-navigation {
@@ -745,14 +1069,100 @@ export default function DocumentsPage() {
           animation: documents-spin 1s linear infinite;
         }
 
-        @keyframes documents-spin {
-          from {
-            transform: rotate(0deg);
-          }
+        .documents-modal-overlay {
+          position: fixed;
+          inset: 0;
+          z-index: 1000;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 24px;
+          background: rgba(24, 18, 16, 0.42);
+        }
 
-          to {
-            transform: rotate(360deg);
-          }
+        .documents-modal {
+          width: min(520px, 100%);
+          max-height: calc(100dvh - 48px);
+          overflow-y: auto;
+          background: #ffffff;
+          border: 1px solid var(--gipe-line);
+          border-radius: 16px;
+          box-shadow:
+            0 20px 60px
+              rgba(0, 0, 0, 0.2);
+        }
+
+        .documents-modal-header {
+          display: flex;
+          align-items: flex-start;
+          justify-content: space-between;
+          gap: 16px;
+          padding: 22px 24px 18px;
+          border-bottom: 1px solid var(--gipe-line);
+        }
+
+        .documents-modal-header h2 {
+          margin: 5px 0 0;
+          font-size: 22px;
+        }
+
+        .documents-modal-close {
+          width: 38px;
+          height: 38px;
+          flex-shrink: 0;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          border: 1px solid var(--gipe-line);
+          border-radius: 9px;
+          background: #ffffff;
+          color: var(--gipe-muted);
+          cursor: pointer;
+        }
+
+        .documents-modal-close:hover {
+          color: #8f211c;
+          border-color: #d7b4b0;
+        }
+
+        .documents-modal-body {
+          padding: 22px 24px;
+        }
+
+        .documents-modal-label {
+          display: block;
+          margin-bottom: 7px;
+          font-size: 13px;
+          font-weight: 700;
+        }
+
+        .documents-modal-help {
+          margin: 9px 0 0;
+          color: var(--gipe-muted);
+          font-size: 12px;
+          line-height: 1.45;
+        }
+
+        .documents-form-error {
+          display: flex;
+          align-items: flex-start;
+          gap: 8px;
+          margin-top: 10px;
+          padding: 10px 12px;
+          border: 1px solid #efc8c4;
+          border-radius: 8px;
+          background: #fff0ee;
+          color: #8a2b22;
+          font-size: 13px;
+          line-height: 1.4;
+        }
+
+        .documents-modal-footer {
+          display: flex;
+          justify-content: flex-end;
+          gap: 10px;
+          padding: 16px 24px 20px;
+          border-top: 1px solid var(--gipe-line);
         }
 
         @media (max-width: 700px) {
@@ -778,6 +1188,16 @@ export default function DocumentsPage() {
 
           .documents-search {
             width: 100%;
+          }
+
+          .documents-toolbar {
+            justify-content: stretch;
+            padding: 14px 0 0;
+          }
+
+          .documents-toolbar .btn {
+            width: 100%;
+            justify-content: center;
           }
 
           .documents-navigation {
@@ -819,7 +1239,8 @@ export default function DocumentsPage() {
             align-items: center;
           }
 
-          .documents-file-row .documents-row-action {
+          .documents-file-row
+            .documents-row-action {
             padding-left: 4px;
           }
 
@@ -831,11 +1252,48 @@ export default function DocumentsPage() {
             font-size: 13px;
           }
 
-          .documents-folder-row .documents-row-action {
+          .documents-folder-row
+            .documents-row-action {
             padding-left: 8px;
           }
 
           .documents-back-bar .btn {
+            width: 100%;
+            justify-content: center;
+          }
+
+          .documents-modal-overlay {
+            align-items: flex-start;
+            padding: 16px;
+            padding-top: max(
+              16px,
+              env(safe-area-inset-top)
+            );
+          }
+
+          .documents-modal {
+            width: 100%;
+            max-height: calc(
+              100dvh - 32px
+            );
+            border-radius: 14px;
+          }
+
+          .documents-modal-header {
+            padding: 18px 18px 16px;
+          }
+
+          .documents-modal-body {
+            padding: 18px;
+          }
+
+          .documents-modal-footer {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            padding: 14px 18px 18px;
+          }
+
+          .documents-modal-footer .btn {
             width: 100%;
             justify-content: center;
           }
