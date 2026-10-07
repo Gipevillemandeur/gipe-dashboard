@@ -47,14 +47,14 @@ export async function middleware(
   const {
     response,
     authenticated,
-    admin,
+    authorized,
   } = await updateSession(
     request
   );
 
   if (
     !authenticated ||
-    !admin
+    !authorized
   ) {
     const loginUrl =
       new URL(
@@ -64,7 +64,7 @@ export async function middleware(
 
     if (
       authenticated &&
-      !admin
+      !authorized
     ) {
       loginUrl.searchParams.set(
         'error',
