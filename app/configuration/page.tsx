@@ -414,6 +414,7 @@ export default function ConfigurationPage() {
             </span>
           </div>
           </div>
+          </div>
         </Link>
       </div>
 
