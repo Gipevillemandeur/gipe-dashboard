@@ -51,17 +51,15 @@ const items = [
     icon: CalendarDays,
   },
   {
-    href: '#',
-    label: 'Documents',
+    href: '/documents',
+    label: 'Docs Drive',
     icon: FileText,
   },
 ];
 
 export default function Sidebar() {
   const pathname = usePathname();
-
-  const [mobileOpen, setMobileOpen] =
-    useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   useEffect(() => {
     setMobileOpen(false);
@@ -82,137 +80,105 @@ export default function Sidebar() {
 
   return (
     <>
-      {/* Barre mobile */}
-      <header className="mobile-header">
-        <button
-          type="button"
-          className="mobile-menu-button"
-          onClick={() =>
-            setMobileOpen(true)
-          }
-          aria-label="Ouvrir le menu"
-        >
-          <Menu size={22} />
-        </button>
+      {/* Bouton hamburger mobile */}
+      <button
+        type="button"
+        className="sidebar-mobile-toggle"
+        onClick={() => setMobileOpen(true)}
+        aria-label="Ouvrir le menu"
+      >
+        <Menu size={24} />
+      </button>
 
-        <div className="mobile-brand">
-          <div className="mobile-brand-mark">
-            G
-          </div>
-
-          <div>
-            <strong>
-              GIPE Villemandeur
-            </strong>
-
-            <span>
-              Centre de gestion
-            </span>
-          </div>
-        </div>
-      </header>
-
-      {/* Fond derrière le menu */}
+      {/* Fond sombre mobile */}
       {mobileOpen && (
         <button
           type="button"
-          className="mobile-overlay"
-          onClick={() =>
-            setMobileOpen(false)
-          }
+          className="sidebar-overlay"
+          onClick={() => setMobileOpen(false)}
           aria-label="Fermer le menu"
         />
       )}
 
-      {/* Menu */}
       <aside
         className={`sidebar ${
-          mobileOpen
-            ? 'sidebar-mobile-open'
-            : ''
+          mobileOpen ? 'sidebar-mobile-open' : ''
         }`}
       >
-        <div className="brand">
-          <div className="brand-mark">
-            G
-          </div>
+        <div className="sidebar-header">
+          <div className="sidebar-brand">
+            <div className="sidebar-logo">G</div>
 
-          <div className="brand-text">
-            <strong>
-              GIPE Villemandeur
-            </strong>
-
-            <span>
-              Centre de gestion
-            </span>
+            <div>
+              <div className="sidebar-title">GIPE</div>
+              <div className="sidebar-subtitle">Villemandeur</div>
+            </div>
           </div>
 
           <button
             type="button"
-            className="mobile-close-button"
-            onClick={() =>
-              setMobileOpen(false)
-            }
+            className="sidebar-mobile-close"
+            onClick={() => setMobileOpen(false)}
             aria-label="Fermer le menu"
           >
             <X size={22} />
           </button>
         </div>
 
-        <nav className="nav">
+        <nav className="sidebar-nav">
           {items.map((item) => {
             const Icon = item.icon;
 
-            const active =
-              item.href !== '#' &&
-              (pathname === item.href ||
-                pathname.startsWith(
-                  `${item.href}/`
-                ));
+            const isActive =
+              item.href === '/'
+                ? pathname === '/'
+                : pathname === item.href ||
+                  pathname.startsWith(`${item.href}/`);
 
             return (
               <Link
-                className={
-                  active ? 'active' : ''
-                }
+                key={item.href}
                 href={item.href}
-                key={item.label}
+                className={`sidebar-link ${
+                  isActive ? 'sidebar-link-active' : ''
+                }`}
               >
-                <Icon size={18} />
-                {item.label}
+                <Icon size={20} strokeWidth={2} />
+                <span>{item.label}</span>
               </Link>
             );
           })}
+        </nav>
 
-          <div className="nav-sep" />
+        <div className="sidebar-bottom">
+          <Link
+            href="/configuration"
+            className={`sidebar-link ${
+              pathname === '/configuration' ||
+              pathname.startsWith('/configuration/')
+                ? 'sidebar-link-active'
+                : ''
+            }`}
+          >
+            <Settings size={20} strokeWidth={2} />
+            <span>Configuration</span>
+          </Link>
 
           <Link
-            className={
-              pathname ===
-                '/configuration' ||
-              pathname.startsWith(
-                '/configuration/'
-              ) ||
-              pathname ===
-                '/import-college'
-                ? 'active'
+            href="/guide"
+            className={`sidebar-link ${
+              pathname === '/guide' ||
+              pathname.startsWith('/guide/')
+                ? 'sidebar-link-active'
                 : ''
-            }
-            href="/configuration"
+            }`}
           >
-            <Settings size={18} />
-            Configuration
+            <BookOpen size={20} strokeWidth={2} />
+            <span>Guide de passation</span>
           </Link>
-
-          <Link href="#">
-            <BookOpen size={18} />
-            Guide de passation
-          </Link>
-
-          <div className="nav-sep" />
 
           <LogoutButton />
-        </nav>
+        </div>
       </aside>
     </>
   );
