@@ -4,8 +4,21 @@ import { updateSession } from '@/lib/supabase/proxy';
 export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
 
-  // Ressources Next.js et fichiers statiques :
-  // ils ne doivent jamais être redirigés vers /login.
+  // ---------------------------------------------------------
+  // Vercel Cron
+  // ---------------------------------------------------------
+  // Cette route possède sa propre protection avec CRON_SECRET.
+  // Elle ne doit donc pas passer par l'authentification
+  // normale du dashboard.
+  if (
+    pathname === '/api/agenda/cleanup-cron'
+  ) {
+    return NextResponse.next();
+  }
+
+  // ---------------------------------------------------------
+  // Ressources Next.js et fichiers statiques
+  // ---------------------------------------------------------
   if (
     pathname.startsWith('/_next/') ||
     pathname === '/favicon.ico' ||
@@ -15,7 +28,9 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // APIs publiques utilisées par appconseils.
+  // ---------------------------------------------------------
+  // APIs publiques utilisées par appconseils
+  // ---------------------------------------------------------
   if (
     pathname === '/api/conseils/public' ||
     pathname === '/api/conseils/send-pdf'
@@ -23,23 +38,47 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Page de connexion.
+  // ---------------------------------------------------------
+  // Page de connexion
+  // ---------------------------------------------------------
   if (pathname === '/login') {
     return NextResponse.next();
   }
 
-  const { response, authenticated, admin } = await updateSession(request);
+  // ---------------------------------------------------------
+  // Authentification normale du dashboard
+  // ---------------------------------------------------------
+  const {
+    response,
+    authenticated,
+    admin,
+  } = await updateSession(request);
 
   if (!authenticated || !admin) {
-    const loginUrl = new URL('/login', request.url);
+    const loginUrl =
+      new URL(
+        '/login',
+        request.url
+      );
 
-    if (authenticated && !admin) {
-      loginUrl.searchParams.set('error', 'unauthorized');
+    if (
+      authenticated &&
+      !admin
+    ) {
+      loginUrl.searchParams.set(
+        'error',
+        'unauthorized'
+      );
     }
 
-    loginUrl.searchParams.set('next', pathname);
+    loginUrl.searchParams.set(
+      'next',
+      pathname
+    );
 
-    return NextResponse.redirect(loginUrl);
+    return NextResponse.redirect(
+      loginUrl
+    );
   }
 
   return response;
