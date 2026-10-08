@@ -1,48 +1,52 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { requireOfficePermission } from '@/lib/office-auth';
 
-async function requireAdmin() {
-  const supabase = await createClient();
+async function requireConfigurationAccess() {
+  try {
+    const access = await requireOfficePermission('configuration');
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+    return {
+      adminClient: createAdminClient(),
+      access,
+    };
+  } catch (error) {
+    if (error instanceof Error) {
+      if (error.message === 'AUTHENTICATION_REQUIRED') {
+        return {
+          error: NextResponse.json(
+            { error: 'Non authentifié.' },
+            { status: 401 }
+          ),
+        };
+      }
 
-  if (!user) {
+      if (
+        error.message === 'OFFICE_ACCESS_DENIED' ||
+        error.message === 'OFFICE_PERMISSION_DENIED'
+      ) {
+        return {
+          error: NextResponse.json(
+            { error: 'Compte non autorisé.' },
+            { status: 403 }
+          ),
+        };
+      }
+    }
+
+    console.error('Erreur contrôle accès configuration:', error);
+
     return {
       error: NextResponse.json(
-        { error: 'Non authentifié.' },
-        { status: 401 }
+        { error: 'Erreur de contrôle des accès.' },
+        { status: 500 }
       ),
     };
   }
-
-  const adminClient = createAdminClient();
-
-  const { data: admin } = await adminClient
-    .from('gipe_admins')
-    .select('user_id')
-    .eq('user_id', user.id)
-    .maybeSingle();
-
-  if (!admin) {
-    return {
-      error: NextResponse.json(
-        { error: 'Accès refusé.' },
-        { status: 403 }
-      ),
-    };
-  }
-
-  return {
-    adminClient,
-    user,
-  };
 }
 
 export async function GET(request: NextRequest) {
-  const auth = await requireAdmin();
+  const auth = await requireConfigurationAccess();
 
   if ('error' in auth) {
     return auth.error;
@@ -158,7 +162,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function PUT(request: NextRequest) {
-  const auth = await requireAdmin();
+  const auth = await requireConfigurationAccess();
 
   if ('error' in auth) {
     return auth.error;
@@ -810,7 +814,7 @@ export async function PUT(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
-  const auth = await requireAdmin();
+  const auth = await requireConfigurationAccess();
 
   if ('error' in auth) {
     return auth.error;
