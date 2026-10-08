@@ -1,115 +1,81 @@
-import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
-import { createAdminClient } from '@/lib/supabase/admin';
+import { NextResponse } from 'next/server'
+import { requireOfficePermission } from '@/lib/office-auth'
+import { createAdminClient } from '@/lib/supabase/admin'
 
 type GoogleTokenResponse = {
-  access_token?: string;
-  error?: string;
-  error_description?: string;
-};
-
-type GoogleDriveUploadResponse = {
-  id?: string;
-  name?: string;
-  mimeType?: string;
-  size?: string;
-  modifiedTime?: string;
-  webViewLink?: string;
-  parents?: string[];
-  error?: {
-    message?: string;
-  };
-};
-
-async function getAuthenticatedUserId() {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return null;
-  }
-
-  const { data: admin } = await supabase
-    .from('gipe_admins')
-    .select('user_id')
-    .eq('user_id', user.id)
-    .maybeSingle();
-
-  if (!admin) {
-    return null;
-  }
-
-  return user.id;
+  access_token?: string
+  error?: string
+  error_description?: string
 }
 
-async function getGoogleAccessToken(
-  userId: string
-) {
-  const adminClient =
-    createAdminClient();
+type GoogleDriveUploadResponse = {
+  id?: string
+  name?: string
+  mimeType?: string
+  size?: string
+  modifiedTime?: string
+  webViewLink?: string
+  parents?: string[]
+  error?: {
+    message?: string
+  }
+}
+
+async function getGoogleAccessToken(userId: string) {
+  const adminClient = createAdminClient()
 
   const { data: connection, error } =
     await adminClient
       .from('google_drive_connections')
       .select('refresh_token')
       .eq('user_id', userId)
-      .maybeSingle();
+      .maybeSingle()
 
   if (error) {
     throw new Error(
       'Impossible de récupérer la connexion Google Drive.'
-    );
+    )
   }
 
   if (!connection?.refresh_token) {
     throw new Error(
       'Google Drive n’est pas connecté.'
-    );
+    )
   }
 
   const clientId =
-    process.env.GOOGLE_CLIENT_ID;
+    process.env.GOOGLE_CLIENT_ID
 
   const clientSecret =
-    process.env.GOOGLE_CLIENT_SECRET;
+    process.env.GOOGLE_CLIENT_SECRET
 
-  if (
-    !clientId ||
-    !clientSecret
-  ) {
+  if (!clientId || !clientSecret) {
     throw new Error(
       'La configuration Google OAuth est incomplète.'
-    );
+    )
   }
 
-  const tokenResponse =
-    await fetch(
-      'https://oauth2.googleapis.com/token',
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type':
-            'application/x-www-form-urlencoded',
-        },
-        body:
-          new URLSearchParams({
-            client_id: clientId,
-            client_secret:
-              clientSecret,
-            refresh_token:
-              connection.refresh_token,
-            grant_type:
-              'refresh_token',
-          }).toString(),
-        cache: 'no-store',
-      }
-    );
+  const tokenResponse = await fetch(
+    'https://oauth2.googleapis.com/token',
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type':
+          'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({
+        client_id: clientId,
+        client_secret: clientSecret,
+        refresh_token:
+          connection.refresh_token,
+        grant_type: 'refresh_token',
+      }).toString(),
+      cache: 'no-store',
+    }
+  )
 
   const tokenData =
-    (await tokenResponse.json()) as GoogleTokenResponse;
+    (await tokenResponse.json()) as GoogleTokenResponse
 
   if (
     !tokenResponse.ok ||
@@ -118,47 +84,47 @@ async function getGoogleAccessToken(
     console.error(
       'Erreur renouvellement token Google:',
       tokenData
-    );
+    )
 
     throw new Error(
       'Impossible d’obtenir un accès au Google Drive.'
-    );
+    )
   }
 
-  return tokenData.access_token;
+  return tokenData.access_token
 }
 
 export async function POST(
   request: Request
 ) {
   try {
-    const userId =
-      await getAuthenticatedUserId();
+    const access =
+      await requireOfficePermission('drive')
 
-    if (!userId) {
+    if (!access.userId) {
       return NextResponse.json(
         {
           error:
-            'Accès réservé aux administrateurs.',
+            'Utilisateur non identifié.',
         },
-        { status: 403 }
-      );
+        { status: 401 }
+      )
     }
 
     const formData =
-      await request.formData();
+      await request.formData()
 
     const file =
-      formData.get('file');
+      formData.get('file')
 
     const parentIdValue =
-      formData.get('parentId');
+      formData.get('parentId')
 
     const parentId =
       typeof parentIdValue === 'string' &&
       parentIdValue.trim()
         ? parentIdValue.trim()
-        : 'root';
+        : 'root'
 
     if (!(file instanceof File)) {
       return NextResponse.json(
@@ -167,7 +133,7 @@ export async function POST(
             'Aucun fichier n’a été fourni.',
         },
         { status: 400 }
-      );
+      )
     }
 
     if (file.size === 0) {
@@ -177,25 +143,25 @@ export async function POST(
             'Le fichier est vide.',
         },
         { status: 400 }
-      );
+      )
     }
 
     const accessToken =
       await getGoogleAccessToken(
-        userId
-      );
+        access.userId
+      )
 
     const fileBuffer =
-      await file.arrayBuffer();
+      await file.arrayBuffer()
 
     const mimeType =
       file.type ||
-      'application/octet-stream';
+      'application/octet-stream'
 
     const metadata = {
       name: file.name,
       parents: [parentId],
-    };
+    }
 
     const multipartBody =
       new Blob(
@@ -206,9 +172,7 @@ export async function POST(
           `\r\n`,
           `--gipe-drive-boundary\r\n`,
           `Content-Type: ${mimeType}\r\n\r\n`,
-          new Uint8Array(
-            fileBuffer
-          ),
+          new Uint8Array(fileBuffer),
           `\r\n`,
           `--gipe-drive-boundary--`,
         ],
@@ -216,7 +180,7 @@ export async function POST(
           type:
             'multipart/related; boundary=gipe-drive-boundary',
         }
-      );
+      )
 
     const uploadResponse =
       await fetch(
@@ -232,16 +196,16 @@ export async function POST(
           body: multipartBody,
           cache: 'no-store',
         }
-      );
+      )
 
     const uploadData =
-      (await uploadResponse.json()) as GoogleDriveUploadResponse;
+      (await uploadResponse.json()) as GoogleDriveUploadResponse
 
     if (!uploadResponse.ok) {
       console.error(
         'Erreur upload Google Drive:',
         uploadData
-      );
+      )
 
       return NextResponse.json(
         {
@@ -253,7 +217,7 @@ export async function POST(
           status:
             uploadResponse.status || 500,
         }
-      );
+      )
     }
 
     return NextResponse.json({
@@ -271,12 +235,42 @@ export async function POST(
         parents:
           uploadData.parents,
       },
-    });
+    })
   } catch (error) {
+    if (error instanceof Error) {
+      if (
+        error.message ===
+        'AUTHENTICATION_REQUIRED'
+      ) {
+        return NextResponse.json(
+          {
+            error:
+              'Non authentifié.',
+          },
+          { status: 401 }
+        )
+      }
+
+      if (
+        error.message ===
+          'OFFICE_ACCESS_DENIED' ||
+        error.message ===
+          'OFFICE_PERMISSION_DENIED'
+      ) {
+        return NextResponse.json(
+          {
+            error:
+              'Compte non autorisé.',
+          },
+          { status: 403 }
+        )
+      }
+    }
+
     console.error(
       'Erreur API upload Google Drive:',
       error
-    );
+    )
 
     return NextResponse.json(
       {
@@ -286,6 +280,6 @@ export async function POST(
             : 'Impossible d’envoyer le fichier.',
       },
       { status: 500 }
-    );
+    )
   }
 }
