@@ -1,24 +1,59 @@
 import { NextResponse } from 'next/server'
-import { requireOfficePermission } from '@/lib/office-auth'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { requireOfficePermission } from '@/lib/office-auth'
 
 const MAX_FILE_SIZE = 8 * 1024 * 1024
 
-async function requireOfficeAccess(permission: string) {
+async function requireAgendaAccess() {
   try {
-    await requireOfficePermission(permission)
-    return { ok: true }
+    await requireOfficePermission('agenda')
+
+    return {
+      admin: createAdminClient(),
+    }
   } catch (error) {
     if (error instanceof Error) {
-      if (error.message === 'AUTHENTICATION_REQUIRED') {
-        return { error: NextResponse.json({ error: 'Non authentifié.' }, { status: 401 }) }
+      if (
+        error.message ===
+        'AUTHENTICATION_REQUIRED'
+      ) {
+        return {
+          error: NextResponse.json(
+            { error: 'Non authentifié.' },
+            { status: 401 }
+          ),
+        }
       }
-      if (error.message === 'OFFICE_ACCESS_DENIED' || error.message === 'OFFICE_PERMISSION_DENIED') {
-        return { error: NextResponse.json({ error: 'Compte non autorisé.' }, { status: 403 }) }
+
+      if (
+        error.message ===
+          'OFFICE_ACCESS_DENIED' ||
+        error.message ===
+          'OFFICE_PERMISSION_DENIED'
+      ) {
+        return {
+          error: NextResponse.json(
+            { error: 'Compte non autorisé.' },
+            { status: 403 }
+          ),
+        }
       }
     }
-    console.error('Erreur contrôle accès bureau:', error)
-    return { error: NextResponse.json({ error: 'Erreur de contrôle des accès.' }, { status: 500 }) }
+
+    console.error(
+      'Erreur contrôle accès agenda:',
+      error
+    )
+
+    return {
+      error: NextResponse.json(
+        {
+          error:
+            'Erreur de contrôle des accès.',
+        },
+        { status: 500 }
+      ),
+    }
   }
 }
 
@@ -56,25 +91,36 @@ async function uploadImage(
   file: File
 ) {
   if (!file.type.startsWith('image/')) {
-    throw new Error('Le fichier doit être une image.')
+    throw new Error(
+      'Le fichier doit être une image.'
+    )
   }
 
   if (file.size > MAX_FILE_SIZE) {
-    throw new Error("L’image ne doit pas dépasser 8 Mo.")
+    throw new Error(
+      "L’image ne doit pas dépasser 8 Mo."
+    )
   }
 
   const extension = getExtension(file.name)
 
-  const filePath = `internal-agenda/${crypto.randomUUID()}.${extension}`
+  const filePath =
+    `internal-agenda/${crypto.randomUUID()}.${extension}`
 
   const bytes = await file.arrayBuffer()
 
-  const { error } = await admin.storage
-    .from('images')
-    .upload(filePath, bytes, {
-      contentType: file.type,
-      upsert: false,
-    })
+  const { error } =
+    await admin.storage
+      .from('images')
+      .upload(
+        filePath,
+        bytes,
+        {
+          contentType:
+            file.type,
+          upsert: false,
+        }
+      )
 
   if (error) {
     throw new Error(
@@ -82,16 +128,22 @@ async function uploadImage(
     )
   }
 
-  const { data } = admin.storage
-    .from('images')
-    .getPublicUrl(filePath)
+  const { data } =
+    admin.storage
+      .from('images')
+      .getPublicUrl(
+        filePath
+      )
 
   return data.publicUrl
 }
 
 async function deleteSupabaseImage(
   admin: ReturnType<typeof createAdminClient>,
-  imageUrl: string | null | undefined
+  imageUrl:
+    | string
+    | null
+    | undefined
 ) {
   if (
     !imageUrl ||
@@ -105,15 +157,19 @@ async function deleteSupabaseImage(
   const marker =
     '/storage/v1/object/public/images/'
 
-  const index = imageUrl.indexOf(marker)
+  const index =
+    imageUrl.indexOf(marker)
 
   if (index === -1) {
     return
   }
 
-  const path = decodeURIComponent(
-    imageUrl.slice(index + marker.length)
-  )
+  const path =
+    decodeURIComponent(
+      imageUrl.slice(
+        index + marker.length
+      )
+    )
 
   if (!path) {
     return
@@ -164,7 +220,8 @@ function validateEventInput(values: {
 }
 
 export async function GET() {
-  const auth = await requireOfficeAccess('agenda')
+  const auth =
+    await requireAgendaAccess()
 
   if ('error' in auth) {
     return auth.error
@@ -172,12 +229,14 @@ export async function GET() {
 
   const { admin } = auth
 
-  const { data: schoolYear, error: schoolYearError } =
-    await admin
-      .from('school_years')
-      .select('id,label')
-      .eq('is_active', true)
-      .maybeSingle()
+  const {
+    data: schoolYear,
+    error: schoolYearError,
+  } = await admin
+    .from('school_years')
+    .select('id,label')
+    .eq('is_active', true)
+    .maybeSingle()
 
   if (schoolYearError) {
     return NextResponse.json(
@@ -196,22 +255,37 @@ export async function GET() {
     })
   }
 
-  const { data, error } = await admin
-    .from('internal_agenda_events')
-    .select(
-      'id,school_year_id,title,description,event_date,start_time,end_time,location,image_url,category,published_on_site,site_event_id,created_at,updated_at'
-    )
-    .eq('school_year_id', schoolYear.id)
-    .order('event_date', {
-      ascending: true,
-    })
-    .order('start_time', {
-      ascending: true,
-      nullsFirst: false,
-    })
-    .order('id', {
-      ascending: true,
-    })
+  const { data, error } =
+    await admin
+      .from(
+        'internal_agenda_events'
+      )
+      .select(
+        'id,school_year_id,title,description,event_date,start_time,end_time,location,image_url,category,published_on_site,site_event_id,created_at,updated_at'
+      )
+      .eq(
+        'school_year_id',
+        schoolYear.id
+      )
+      .order(
+        'event_date',
+        {
+          ascending: true,
+        }
+      )
+      .order(
+        'start_time',
+        {
+          ascending: true,
+          nullsFirst: false,
+        }
+      )
+      .order(
+        'id',
+        {
+          ascending: true,
+        }
+      )
 
   if (error) {
     return NextResponse.json(
@@ -229,8 +303,11 @@ export async function GET() {
   })
 }
 
-export async function POST(request: Request) {
-  const auth = await requireOfficeAccess('agenda')
+export async function POST(
+  request: Request
+) {
+  const auth =
+    await requireAgendaAccess()
 
   if ('error' in auth) {
     return auth.error
@@ -239,15 +316,19 @@ export async function POST(request: Request) {
   const { admin } = auth
 
   try {
-    const formData = await request.formData()
+    const formData =
+      await request.formData()
 
     const title = cleanString(
       formData.get('title')
     )
 
-    const description = cleanString(
-      formData.get('description')
-    )
+    const description =
+      cleanString(
+        formData.get(
+          'description'
+        )
+      )
 
     const date = cleanString(
       formData.get('date')
@@ -257,38 +338,50 @@ export async function POST(request: Request) {
       formData.get('time')
     )
 
-    const location = cleanString(
-      formData.get('location')
-    )
+    const location =
+      cleanString(
+        formData.get('location')
+      )
 
-    const category = cleanString(
-      formData.get('category')
-    )
+    const category =
+      cleanString(
+        formData.get('category')
+      )
 
-    const imageFile = formData.get('imageFile')
+    const imageFile =
+      formData.get(
+        'imageFile'
+      )
 
-    const validationError = validateEventInput({
-      title,
-      description,
-      date,
-      time,
-      location,
-      category,
-    })
+    const validationError =
+      validateEventInput({
+        title,
+        description,
+        date,
+        time,
+        location,
+        category,
+      })
 
     if (validationError) {
       return NextResponse.json(
-        { error: validationError },
+        {
+          error:
+            validationError,
+        },
         { status: 400 }
       )
     }
 
-    const { data: schoolYear, error: schoolYearError } =
-      await admin
-        .from('school_years')
-        .select('id,label')
-        .eq('is_active', true)
-        .maybeSingle()
+    const {
+      data: schoolYear,
+      error:
+        schoolYearError,
+    } = await admin
+      .from('school_years')
+      .select('id,label')
+      .eq('is_active', true)
+      .maybeSingle()
 
     if (schoolYearError) {
       return NextResponse.json(
@@ -316,24 +409,37 @@ export async function POST(request: Request) {
       imageFile instanceof File &&
       imageFile.size > 0
     ) {
-      imageUrl = await uploadImage(
-        admin,
-        imageFile
-      )
+      imageUrl =
+        await uploadImage(
+          admin,
+          imageFile
+        )
     }
 
-    const { data, error } = await admin
-      .from('internal_agenda_events')
+    const {
+      data,
+      error,
+    } = await admin
+      .from(
+        'internal_agenda_events'
+      )
       .insert({
-        school_year_id: schoolYear.id,
+        school_year_id:
+          schoolYear.id,
         title,
-        description: description || null,
+        description:
+          description ||
+          null,
         event_date: date,
-        start_time: time || null,
+        start_time:
+          time || null,
         end_time: null,
-        location: location || null,
-        image_url: imageUrl || null,
-        category: category || null,
+        location:
+          location || null,
+        image_url:
+          imageUrl || null,
+        category:
+          category || null,
       })
       .select(
         'id,school_year_id,title,description,event_date,start_time,end_time,location,image_url,category,published_on_site,site_event_id,created_at,updated_at'
@@ -377,8 +483,11 @@ export async function POST(request: Request) {
   }
 }
 
-export async function PUT(request: Request) {
-  const auth = await requireOfficeAccess('agenda')
+export async function PUT(
+  request: Request
+) {
+  const auth =
+    await requireAgendaAccess()
 
   if ('error' in auth) {
     return auth.error
@@ -387,7 +496,8 @@ export async function PUT(request: Request) {
   const { admin } = auth
 
   try {
-    const formData = await request.formData()
+    const formData =
+      await request.formData()
 
     const id = cleanString(
       formData.get('id')
@@ -397,9 +507,12 @@ export async function PUT(request: Request) {
       formData.get('title')
     )
 
-    const description = cleanString(
-      formData.get('description')
-    )
+    const description =
+      cleanString(
+        formData.get(
+          'description'
+        )
+      )
 
     const date = cleanString(
       formData.get('date')
@@ -409,92 +522,136 @@ export async function PUT(request: Request) {
       formData.get('time')
     )
 
-    const location = cleanString(
-      formData.get('location')
-    )
+    const location =
+      cleanString(
+        formData.get('location')
+      )
 
-    const category = cleanString(
-      formData.get('category')
-    )
+    const category =
+      cleanString(
+        formData.get('category')
+      )
 
     const keepImage =
-      formData.get('keepImage') === 'true'
+      formData.get(
+        'keepImage'
+      ) === 'true'
 
-    const imageFile = formData.get('imageFile')
+    const imageFile =
+      formData.get(
+        'imageFile'
+      )
 
     if (!id) {
       return NextResponse.json(
-        { error: 'Événement introuvable.' },
+        {
+          error:
+            'Événement introuvable.',
+        },
         { status: 400 }
       )
     }
 
-    const validationError = validateEventInput({
-      title,
-      description,
-      date,
-      time,
-      location,
-      category,
-    })
+    const validationError =
+      validateEventInput({
+        title,
+        description,
+        date,
+        time,
+        location,
+        category,
+      })
 
     if (validationError) {
       return NextResponse.json(
-        { error: validationError },
+        {
+          error:
+            validationError,
+        },
         { status: 400 }
       )
     }
 
     const {
       data: existing,
-      error: existingError,
+      error:
+        existingError,
     } = await admin
-      .from('internal_agenda_events')
-      .select('id,image_url')
-      .eq('id', id)
+      .from(
+        'internal_agenda_events'
+      )
+      .select(
+        'id,image_url'
+      )
+      .eq(
+        'id',
+        id
+      )
       .maybeSingle()
 
     if (existingError) {
       return NextResponse.json(
-        { error: existingError.message },
+        {
+          error:
+            existingError.message,
+        },
         { status: 500 }
       )
     }
 
     if (!existing) {
       return NextResponse.json(
-        { error: 'Événement introuvable.' },
+        {
+          error:
+            'Événement introuvable.',
+        },
         { status: 404 }
       )
     }
 
     let imageUrl =
       keepImage
-        ? existing.image_url || null
+        ? existing.image_url ||
+          null
         : null
 
     if (
       imageFile instanceof File &&
       imageFile.size > 0
     ) {
-      imageUrl = await uploadImage(
-        admin,
-        imageFile
-      )
+      imageUrl =
+        await uploadImage(
+          admin,
+          imageFile
+        )
     }
 
-    const { data, error } = await admin
-      .from('internal_agenda_events')
+    const {
+      data,
+      error,
+    } = await admin
+      .from(
+        'internal_agenda_events'
+      )
       .update({
         title,
-        description: description || null,
+        description:
+          description ||
+          null,
         event_date: date,
-        start_time: time || null,
-        location: location || null,
-        image_url: imageUrl,
-        category: category || null,
+        start_time:
+          time || null,
+        location:
+          location || null,
+        image_url:
+          imageUrl,
+        category:
+          category || null,
       })
-      .eq('id', id)
+      .eq(
+        'id',
+        id
+      )
       .select(
         'id,school_year_id,title,description,event_date,start_time,end_time,location,image_url,category,published_on_site,site_event_id,created_at,updated_at'
       )
@@ -523,7 +680,8 @@ export async function PUT(request: Request) {
 
     if (
       existing.image_url &&
-      existing.image_url !== imageUrl
+      existing.image_url !==
+        imageUrl
     ) {
       await deleteSupabaseImage(
         admin,
@@ -548,8 +706,11 @@ export async function PUT(request: Request) {
   }
 }
 
-export async function DELETE(request: Request) {
-  const auth = await requireOfficeAccess('agenda')
+export async function DELETE(
+  request: Request
+) {
+  const auth =
+    await requireAgendaAccess()
 
   if ('error' in auth) {
     return auth.error
@@ -558,44 +719,70 @@ export async function DELETE(request: Request) {
   const { admin } = auth
 
   try {
-    const body = await request.json()
+    const body =
+      await request.json()
 
-    const id = cleanString(body?.id)
+    const id = cleanString(
+      body?.id
+    )
 
     if (!id) {
       return NextResponse.json(
-        { error: 'Événement introuvable.' },
+        {
+          error:
+            'Événement introuvable.',
+        },
         { status: 400 }
       )
     }
 
     const {
       data: existing,
-      error: existingError,
+      error:
+        existingError,
     } = await admin
-      .from('internal_agenda_events')
-      .select('id,image_url')
-      .eq('id', id)
+      .from(
+        'internal_agenda_events'
+      )
+      .select(
+        'id,image_url'
+      )
+      .eq(
+        'id',
+        id
+      )
       .maybeSingle()
 
     if (existingError) {
       return NextResponse.json(
-        { error: existingError.message },
+        {
+          error:
+            existingError.message,
+        },
         { status: 500 }
       )
     }
 
     if (!existing) {
       return NextResponse.json(
-        { error: 'Événement introuvable.' },
+        {
+          error:
+            'Événement introuvable.',
+        },
         { status: 404 }
       )
     }
 
-    const { error } = await admin
-      .from('internal_agenda_events')
-      .delete()
-      .eq('id', id)
+    const { error } =
+      await admin
+        .from(
+          'internal_agenda_events'
+        )
+        .delete()
+        .eq(
+          'id',
+          id
+        )
 
     if (error) {
       return NextResponse.json(
