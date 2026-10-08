@@ -1,76 +1,88 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { requireOfficePermission } from '@/lib/office-auth';
 import { createAdminClient } from '@/lib/supabase/admin';
 import {
   buildAnnualReportPdf,
   type AnnualReportData,
 } from '@/lib/annual-report-pdf';
 
-async function requireAdmin() {
-  const supabase = await createClient();
+async function requireConfigurationAccess() {
+  try {
+    await requireOfficePermission('configuration');
 
-  const { data: authData } = await supabase.auth.getClaims();
-  const userId = authData?.claims?.sub;
+    return {};
+  } catch (error) {
+    if (error instanceof Error) {
+      if (
+        error.message === 'AUTHENTICATION_REQUIRED'
+      ) {
+        return {
+          error: NextResponse.json(
+            { error: 'Non authentifié.' },
+            { status: 401 }
+          ),
+        };
+      }
 
-  if (!userId) {
-    return {
-      error: NextResponse.json(
-        { error: 'Non authentifié.' },
-        { status: 401 }
-      ),
-    };
-  }
+      if (
+        error.message === 'OFFICE_ACCESS_DENIED' ||
+        error.message === 'OFFICE_PERMISSION_DENIED'
+      ) {
+        return {
+          error: NextResponse.json(
+            { error: 'Compte non autorisé.' },
+            { status: 403 }
+          ),
+        };
+      }
+    }
 
-  const admin = createAdminClient();
+    console.error(
+      'Erreur contrôle accès configuration :',
+      error
+    );
 
-  const { data, error } = await admin
-    .from('gipe_admins')
-    .select('user_id')
-    .eq('user_id', userId)
-    .maybeSingle();
-
-  if (error) {
     return {
       error: NextResponse.json(
         {
           error:
-            'Impossible de vérifier les droits administrateur.',
+            'Erreur de contrôle des accès.',
         },
         { status: 500 }
       ),
     };
   }
-
-  if (!data) {
-    return {
-      error: NextResponse.json(
-        { error: 'Compte non autorisé.' },
-        { status: 403 }
-      ),
-    };
-  }
-
-  return { admin };
 }
 
 async function getAnnualReportData() {
-  const admin = createAdminClient();
+  const admin =
+    createAdminClient();
 
-  const { data: year, error: yearError } = await admin
+  const {
+    data: year,
+    error: yearError,
+  } = await admin
     .from('school_years')
     .select('id,label')
     .eq('is_active', true)
     .maybeSingle();
 
   if (yearError) {
-    throw new Error(yearError.message);
+    throw new Error(
+      yearError.message
+    );
   }
 
   if (!year) {
-    throw new Error('Aucune année scolaire active.');
+    throw new Error(
+      'Aucune année scolaire active.'
+    );
   }
 
-  const { data: memberships, error: membershipsError } = await admin
+  const {
+    data: memberships,
+    error: membershipsError,
+  } = await admin
     .from('gipe_memberships')
     .select(`
       id,
@@ -81,14 +93,22 @@ async function getAnnualReportData() {
         )
       )
     `)
-    .eq('school_year_id', year.id);
+    .eq(
+      'school_year_id',
+      year.id
+    );
 
   if (membershipsError) {
-    throw new Error(membershipsError.message);
+    throw new Error(
+      membershipsError.message
+    );
   }
 
-  const rows = memberships || [];
-  const byClass = new Map<string, Set<string>>();
+  const rows =
+    memberships || [];
+
+  const byClass =
+    new Map<string, Set<string>>();
 
   for (const membership of rows) {
     const children = Array.isArray(
@@ -97,83 +117,121 @@ async function getAnnualReportData() {
       ? membership.gipe_membership_children
       : [];
 
-    const classesForMember = new Set<string>();
+    const classesForMember =
+      new Set<string>();
 
     for (const child of children) {
-      const classData = Array.isArray(child.classes)
-        ? child.classes[0]
-        : child.classes;
+      const classData =
+        Array.isArray(child.classes)
+          ? child.classes[0]
+          : child.classes;
 
-      const className = classData?.name;
+      const className =
+        classData?.name;
 
       if (className) {
-        classesForMember.add(className);
+        classesForMember.add(
+          className
+        );
       }
     }
 
     for (const className of classesForMember) {
       if (!byClass.has(className)) {
-        byClass.set(className, new Set<string>());
+        byClass.set(
+          className,
+          new Set<string>()
+        );
       }
 
-      byClass.get(className)!.add(membership.id);
+      byClass
+        .get(className)!
+        .add(membership.id);
     }
   }
 
-  const adherentsByClass = Array.from(byClass.entries())
-    .map(([className, memberIds]) => ({
-      className,
-      count: memberIds.size,
-    }))
-    .sort((a, b) =>
-      a.className.localeCompare(b.className, 'fr', {
-        numeric: true,
-      })
-    );
+  const adherentsByClass =
+    Array.from(byClass.entries())
+      .map(
+        ([className, memberIds]) => ({
+          className,
+          count: memberIds.size,
+        })
+      )
+      .sort((a, b) =>
+        a.className.localeCompare(
+          b.className,
+          'fr',
+          {
+            numeric: true,
+          }
+        )
+      );
 
   return {
     schoolYear: year.label,
-    totalAdherents: rows.length,
+    totalAdherents:
+      rows.length,
     adherentsByClass,
   };
 }
 
 export async function GET() {
-  const auth = await requireAdmin();
+  const auth =
+    await requireConfigurationAccess();
 
   if ('error' in auth) {
     return auth.error;
   }
 
   try {
-    const data = await getAnnualReportData();
+    const data =
+      await getAnnualReportData();
 
     const report: AnnualReportData = {
       ...data,
       totalRecettes: null,
       totalDepenses: null,
       solde: null,
-      closedAt: new Date().toISOString(),
+      closedAt:
+        new Date().toISOString(),
     };
 
-    const pdf = await buildAnnualReportPdf(report);
+    const pdf =
+      await buildAnnualReportPdf(
+        report
+      );
 
     // pdf-lib retourne un Uint8Array dont le type peut être basé
     // sur ArrayBufferLike. Next/TypeScript attend ici un vrai ArrayBuffer.
-    const body = new ArrayBuffer(pdf.byteLength);
-    new Uint8Array(body).set(pdf);
+    const body =
+      new ArrayBuffer(
+        pdf.byteLength
+      );
 
-    return new NextResponse(body, {
-      status: 200,
-      headers: {
-        'Content-Type': 'application/pdf',
-        'Content-Disposition':
-          `attachment; filename="Bilan-annuel-GIPE-${data.schoolYear}.pdf"`,
-        'Cache-Control': 'no-store',
-      },
-    });
+    new Uint8Array(body).set(
+      pdf
+    );
+
+    return new NextResponse(
+      body,
+      {
+        status: 200,
+        headers: {
+          'Content-Type':
+            'application/pdf',
+          'Content-Disposition':
+            `attachment; filename="Bilan-annuel-GIPE-${data.schoolYear}.pdf"`,
+          'Cache-Control':
+            'no-store',
+        },
+      }
+    );
   } catch (error) {
-    console.error('Erreur génération bilan PDF:', error);
+    console.error(
+      'Erreur génération bilan PDF:',
+      error
+    );
 
     return NextResponse.json(
       {
