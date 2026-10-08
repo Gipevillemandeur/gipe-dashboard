@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { requireOfficePermission } from '@/lib/office-auth'
 
 const BUCKET = 'instance-documents'
 const MAX_FILE_SIZE = 50 * 1024 * 1024
@@ -11,50 +11,50 @@ type RouteContext = {
   }>
 }
 
-async function requireAdmin() {
-  const supabase = await createClient()
-  const { data: authData } = await supabase.auth.getClaims()
-  const userId = authData?.claims?.sub
+async function requireSchoolingAccess() {
+  try {
+    const access = await requireOfficePermission('schooling')
 
-  if (!userId) {
     return {
-      error: NextResponse.json(
-        { error: 'Non authentifié.' },
-        { status: 401 }
-      ),
+      admin: createAdminClient(),
+      access,
     }
-  }
+  } catch (error) {
+    if (error instanceof Error) {
+      if (error.message === 'AUTHENTICATION_REQUIRED') {
+        return {
+          error: NextResponse.json(
+            { error: 'Non authentifié.' },
+            { status: 401 }
+          ),
+        }
+      }
 
-  const admin = createAdminClient()
+      if (
+        error.message === 'OFFICE_ACCESS_DENIED' ||
+        error.message === 'OFFICE_PERMISSION_DENIED'
+      ) {
+        return {
+          error: NextResponse.json(
+            { error: 'Compte non autorisé.' },
+            { status: 403 }
+          ),
+        }
+      }
+    }
 
-  const { data, error } = await admin
-    .from('gipe_admins')
-    .select('user_id')
-    .eq('user_id', userId)
-    .maybeSingle()
+    console.error(
+      'Erreur contrôle accès Scolarité :',
+      error
+    )
 
-  if (error) {
     return {
       error: NextResponse.json(
-        {
-          error:
-            'Impossible de vérifier les droits administrateur.',
-        },
+        { error: 'Erreur de contrôle des accès.' },
         { status: 500 }
       ),
     }
   }
-
-  if (!data) {
-    return {
-      error: NextResponse.json(
-        { error: 'Compte non autorisé.' },
-        { status: 403 }
-      ),
-    }
-  }
-
-  return { admin }
 }
 
 function sanitizeFileName(name: string) {
@@ -68,16 +68,21 @@ function sanitizeFileName(name: string) {
 }
 
 function formatDocumentName(name: string) {
-  const cleaned = sanitizeFileName(name)
+  const cleaned =
+    sanitizeFileName(name)
 
-  return cleaned || `document-${crypto.randomUUID()}`
+  return (
+    cleaned ||
+    `document-${crypto.randomUUID()}`
+  )
 }
 
 export async function GET(
   _request: Request,
   { params }: RouteContext
 ) {
-  const auth = await requireAdmin()
+  const auth =
+    await requireSchoolingAccess()
 
   if ('error' in auth) {
     return auth.error
@@ -85,7 +90,10 @@ export async function GET(
 
   const { id } = await params
 
-  const { data: meeting, error: meetingError } =
+  const {
+    data: meeting,
+    error: meetingError,
+  } =
     await auth.admin
       .from('instance_meetings')
       .select('id')
@@ -104,18 +112,35 @@ export async function GET(
 
   if (!meeting) {
     return NextResponse.json(
-      { error: 'Réunion introuvable.' },
+      {
+        error:
+          'Réunion introuvable.',
+      },
       { status: 404 }
     )
   }
 
-  const { data: documents, error } = await auth.admin
-    .from('instance_meeting_documents')
-    .select(
-      'id,meeting_id,file_name,file_url,file_type,file_size,created_at,updated_at'
-    )
-    .eq('meeting_id', id)
-    .order('created_at', { ascending: false })
+  const {
+    data: documents,
+    error,
+  } =
+    await auth.admin
+      .from(
+        'instance_meeting_documents'
+      )
+      .select(
+        'id,meeting_id,file_name,file_url,file_type,file_size,created_at,updated_at'
+      )
+      .eq(
+        'meeting_id',
+        id
+      )
+      .order(
+        'created_at',
+        {
+          ascending: false,
+        }
+      )
 
   if (error) {
     return NextResponse.json(
@@ -127,24 +152,36 @@ export async function GET(
     )
   }
 
-  const documentsWithUrls = await Promise.all(
-    (documents || []).map(async (document) => {
-      const { data: signedData, error: signedError } =
-        await auth.admin.storage
-          .from(BUCKET)
-          .createSignedUrl(document.file_url, 3600)
+  const documentsWithUrls =
+    await Promise.all(
+      (documents || []).map(
+        async (document) => {
+          const {
+            data: signedData,
+            error: signedError,
+          } =
+            await auth.admin.storage
+              .from(BUCKET)
+              .createSignedUrl(
+                document.file_url,
+                3600
+              )
 
-      return {
-        ...document,
-        download_url: signedError
-          ? null
-          : signedData?.signedUrl || null,
-      }
-    })
-  )
+          return {
+            ...document,
+            download_url:
+              signedError
+                ? null
+                : signedData?.signedUrl ||
+                  null,
+          }
+        }
+      )
+    )
 
   return NextResponse.json({
-    documents: documentsWithUrls,
+    documents:
+      documentsWithUrls,
   })
 }
 
@@ -152,16 +189,21 @@ export async function POST(
   request: Request,
   { params }: RouteContext
 ) {
-  const auth = await requireAdmin()
+  const auth =
+    await requireSchoolingAccess()
 
   if ('error' in auth) {
     return auth.error
   }
 
   try {
-    const { id } = await params
+    const { id } =
+      await params
 
-    const { data: meeting, error: meetingError } =
+    const {
+      data: meeting,
+      error: meetingError,
+    } =
       await auth.admin
         .from('instance_meetings')
         .select('id')
@@ -180,29 +222,44 @@ export async function POST(
 
     if (!meeting) {
       return NextResponse.json(
-        { error: 'Réunion introuvable.' },
+        {
+          error:
+            'Réunion introuvable.',
+        },
         { status: 404 }
       )
     }
 
-    const formData = await request.formData()
-    const entry = formData.get('file')
+    const formData =
+      await request.formData()
+
+    const entry =
+      formData.get('file')
 
     if (!(entry instanceof File)) {
       return NextResponse.json(
-        { error: 'Aucun fichier sélectionné.' },
+        {
+          error:
+            'Aucun fichier sélectionné.',
+        },
         { status: 400 }
       )
     }
 
     if (entry.size <= 0) {
       return NextResponse.json(
-        { error: 'Le fichier est vide.' },
+        {
+          error:
+            'Le fichier est vide.',
+        },
         { status: 400 }
       )
     }
 
-    if (entry.size > MAX_FILE_SIZE) {
+    if (
+      entry.size >
+      MAX_FILE_SIZE
+    ) {
       return NextResponse.json(
         {
           error:
@@ -212,22 +269,36 @@ export async function POST(
       )
     }
 
-    const originalName = entry.name || 'document'
-    const safeName = formatDocumentName(originalName)
+    const originalName =
+      entry.name ||
+      'document'
+
+    const safeName =
+      formatDocumentName(
+        originalName
+      )
 
     const storagePath =
       `${id}/${crypto.randomUUID()}-${safeName}`
 
-    const fileBuffer = await entry.arrayBuffer()
+    const fileBuffer =
+      await entry.arrayBuffer()
 
-    const { error: uploadError } =
+    const {
+      error: uploadError,
+    } =
       await auth.admin.storage
         .from(BUCKET)
-        .upload(storagePath, fileBuffer, {
-          contentType:
-            entry.type || 'application/octet-stream',
-          upsert: false,
-        })
+        .upload(
+          storagePath,
+          fileBuffer,
+          {
+            contentType:
+              entry.type ||
+              'application/octet-stream',
+            upsert: false,
+          }
+        )
 
     if (uploadError) {
       return NextResponse.json(
@@ -239,16 +310,26 @@ export async function POST(
       )
     }
 
-    const { data: document, error: insertError } =
+    const {
+      data: document,
+      error: insertError,
+    } =
       await auth.admin
-        .from('instance_meeting_documents')
+        .from(
+          'instance_meeting_documents'
+        )
         .insert({
-          meeting_id: id,
-          file_name: originalName,
-          file_url: storagePath,
+          meeting_id:
+            id,
+          file_name:
+            originalName,
+          file_url:
+            storagePath,
           file_type:
-            entry.type || 'application/octet-stream',
-          file_size: entry.size,
+            entry.type ||
+            'application/octet-stream',
+          file_size:
+            entry.size,
         })
         .select(
           'id,meeting_id,file_name,file_url,file_type,file_size,created_at,updated_at'
@@ -258,7 +339,9 @@ export async function POST(
     if (insertError) {
       await auth.admin.storage
         .from(BUCKET)
-        .remove([storagePath])
+        .remove([
+          storagePath,
+        ])
 
       return NextResponse.json(
         {
@@ -269,17 +352,23 @@ export async function POST(
       )
     }
 
-    const { data: signedData } =
+    const {
+      data: signedData,
+    } =
       await auth.admin.storage
         .from(BUCKET)
-        .createSignedUrl(storagePath, 3600)
+        .createSignedUrl(
+          storagePath,
+          3600
+        )
 
     return NextResponse.json({
       ok: true,
       document: {
         ...document,
         download_url:
-          signedData?.signedUrl || null,
+          signedData?.signedUrl ||
+          null,
       },
     })
   } catch (error) {
@@ -299,37 +388,57 @@ export async function DELETE(
   request: Request,
   { params }: RouteContext
 ) {
-  const auth = await requireAdmin()
+  const auth =
+    await requireSchoolingAccess()
 
   if ('error' in auth) {
     return auth.error
   }
 
   try {
-    const { id } = await params
-    const body = (await request.json()) as {
-      documentId?: unknown
-    }
+    const { id } =
+      await params
 
-    const documentId = String(
-      body.documentId || ''
-    ).trim()
+    const body =
+      (await request.json()) as {
+        documentId?: unknown
+      }
+
+    const documentId =
+      String(
+        body.documentId ||
+          ''
+      ).trim()
 
     if (!documentId) {
       return NextResponse.json(
-        { error: 'Document non précisé.' },
+        {
+          error:
+            'Document non précisé.',
+        },
         { status: 400 }
       )
     }
 
-    const { data: document, error: documentError } =
+    const {
+      data: document,
+      error: documentError,
+    } =
       await auth.admin
-        .from('instance_meeting_documents')
+        .from(
+          'instance_meeting_documents'
+        )
         .select(
           'id,meeting_id,file_url'
         )
-        .eq('id', documentId)
-        .eq('meeting_id', id)
+        .eq(
+          'id',
+          documentId
+        )
+        .eq(
+          'meeting_id',
+          id
+        )
         .maybeSingle()
 
     if (documentError) {
@@ -344,15 +453,22 @@ export async function DELETE(
 
     if (!document) {
       return NextResponse.json(
-        { error: 'Document introuvable.' },
+        {
+          error:
+            'Document introuvable.',
+        },
         { status: 404 }
       )
     }
 
-    const { error: storageError } =
+    const {
+      error: storageError,
+    } =
       await auth.admin.storage
         .from(BUCKET)
-        .remove([document.file_url])
+        .remove([
+          document.file_url,
+        ])
 
     if (storageError) {
       return NextResponse.json(
@@ -364,12 +480,22 @@ export async function DELETE(
       )
     }
 
-    const { error: deleteError } =
+    const {
+      error: deleteError,
+    } =
       await auth.admin
-        .from('instance_meeting_documents')
+        .from(
+          'instance_meeting_documents'
+        )
         .delete()
-        .eq('id', documentId)
-        .eq('meeting_id', id)
+        .eq(
+          'id',
+          documentId
+        )
+        .eq(
+          'meeting_id',
+          id
+        )
 
     if (deleteError) {
       return NextResponse.json(
