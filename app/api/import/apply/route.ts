@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { createHash } from 'crypto';
-import { createClient } from '@/lib/supabase/server';
+import {
+  requireOfficePermission,
+} from '@/lib/office-auth';
 import { createAdminClient } from '@/lib/supabase/admin';
 import {
   parseCollegeWorkbook,
@@ -9,43 +11,57 @@ import {
 
 export const runtime = 'nodejs';
 
-export async function POST(request: Request) {
-  const supabase = await createClient();
-
-  const { data: authData } =
-    await supabase.auth.getClaims();
-
-  const userId =
-    authData?.claims?.sub;
-
-  if (!userId) {
-    return NextResponse.json(
-      {
-        error: 'Non authentifié.',
-      },
-      {
-        status: 401,
-      }
+export async function POST(
+  request: Request
+) {
+  try {
+    await requireOfficePermission(
+      'configuration'
     );
-  }
+  } catch (error) {
+    if (error instanceof Error) {
+      if (
+        error.message ===
+        'AUTHENTICATION_REQUIRED'
+      ) {
+        return NextResponse.json(
+          {
+            error:
+              'Non authentifié.',
+          },
+          {
+            status: 401,
+          }
+        );
+      }
 
-  const admin =
-    createAdminClient();
+      if (
+        error.message ===
+          'OFFICE_ACCESS_DENIED' ||
+        error.message ===
+          'OFFICE_PERMISSION_DENIED'
+      ) {
+        return NextResponse.json(
+          {
+            error:
+              'Compte non autorisé.',
+          },
+          {
+            status: 403,
+          }
+        );
+      }
+    }
 
-  const {
-    data: adminRow,
-    error: adminError,
-  } = await admin
-    .from('gipe_admins')
-    .select('user_id')
-    .eq('user_id', userId)
-    .maybeSingle();
+    console.error(
+      'Erreur contrôle accès import apply:',
+      error
+    );
 
-  if (adminError) {
     return NextResponse.json(
       {
         error:
-          'Impossible de vérifier les droits administrateur.',
+          'Erreur de contrôle des accès.',
       },
       {
         status: 500,
@@ -53,17 +69,8 @@ export async function POST(request: Request) {
     );
   }
 
-  if (!adminRow) {
-    return NextResponse.json(
-      {
-        error:
-          "Ce compte n'est pas autorisé à importer les données du collège.",
-      },
-      {
-        status: 403,
-      }
-    );
-  }
+  const admin =
+    createAdminClient();
 
   const formData =
     await request.formData();
@@ -152,27 +159,27 @@ export async function POST(request: Request) {
 
     /*
      * Calcul de l'empreinte SHA-256 du fichier.
-     *
-     * Buffer.from() est utilisé uniquement ici
-     * pour le calcul du hash Node.js.
      */
     const fileHash =
       createHash('sha256')
         .update(
-          Buffer.from(fileBuffer)
+          Buffer.from(
+            fileBuffer
+          )
         )
         .digest('hex');
 
     /*
      * Vérification de l'année scolaire.
      */
-
     const {
       data: schoolYear,
       error: yearError,
     } = await admin
       .from('school_years')
-      .select('id,label')
+      .select(
+        'id,label'
+      )
       .eq(
         'label',
         schoolYearLabel
@@ -206,12 +213,14 @@ export async function POST(request: Request) {
     /*
      * Vérification d'un éventuel doublon.
      */
-
     const {
       data: existingImport,
-      error: existingImportError,
+      error:
+        existingImportError,
     } = await admin
-      .from('gipe_college_imports')
+      .from(
+        'gipe_college_imports'
+      )
       .select(
         'id,file_name,imported_at,classes_count,students_count,teachers_count,direction_count'
       )
@@ -259,11 +268,7 @@ export async function POST(request: Request) {
 
     /*
      * Lecture du fichier.
-     *
-     * IMPORTANT :
-     * parseCollegeWorkbook() attend un ArrayBuffer.
      */
-
     const parsed =
       parseCollegeWorkbook(
         fileBuffer
@@ -290,10 +295,8 @@ export async function POST(request: Request) {
       );
 
     /*
-     * On conserve exactement le mécanisme
-     * d'import existant.
+     * Import principal.
      */
-
     const {
       error,
     } = await admin.rpc(
@@ -325,7 +328,6 @@ export async function POST(request: Request) {
     /*
      * Enregistrement du fichier importé.
      */
-
     const importData = {
       school_year_id:
         schoolYear.id,
@@ -390,7 +392,6 @@ export async function POST(request: Request) {
      * L'import principal est réussi même si
      * l'historique rencontre un problème.
      */
-
     if (historyError) {
       return NextResponse.json({
         ok: true,
@@ -413,7 +414,6 @@ export async function POST(request: Request) {
 
       summary,
     });
-
   } catch (error) {
     console.error(
       'Erreur import collège:',
