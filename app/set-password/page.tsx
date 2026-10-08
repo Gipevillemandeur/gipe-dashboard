@@ -6,6 +6,8 @@ import {
 } from 'react';
 import {
   Check,
+  Eye,
+  EyeOff,
   KeyRound,
   Loader2,
   ShieldCheck,
@@ -21,6 +23,12 @@ export default function SetPasswordPage() {
 
   const [confirmation, setConfirmation] =
     useState('');
+
+  const [showPassword, setShowPassword] =
+    useState(false);
+
+  const [showConfirmation, setShowConfirmation] =
+    useState(false);
 
   const [loading, setLoading] =
     useState(false);
@@ -138,37 +146,91 @@ export default function SetPasswordPage() {
             <label>
               Nouveau mot de passe
 
-              <input
-                className="input"
-                type="password"
-                autoComplete="new-password"
-                value={password}
-                onChange={(event) =>
-                  setPassword(
-                    event.target.value
-                  )
-                }
-                required
-                minLength={8}
-              />
+              <div className="password-field">
+                <input
+                  className="input"
+                  type={
+                    showPassword
+                      ? 'text'
+                      : 'password'
+                  }
+                  autoComplete="new-password"
+                  value={password}
+                  onChange={(event) =>
+                    setPassword(
+                      event.target.value
+                    )
+                  }
+                  required
+                  minLength={8}
+                />
+
+                <button
+                  type="button"
+                  className="password-toggle"
+                  onClick={() =>
+                    setShowPassword(
+                      (current) => !current
+                    )
+                  }
+                  aria-label={
+                    showPassword
+                      ? 'Masquer le mot de passe'
+                      : 'Afficher le mot de passe'
+                  }
+                >
+                  {showPassword ? (
+                    <EyeOff size={18} />
+                  ) : (
+                    <Eye size={18} />
+                  )}
+                </button>
+              </div>
             </label>
 
             <label>
               Confirmer le mot de passe
 
-              <input
-                className="input"
-                type="password"
-                autoComplete="new-password"
-                value={confirmation}
-                onChange={(event) =>
-                  setConfirmation(
-                    event.target.value
-                  )
-                }
-                required
-                minLength={8}
-              />
+              <div className="password-field">
+                <input
+                  className="input"
+                  type={
+                    showConfirmation
+                      ? 'text'
+                      : 'password'
+                  }
+                  autoComplete="new-password"
+                  value={confirmation}
+                  onChange={(event) =>
+                    setConfirmation(
+                      event.target.value
+                    )
+                  }
+                  required
+                  minLength={8}
+                />
+
+                <button
+                  type="button"
+                  className="password-toggle"
+                  onClick={() =>
+                    setShowConfirmation(
+                      (current) => !current
+                    )
+                  }
+                  aria-label={
+                    showConfirmation
+                      ? 'Masquer le mot de passe'
+                      : 'Afficher le mot de passe'
+                  }
+                >
+                  {showConfirmation ? (
+                    <EyeOff size={18} />
+                  ) : (
+                    <Eye size={18} />
+                  )}
+                </button>
+              </div>
             </label>
 
             {error && (
@@ -209,6 +271,44 @@ export default function SetPasswordPage() {
       </section>
 
       <style jsx>{`
+        .password-field {
+          position: relative;
+          width: 100%;
+        }
+
+        .password-field .input {
+          width: 100%;
+          padding-right: 46px;
+          box-sizing: border-box;
+        }
+
+        .password-toggle {
+          position: absolute;
+          top: 50%;
+          right: 12px;
+          transform: translateY(-50%);
+          width: 30px;
+          height: 30px;
+          padding: 0;
+          border: 0;
+          background: transparent;
+          color: #8f211c;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          border-radius: 6px;
+        }
+
+        .password-toggle:hover {
+          background: #fff1f0;
+        }
+
+        .password-toggle:focus-visible {
+          outline: 2px solid #8f211c;
+          outline-offset: 2px;
+        }
+
         .password-success {
           display: flex;
           align-items: center;
