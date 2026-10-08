@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { requireOfficePermission } from '@/lib/office-auth';
 
 const MAX_FILE_SIZE = 8 * 1024 * 1024;
 
@@ -11,52 +11,42 @@ const CATEGORIES = [
 ];
 
 async function requireAdmin() {
-  const supabase = await createClient();
+  try {
+    await requireOfficePermission('website');
+    return { admin: createAdminClient() };
+  } catch (error) {
+    if (error instanceof Error) {
+      if (error.message === 'AUTHENTICATION_REQUIRED') {
+        return {
+          error: NextResponse.json(
+            { error: 'Non authentifié.' },
+            { status: 401 }
+          ),
+        };
+      }
 
-  const { data: authData } =
-    await supabase.auth.getClaims();
+      if (
+        error.message === 'OFFICE_ACCESS_DENIED' ||
+        error.message === 'OFFICE_PERMISSION_DENIED'
+      ) {
+        return {
+          error: NextResponse.json(
+            { error: 'Compte non autorisé.' },
+            { status: 403 }
+          ),
+        };
+      }
+    }
 
-  const userId = authData?.claims?.sub;
+    console.error('Erreur contrôle accès site:', error);
 
-  if (!userId) {
     return {
       error: NextResponse.json(
-        { error: 'Non authentifié.' },
-        { status: 401 }
-      ),
-    };
-  }
-
-  const admin = createAdminClient();
-
-  const { data, error } = await admin
-    .from('gipe_admins')
-    .select('user_id')
-    .eq('user_id', userId)
-    .maybeSingle();
-
-  if (error) {
-    return {
-      error: NextResponse.json(
-        {
-          error:
-            'Impossible de vérifier les droits administrateur.',
-        },
+        { error: 'Erreur de contrôle des accès.' },
         { status: 500 }
       ),
     };
   }
-
-  if (!data) {
-    return {
-      error: NextResponse.json(
-        { error: 'Compte non autorisé.' },
-        { status: 403 }
-      ),
-    };
-  }
-
-  return { admin };
 }
 
 function cleanString(value: unknown) {
