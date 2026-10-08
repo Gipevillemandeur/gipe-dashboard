@@ -1,27 +1,67 @@
 import { NextResponse } from 'next/server';
-import { requireOfficePermission } from '@/lib/office-auth';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { requireOfficePermission } from '@/lib/office-auth';
 
-async function requireOfficeAccess(permission: string) {
+async function requireMembersAccess() {
   try {
-    await requireOfficePermission(permission)
-    return { ok: true }
+    await requireOfficePermission('members');
+
+    return createAdminClient();
   } catch (error) {
     if (error instanceof Error) {
-      if (error.message === 'AUTHENTICATION_REQUIRED') {
-        return { error: NextResponse.json({ error: 'Non authentifié.' }, { status: 401 }) }
+      if (
+        error.message ===
+        'AUTHENTICATION_REQUIRED'
+      ) {
+        return NextResponse.json(
+          {
+            error:
+              'Non authentifié.',
+          },
+          {
+            status: 401,
+          }
+        );
       }
-      if (error.message === 'OFFICE_ACCESS_DENIED' || error.message === 'OFFICE_PERMISSION_DENIED') {
-        return { error: NextResponse.json({ error: 'Compte non autorisé.' }, { status: 403 }) }
+
+      if (
+        error.message ===
+          'OFFICE_ACCESS_DENIED' ||
+        error.message ===
+          'OFFICE_PERMISSION_DENIED'
+      ) {
+        return NextResponse.json(
+          {
+            error:
+              'Compte non autorisé.',
+          },
+          {
+            status: 403,
+          }
+        );
       }
     }
-    console.error('Erreur contrôle accès bureau:', error)
-    return { error: NextResponse.json({ error: 'Erreur de contrôle des accès.' }, { status: 500 }) }
+
+    console.error(
+      'Erreur contrôle accès membres:',
+      error
+    );
+
+    return NextResponse.json(
+      {
+        error:
+          'Erreur de contrôle des accès.',
+      },
+      {
+        status: 500,
+      }
+    );
   }
 }
 
-
-function isValidCouncilParticipation(value: string) {
+function isValidCouncilParticipation(
+  value: string
+) {
   return [
     'no',
     'child_class',
@@ -29,8 +69,9 @@ function isValidCouncilParticipation(value: string) {
   ].includes(value);
 }
 
-
-function isValidPaymentMethod(value: string) {
+function isValidPaymentMethod(
+  value: string
+) {
   return [
     'cheque',
     'cash',
@@ -40,33 +81,43 @@ function isValidPaymentMethod(value: string) {
   ].includes(value);
 }
 
+function cleanNullableString(
+  value: unknown
+) {
+  const result =
+    String(value || '').trim();
 
-function cleanNullableString(value: unknown) {
-  const result = String(value || '').trim();
   return result || null;
 }
 
-
 export async function GET() {
-  const auth = await requireOfficeAccess('members');
+  const auth =
+    await requireMembersAccess();
 
-  if ('error' in auth) {
-    return auth.error;
+  if (auth instanceof NextResponse) {
+    return auth;
   }
 
-  const { admin } = auth;
+  const admin = auth;
 
-  const { data: year, error: yearError } =
-    await admin
-      .from('school_years')
-      .select('id,label')
-      .eq('is_active', true)
-      .maybeSingle();
+  const {
+    data: year,
+    error: yearError,
+  } = await admin
+    .from('school_years')
+    .select('id,label')
+    .eq('is_active', true)
+    .maybeSingle();
 
   if (yearError) {
     return NextResponse.json(
-      { error: yearError.message },
-      { status: 500 }
+      {
+        error:
+          yearError.message,
+      },
+      {
+        status: 500,
+      }
     );
   }
 
@@ -79,168 +130,229 @@ export async function GET() {
     });
   }
 
-  const { data: memberships, error } =
-    await admin
-      .from('gipe_memberships')
-      .select(`
+  const {
+    data: memberships,
+    error,
+  } = await admin
+    .from('gipe_memberships')
+    .select(`
+      id,
+      adherent_id,
+      renewal,
+      council_participation,
+      board_member,
+      ca_member,
+      payment_received,
+      payment_date,
+      payment_method,
+      cheque_number,
+      amount,
+      gipe_adherents (
         id,
-        adherent_id,
-        renewal,
-        council_participation,
-        board_member,
-        ca_member,
-        payment_received,
-        payment_date,
-        payment_method,
-        cheque_number,
-        amount,
-        gipe_adherents (
+        last_name,
+        first_name,
+        address,
+        phone,
+        email
+      ),
+      gipe_membership_children (
+        id,
+        gipe_children (
           id,
           last_name,
-          first_name,
-          address,
-          phone,
-          email
+          first_name
         ),
-        gipe_membership_children (
+        classes (
           id,
-          gipe_children (
-            id,
-            last_name,
-            first_name
-          ),
-          classes (
-            id,
-            name
-          )
+          name
         )
-      `)
-      .eq('school_year_id', year.id)
-      .order('created_at', {
+      )
+    `)
+    .eq(
+      'school_year_id',
+      year.id
+    )
+    .order(
+      'created_at',
+      {
         ascending: false,
-      });
+      }
+    );
 
   if (error) {
     return NextResponse.json(
-      { error: error.message },
-      { status: 500 }
+      {
+        error:
+          error.message,
+      },
+      {
+        status: 500,
+      }
     );
   }
 
-  const members = (memberships || []).map(
-    (membership: any) => ({
-      id: membership.id,
-      adherentId: membership.adherent_id,
+  const members =
+    (memberships || []).map(
+      (membership: any) => ({
+        id: membership.id,
+        adherentId:
+          membership.adherent_id,
 
-      lastName:
-        membership.gipe_adherents?.last_name || '',
+        lastName:
+          membership.gipe_adherents
+            ?.last_name || '',
 
-      firstName:
-        membership.gipe_adherents?.first_name || '',
+        firstName:
+          membership.gipe_adherents
+            ?.first_name || '',
 
-      address:
-        membership.gipe_adherents?.address || '',
+        address:
+          membership.gipe_adherents
+            ?.address || '',
 
-      phone:
-        membership.gipe_adherents?.phone || '',
+        phone:
+          membership.gipe_adherents
+            ?.phone || '',
 
-      email:
-        membership.gipe_adherents?.email || '',
+        email:
+          membership.gipe_adherents
+            ?.email || '',
 
-      renewal:
-        membership.renewal,
+        renewal:
+          membership.renewal,
 
-      councilParticipation:
-        membership.council_participation,
+        councilParticipation:
+          membership.council_participation,
 
-      boardMember:
-        membership.board_member,
+        boardMember:
+          membership.board_member,
 
-      caMember:
-        membership.ca_member,
+        caMember:
+          membership.ca_member,
 
-      paymentReceived:
-        membership.payment_received,
+        paymentReceived:
+          membership.payment_received,
 
-      paymentDate:
-        membership.payment_date,
+        paymentDate:
+          membership.payment_date,
 
-      paymentMethod:
-        membership.payment_method,
+        paymentMethod:
+          membership.payment_method,
 
-      chequeNumber:
-        membership.cheque_number,
+        chequeNumber:
+          membership.cheque_number,
 
-      amount:
-        membership.amount,
+        amount:
+          membership.amount,
 
-      children:
-        (membership.gipe_membership_children || []).map(
-          (link: any) => ({
-            id: link.gipe_children?.id,
-            lastName:
-              link.gipe_children?.last_name || '',
-            firstName:
-              link.gipe_children?.first_name || '',
-            classId:
-              link.classes?.id || '',
-            className:
-              link.classes?.name || '',
-          })
-        ),
-    })
-  );
+        children:
+          (
+            membership
+              .gipe_membership_children ||
+            []
+          ).map(
+            (link: any) => ({
+              id:
+                link.gipe_children
+                  ?.id,
 
-  const classCounts: Record<string, number> = {};
+              lastName:
+                link.gipe_children
+                  ?.last_name || '',
+
+              firstName:
+                link.gipe_children
+                  ?.first_name || '',
+
+              classId:
+                link.classes?.id ||
+                '',
+
+              className:
+                link.classes?.name ||
+                '',
+            })
+          ),
+      })
+    );
+
+  const classCounts:
+    Record<string, number> = {};
 
   for (const member of members) {
     for (const child of member.children) {
-      if (!child.className) continue;
+      if (!child.className) {
+        continue;
+      }
 
-      classCounts[child.className] =
-        (classCounts[child.className] || 0) + 1;
+      classCounts[
+        child.className
+      ] =
+        (classCounts[
+          child.className
+        ] || 0) + 1;
     }
   }
 
-  const byClass = Object.entries(classCounts)
-    .map(([className, count]) => ({
-      className,
-      count,
-    }))
-    .sort((a, b) =>
-      a.className.localeCompare(
-        b.className,
-        'fr',
-        { numeric: true }
+  const byClass =
+    Object.entries(classCounts)
+      .map(
+        ([className, count]) => ({
+          className,
+          count,
+        })
       )
-    );
+      .sort((a, b) =>
+        a.className.localeCompare(
+          b.className,
+          'fr',
+          {
+            numeric: true,
+          }
+        )
+      );
 
   return NextResponse.json({
-    schoolYear: year.label,
-    total: members.length,
+    schoolYear:
+      year.label,
+
+    total:
+      members.length,
+
     byClass,
+
     members,
   });
 }
 
+export async function POST(
+  request: Request
+) {
+  const auth =
+    await requireMembersAccess();
 
-export async function POST(request: Request) {
-  const auth = await requireOfficeAccess('members');
-
-  if ('error' in auth) {
-    return auth.error;
+  if (auth instanceof NextResponse) {
+    return auth;
   }
 
-  const { admin } = auth;
+  const admin = auth;
 
-  const body = await request
-    .json()
-    .catch(() => null) as any;
+  const body =
+    (await request
+      .json()
+      .catch(
+        () => null
+      )) as any;
 
   if (!body) {
     return NextResponse.json(
-      { error: 'Données invalides.' },
-      { status: 400 }
+      {
+        error:
+          'Données invalides.',
+      },
+      {
+        status: 400,
+      }
     );
   }
 
@@ -271,13 +383,16 @@ export async function POST(request: Request) {
         error:
           'Le nom et le prénom sont obligatoires.',
       },
-      { status: 400 }
+      {
+        status: 400,
+      }
     );
   }
 
   if (
     !isValidCouncilParticipation(
-      councilParticipation || 'no'
+      councilParticipation ||
+        'no'
     )
   ) {
     return NextResponse.json(
@@ -285,41 +400,53 @@ export async function POST(request: Request) {
         error:
           'Choix de participation aux conseils invalide.',
       },
-      { status: 400 }
+      {
+        status: 400,
+      }
     );
   }
 
   if (
     paymentMethod &&
-    !isValidPaymentMethod(paymentMethod)
+    !isValidPaymentMethod(
+      paymentMethod
+    )
   ) {
     return NextResponse.json(
       {
-        error: 'Mode de paiement invalide.',
+        error:
+          'Mode de paiement invalide.',
       },
-      { status: 400 }
+      {
+        status: 400,
+      }
     );
   }
 
   if (
     chequeNumber &&
-    paymentMethod !== 'cheque'
+    paymentMethod !==
+      'cheque'
   ) {
     return NextResponse.json(
       {
         error:
           'Le numéro de chèque nécessite un paiement par chèque.',
       },
-      { status: 400 }
+      {
+        status: 400,
+      }
     );
   }
 
-  const { data: year, error: yearError } =
-    await admin
-      .from('school_years')
-      .select('id')
-      .eq('is_active', true)
-      .maybeSingle();
+  const {
+    data: year,
+    error: yearError,
+  } = await admin
+    .from('school_years')
+    .select('id')
+    .eq('is_active', true)
+    .maybeSingle();
 
   if (yearError || !year) {
     return NextResponse.json(
@@ -328,89 +455,116 @@ export async function POST(request: Request) {
           yearError?.message ||
           'Aucune année scolaire active.',
       },
-      { status: 409 }
+      {
+        status: 409,
+      }
     );
   }
 
-  const { data: adherent, error: adherentError } =
-    await admin
-      .from('gipe_adherents')
-      .insert({
-        last_name:
-          String(lastName).trim(),
+  const {
+    data: adherent,
+    error: adherentError,
+  } = await admin
+    .from('gipe_adherents')
+    .insert({
+      last_name:
+        String(lastName).trim(),
 
-        first_name:
-          String(firstName).trim(),
+      first_name:
+        String(firstName).trim(),
 
-        address:
-          cleanNullableString(address),
+      address:
+        cleanNullableString(
+          address
+        ),
 
-        phone:
-          cleanNullableString(phone),
+      phone:
+        cleanNullableString(
+          phone
+        ),
 
-        email:
-          cleanNullableString(email),
-      })
-      .select('id')
-      .single();
+      email:
+        cleanNullableString(
+          email
+        ),
+    })
+    .select('id')
+    .single();
 
-  if (adherentError || !adherent) {
+  if (
+    adherentError ||
+    !adherent
+  ) {
     return NextResponse.json(
       {
         error:
           adherentError?.message ||
           'Impossible de créer l’adhérent.',
       },
-      { status: 500 }
+      {
+        status: 500,
+      }
     );
   }
 
-  const { data: membership, error: membershipError } =
-    await admin
-      .from('gipe_memberships')
-      .insert({
-        adherent_id: adherent.id,
-        school_year_id: year.id,
+  const {
+    data: membership,
+    error: membershipError,
+  } = await admin
+    .from('gipe_memberships')
+    .insert({
+      adherent_id:
+        adherent.id,
 
-        renewal:
-          Boolean(renewal),
+      school_year_id:
+        year.id,
 
-        council_participation:
-          councilParticipation || 'no',
+      renewal:
+        Boolean(renewal),
 
-        board_member:
-          Boolean(boardMember),
+      council_participation:
+        councilParticipation ||
+        'no',
 
-        ca_member:
-          Boolean(caMember),
+      board_member:
+        Boolean(boardMember),
 
-        payment_received:
-          Boolean(paymentReceived),
+      ca_member:
+        Boolean(caMember),
 
-        payment_date:
-          paymentDate || null,
+      payment_received:
+        Boolean(paymentReceived),
 
-        payment_method:
-          paymentMethod || null,
+      payment_date:
+        paymentDate || null,
 
-        cheque_number:
-          chequeNumber || null,
+      payment_method:
+        paymentMethod || null,
 
-        amount:
-          amount === '' ||
-          amount === null ||
-          amount === undefined
-            ? null
-            : Number(amount),
-      })
-      .select('id')
-      .single();
+      cheque_number:
+        chequeNumber || null,
 
-  if (membershipError || !membership) {
+      amount:
+        amount === '' ||
+        amount === null ||
+        amount === undefined
+          ? null
+          : Number(amount),
+    })
+    .select('id')
+    .single();
+
+  if (
+    membershipError ||
+    !membership
+  ) {
     await admin
       .from('gipe_adherents')
       .delete()
-      .eq('id', adherent.id);
+      .eq(
+        'id',
+        adherent.id
+      );
 
     return NextResponse.json(
       {
@@ -418,7 +572,9 @@ export async function POST(request: Request) {
           membershipError?.message ||
           'Impossible de créer l’adhésion.',
       },
-      { status: 500 }
+      {
+        status: 500,
+      }
     );
   }
 
@@ -429,49 +585,67 @@ export async function POST(request: Request) {
 
   for (const child of childList) {
     if (
-      !String(child.lastName || '').trim() ||
-      !String(child.firstName || '').trim()
+      !String(
+        child.lastName || ''
+      ).trim() ||
+      !String(
+        child.firstName || ''
+      ).trim()
     ) {
       continue;
     }
 
-    const { data: createdChild, error: childError } =
-      await admin
-        .from('gipe_children')
-        .insert({
-          last_name:
-            String(child.lastName).trim(),
+    const {
+      data: createdChild,
+      error: childError,
+    } = await admin
+      .from('gipe_children')
+      .insert({
+        last_name:
+          String(
+            child.lastName
+          ).trim(),
 
-          first_name:
-            String(child.firstName).trim(),
-        })
-        .select('id')
-        .single();
+        first_name:
+          String(
+            child.firstName
+          ).trim(),
+      })
+      .select('id')
+      .single();
 
-    if (childError || !createdChild) {
+    if (
+      childError ||
+      !createdChild
+    ) {
       return NextResponse.json(
         {
           error:
             childError?.message ||
             'Impossible de créer un enfant.',
         },
-        { status: 500 }
+        {
+          status: 500,
+        }
       );
     }
 
-    const { error: linkError } =
-      await admin
-        .from('gipe_membership_children')
-        .insert({
-          membership_id:
-            membership.id,
+    const {
+      error: linkError,
+    } = await admin
+      .from(
+        'gipe_membership_children'
+      )
+      .insert({
+        membership_id:
+          membership.id,
 
-          child_id:
-            createdChild.id,
+        child_id:
+          createdChild.id,
 
-          class_id:
-            child.classId || null,
-        });
+        class_id:
+          child.classId || null,
+      });
 
     if (linkError) {
       return NextResponse.json(
@@ -479,7 +653,9 @@ export async function POST(request: Request) {
           error:
             linkError.message,
         },
-        { status: 500 }
+        {
+          status: 500,
+        }
       );
     }
   }
@@ -487,31 +663,44 @@ export async function POST(request: Request) {
   return NextResponse.json(
     {
       success: true,
+
       membershipId:
         membership.id,
     },
-    { status: 201 }
+    {
+      status: 201,
+    }
   );
 }
 
+export async function PUT(
+  request: Request
+) {
+  const auth =
+    await requireMembersAccess();
 
-export async function PUT(request: Request) {
-  const auth = await requireOfficeAccess('members');
-
-  if ('error' in auth) {
-    return auth.error;
+  if (auth instanceof NextResponse) {
+    return auth;
   }
 
-  const { admin } = auth;
+  const admin = auth;
 
-  const body = await request
-    .json()
-    .catch(() => null) as any;
+  const body =
+    (await request
+      .json()
+      .catch(
+        () => null
+      )) as any;
 
   if (!body) {
     return NextResponse.json(
-      { error: 'Données invalides.' },
-      { status: 400 }
+      {
+        error:
+          'Données invalides.',
+      },
+      {
+        status: 400,
+      }
     );
   }
 
@@ -536,8 +725,13 @@ export async function PUT(request: Request) {
 
   if (!id) {
     return NextResponse.json(
-      { error: 'Adhérent introuvable.' },
-      { status: 400 }
+      {
+        error:
+          'Adhérent introuvable.',
+      },
+      {
+        status: 400,
+      }
     );
   }
 
@@ -550,13 +744,16 @@ export async function PUT(request: Request) {
         error:
           'Le nom et le prénom sont obligatoires.',
       },
-      { status: 400 }
+      {
+        status: 400,
+      }
     );
   }
 
   if (
     !isValidCouncilParticipation(
-      councilParticipation || 'no'
+      councilParticipation ||
+        'no'
     )
   ) {
     return NextResponse.json(
@@ -564,98 +761,138 @@ export async function PUT(request: Request) {
         error:
           'Choix de participation aux conseils invalide.',
       },
-      { status: 400 }
+      {
+        status: 400,
+      }
     );
   }
 
   if (
     paymentMethod &&
-    !isValidPaymentMethod(paymentMethod)
+    !isValidPaymentMethod(
+      paymentMethod
+    )
   ) {
     return NextResponse.json(
       {
-        error: 'Mode de paiement invalide.',
+        error:
+          'Mode de paiement invalide.',
       },
-      { status: 400 }
+      {
+        status: 400,
+      }
     );
   }
 
   if (
     chequeNumber &&
-    paymentMethod !== 'cheque'
+    paymentMethod !==
+      'cheque'
   ) {
     return NextResponse.json(
       {
         error:
           'Le numéro de chèque nécessite un paiement par chèque.',
       },
-      { status: 400 }
+      {
+        status: 400,
+      }
     );
   }
 
-  const { data: year, error: yearError } =
-    await admin
-      .from('school_years')
-      .select('id')
-      .eq('is_active', true)
-      .maybeSingle();
+  const {
+    data: year,
+    error: yearError,
+  } = await admin
+    .from('school_years')
+    .select('id')
+    .eq('is_active', true)
+    .maybeSingle();
 
-  if (yearError || !year) {
+  if (
+    yearError ||
+    !year
+  ) {
     return NextResponse.json(
       {
         error:
           yearError?.message ||
           'Aucune année scolaire active.',
       },
-      { status: 409 }
+      {
+        status: 409,
+      }
     );
   }
 
-  const { data: membership, error: membershipError } =
-    await admin
-      .from('gipe_memberships')
-      .select(`
-        id,
-        adherent_id
-      `)
-      .eq('id', id)
-      .eq('school_year_id', year.id)
-      .maybeSingle();
+  const {
+    data: membership,
+    error: membershipError,
+  } = await admin
+    .from('gipe_memberships')
+    .select(`
+      id,
+      adherent_id
+    `)
+    .eq(
+      'id',
+      id
+    )
+    .eq(
+      'school_year_id',
+      year.id
+    )
+    .maybeSingle();
 
-  if (membershipError || !membership) {
+  if (
+    membershipError ||
+    !membership
+  ) {
     return NextResponse.json(
       {
         error:
           membershipError?.message ||
           'Adhésion introuvable pour cette année scolaire.',
       },
-      { status: 404 }
+      {
+        status: 404,
+      }
     );
   }
 
-  const { error: adherentError } =
-    await admin
-      .from('gipe_adherents')
-      .update({
-        last_name:
-          String(lastName).trim(),
+  const {
+    error: adherentError,
+  } = await admin
+    .from('gipe_adherents')
+    .update({
+      last_name:
+        String(lastName).trim(),
 
-        first_name:
-          String(firstName).trim(),
+      first_name:
+        String(firstName).trim(),
 
-        address:
-          cleanNullableString(address),
+      address:
+        cleanNullableString(
+          address
+        ),
 
-        phone:
-          cleanNullableString(phone),
+      phone:
+        cleanNullableString(
+          phone
+        ),
 
-        email:
-          cleanNullableString(email),
+      email:
+        cleanNullableString(
+          email
+        ),
 
-        updated_at:
-          new Date().toISOString(),
-      })
-      .eq('id', membership.adherent_id);
+      updated_at:
+        new Date().toISOString(),
+    })
+    .eq(
+      'id',
+      membership.adherent_id
+    );
 
   if (adherentError) {
     return NextResponse.json(
@@ -663,57 +900,69 @@ export async function PUT(request: Request) {
         error:
           adherentError.message,
       },
-      { status: 500 }
+      {
+        status: 500,
+      }
     );
   }
 
-  const { error: updateMembershipError } =
-    await admin
-      .from('gipe_memberships')
-      .update({
-        renewal:
-          Boolean(renewal),
+  const {
+    error:
+      updateMembershipError,
+  } = await admin
+    .from('gipe_memberships')
+    .update({
+      renewal:
+        Boolean(renewal),
 
-        council_participation:
-          councilParticipation || 'no',
+      council_participation:
+        councilParticipation ||
+        'no',
 
-        board_member:
-          Boolean(boardMember),
+      board_member:
+        Boolean(boardMember),
 
-        ca_member:
-          Boolean(caMember),
+      ca_member:
+        Boolean(caMember),
 
-        payment_received:
-          Boolean(paymentReceived),
+      payment_received:
+        Boolean(paymentReceived),
 
-        payment_date:
-          paymentDate || null,
+      payment_date:
+        paymentDate || null,
 
-        payment_method:
-          paymentMethod || null,
+      payment_method:
+        paymentMethod || null,
 
-        cheque_number:
-          chequeNumber || null,
+      cheque_number:
+        chequeNumber || null,
 
-        amount:
-          amount === '' ||
-          amount === null ||
-          amount === undefined
-            ? null
-            : Number(amount),
+      amount:
+        amount === '' ||
+        amount === null ||
+        amount === undefined
+          ? null
+          : Number(amount),
 
-        updated_at:
-          new Date().toISOString(),
-      })
-      .eq('id', membership.id);
+      updated_at:
+        new Date().toISOString(),
+    })
+    .eq(
+      'id',
+      membership.id
+    );
 
-  if (updateMembershipError) {
+  if (
+    updateMembershipError
+  ) {
     return NextResponse.json(
       {
         error:
           updateMembershipError.message,
       },
-      { status: 500 }
+      {
+        status: 500,
+      }
     );
   }
 
@@ -723,11 +972,17 @@ export async function PUT(request: Request) {
    * de gipe_children afin de ne pas casser d'éventuels
    * liens historiques.
    */
-  const { error: deleteLinksError } =
-    await admin
-      .from('gipe_membership_children')
-      .delete()
-      .eq('membership_id', membership.id);
+  const {
+    error: deleteLinksError,
+  } = await admin
+    .from(
+      'gipe_membership_children'
+    )
+    .delete()
+    .eq(
+      'membership_id',
+      membership.id
+    );
 
   if (deleteLinksError) {
     return NextResponse.json(
@@ -735,7 +990,9 @@ export async function PUT(request: Request) {
         error:
           deleteLinksError.message,
       },
-      { status: 500 }
+      {
+        status: 500,
+      }
     );
   }
 
@@ -746,81 +1003,115 @@ export async function PUT(request: Request) {
 
   for (const child of childList) {
     if (
-      !String(child.lastName || '').trim() ||
-      !String(child.firstName || '').trim()
+      !String(
+        child.lastName || ''
+      ).trim() ||
+      !String(
+        child.firstName || ''
+      ).trim()
     ) {
       continue;
     }
 
     let childId =
-      String(child.id || '').trim();
+      String(
+        child.id || ''
+      ).trim();
 
     if (childId) {
-      const { error: childUpdateError } =
-        await admin
-          .from('gipe_children')
-          .update({
-            last_name:
-              String(child.lastName).trim(),
+      const {
+        error:
+          childUpdateError,
+      } = await admin
+        .from('gipe_children')
+        .update({
+          last_name:
+            String(
+              child.lastName
+            ).trim(),
 
-            first_name:
-              String(child.firstName).trim(),
+          first_name:
+            String(
+              child.firstName
+            ).trim(),
 
-            updated_at:
-              new Date().toISOString(),
-          })
-          .eq('id', childId);
+          updated_at:
+            new Date().toISOString(),
+        })
+        .eq(
+          'id',
+          childId
+        );
 
-      if (childUpdateError) {
+      if (
+        childUpdateError
+      ) {
         return NextResponse.json(
           {
             error:
               childUpdateError.message,
           },
-          { status: 500 }
+          {
+            status: 500,
+          }
         );
       }
     } else {
-      const { data: createdChild, error: childError } =
-        await admin
-          .from('gipe_children')
-          .insert({
-            last_name:
-              String(child.lastName).trim(),
+      const {
+        data: createdChild,
+        error: childError,
+      } = await admin
+        .from('gipe_children')
+        .insert({
+          last_name:
+            String(
+              child.lastName
+            ).trim(),
 
-            first_name:
-              String(child.firstName).trim(),
-          })
-          .select('id')
-          .single();
+          first_name:
+            String(
+              child.firstName
+            ).trim(),
+        })
+        .select('id')
+        .single();
 
-      if (childError || !createdChild) {
+      if (
+        childError ||
+        !createdChild
+      ) {
         return NextResponse.json(
           {
             error:
               childError?.message ||
               'Impossible de créer un enfant.',
           },
-          { status: 500 }
+          {
+            status: 500,
+          }
         );
       }
 
-      childId = createdChild.id;
+      childId =
+        createdChild.id;
     }
 
-    const { error: linkError } =
-      await admin
-        .from('gipe_membership_children')
-        .insert({
-          membership_id:
-            membership.id,
+    const {
+      error: linkError,
+    } = await admin
+      .from(
+        'gipe_membership_children'
+      )
+      .insert({
+        membership_id:
+          membership.id,
 
-          child_id:
-            childId,
+        child_id:
+          childId,
 
-          class_id:
-            child.classId || null,
-        });
+        class_id:
+          child.classId || null,
+      });
 
     if (linkError) {
       return NextResponse.json(
@@ -828,13 +1119,16 @@ export async function PUT(request: Request) {
           error:
             linkError.message,
         },
-        { status: 500 }
+        {
+          status: 500,
+        }
       );
     }
   }
 
   return NextResponse.json({
     success: true,
+
     membershipId:
       membership.id,
   });
