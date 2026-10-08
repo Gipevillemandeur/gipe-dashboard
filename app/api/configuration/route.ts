@@ -1,17 +1,16 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { getOfficeAccess } from '@/lib/office-auth';
 
-async function requireAdmin() {
+async function requireConfigurationAccess() {
   const supabase = await createClient();
 
-  const { data: authData } =
-    await supabase.auth.getClaims();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
-  const userId =
-    authData?.claims?.sub;
-
-  if (!userId) {
+  if (!user) {
     return {
       error: NextResponse.json(
         {
@@ -24,19 +23,32 @@ async function requireAdmin() {
     };
   }
 
-  const admin =
-    createAdminClient();
+  const admin = createAdminClient();
+
+  /*
+   * ---------------------------------------------------------
+   * ANCIEN SYSTÈME ADMINISTRATEUR
+   * ---------------------------------------------------------
+   *
+   * On conserve l'accès des comptes présents dans
+   * gipe_admins.
+   */
 
   const {
-    data,
-    error,
+    data: adminUser,
+    error: adminError,
   } = await admin
     .from('gipe_admins')
     .select('user_id')
-    .eq('user_id', userId)
+    .eq('user_id', user.id)
     .maybeSingle();
 
-  if (error) {
+  if (adminError) {
+    console.error(
+      'Erreur vérification gipe_admins:',
+      adminError
+    );
+
     return {
       error: NextResponse.json(
         {
@@ -50,22 +62,46 @@ async function requireAdmin() {
     };
   }
 
-  if (!data) {
+  if (adminUser) {
     return {
-      error: NextResponse.json(
-        {
-          error:
-            'Compte non autorisé.',
-        },
-        {
-          status: 403,
-        }
-      ),
+      admin,
+    };
+  }
+
+  /*
+   * ---------------------------------------------------------
+   * NOUVEAU SYSTÈME DES MEMBRES DU BUREAU
+   * ---------------------------------------------------------
+   *
+   * Président / SUPER ADMIN :
+   * accès complet.
+   *
+   * Autres postes :
+   * accès uniquement si la permission
+   * "configuration" est attribuée.
+   */
+
+  const access = await getOfficeAccess();
+
+  if (
+    access.authorized &&
+    access.permissions.includes('configuration')
+  ) {
+    return {
+      admin,
+      access,
     };
   }
 
   return {
-    admin,
+    error: NextResponse.json(
+      {
+        error: 'Compte non autorisé.',
+      },
+      {
+        status: 403,
+      }
+    ),
   };
 }
 
@@ -76,14 +112,13 @@ async function requireAdmin() {
 
 export async function GET() {
   const auth =
-    await requireAdmin();
+    await requireConfigurationAccess();
 
   if ('error' in auth) {
     return auth.error;
   }
 
-  const { admin } =
-    auth;
+  const { admin } = auth;
 
   /*
    * Année scolaire active
@@ -234,14 +269,13 @@ export async function PATCH(
   request: Request
 ) {
   const auth =
-    await requireAdmin();
+    await requireConfigurationAccess();
 
   if ('error' in auth) {
     return auth.error;
   }
 
-  const { admin } =
-    auth;
+  const { admin } = auth;
 
   const body =
     await request
@@ -352,14 +386,13 @@ export async function PUT(
   request: Request
 ) {
   const auth =
-    await requireAdmin();
+    await requireConfigurationAccess();
 
   if ('error' in auth) {
     return auth.error;
   }
 
-  const { admin } =
-    auth;
+  const { admin } = auth;
 
   const body =
     await request
