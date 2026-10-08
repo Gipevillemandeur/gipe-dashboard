@@ -1,90 +1,44 @@
-import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
-import { createAdminClient } from '@/lib/supabase/admin';
+import { NextResponse } from 'next/server'
+import { requireOfficePermission } from '@/lib/office-auth'
+import { createAdminClient } from '@/lib/supabase/admin'
 
 type GoogleTokenResponse = {
-  access_token?: string;
-  error?: string;
-  error_description?: string;
-};
-
-const EXPORT_FORMATS: Record<
-  string,
-  {
-    mimeType: string;
-    extension: string;
-  }
-> = {
-  'application/vnd.google-apps.document': {
-    mimeType: 'application/pdf',
-    extension: '.pdf',
-  },
-  'application/vnd.google-apps.spreadsheet': {
-    mimeType:
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    extension: '.xlsx',
-  },
-  'application/vnd.google-apps.presentation': {
-    mimeType:
-      'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-    extension: '.pptx',
-  },
-};
-
-async function getAuthenticatedUserId() {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return null;
-  }
-
-  const { data: admin } = await supabase
-    .from('gipe_admins')
-    .select('user_id')
-    .eq('user_id', user.id)
-    .maybeSingle();
-
-  if (!admin) {
-    return null;
-  }
-
-  return user.id;
+  access_token?: string
+  error?: string
+  error_description?: string
 }
 
 async function getGoogleAccessToken(userId: string) {
-  const adminClient = createAdminClient();
+  const admin = createAdminClient()
 
-  const { data: connection, error } =
-    await adminClient
-      .from('google_drive_connections')
-      .select('refresh_token')
-      .eq('user_id', userId)
-      .maybeSingle();
+  const { data: connection, error } = await admin
+    .from('google_drive_connections')
+    .select('refresh_token')
+    .eq('user_id', userId)
+    .maybeSingle()
 
   if (error) {
     throw new Error(
       'Impossible de récupérer la connexion Google Drive.'
-    );
+    )
   }
 
   if (!connection?.refresh_token) {
     throw new Error(
       'Google Drive n’est pas connecté.'
-    );
+    )
   }
 
-  const clientId = process.env.GOOGLE_CLIENT_ID;
+  const clientId =
+    process.env.GOOGLE_CLIENT_ID
+
   const clientSecret =
-    process.env.GOOGLE_CLIENT_SECRET;
+    process.env.GOOGLE_CLIENT_SECRET
 
   if (!clientId || !clientSecret) {
     throw new Error(
       'La configuration Google OAuth est incomplète.'
-    );
+    )
   }
 
   const tokenResponse = await fetch(
@@ -104,10 +58,10 @@ async function getGoogleAccessToken(userId: string) {
       }).toString(),
       cache: 'no-store',
     }
-  );
+  )
 
   const tokenData =
-    (await tokenResponse.json()) as GoogleTokenResponse;
+    (await tokenResponse.json()) as GoogleTokenResponse
 
   if (
     !tokenResponse.ok ||
@@ -116,69 +70,38 @@ async function getGoogleAccessToken(userId: string) {
     console.error(
       'Erreur renouvellement token Google:',
       tokenData
-    );
+    )
 
     throw new Error(
       'Impossible d’obtenir un accès au Google Drive.'
-    );
-  }
-
-  return tokenData.access_token;
-}
-
-function cleanDownloadName(
-  name: string
-) {
-  return name
-    .replace(/[<>:"/\\|?*\x00-\x1F]/g, '_')
-    .trim() || 'document';
-}
-
-function addExtensionIfNeeded(
-  name: string,
-  extension: string
-) {
-  const lowerName =
-    name.toLocaleLowerCase('fr-FR');
-
-  if (
-    lowerName.endsWith(
-      extension.toLocaleLowerCase('fr-FR')
     )
-  ) {
-    return name;
   }
 
-  return `${name}${extension}`;
+  return tokenData.access_token
 }
 
 export async function GET(request: Request) {
   try {
-    const userId =
-      await getAuthenticatedUserId();
+    const access =
+      await requireOfficePermission('drive')
 
-    if (!userId) {
+    if (!access.userId) {
       return NextResponse.json(
         {
           error:
-            'Accès réservé aux administrateurs.',
+            'Utilisateur non identifié.',
         },
-        { status: 403 }
-      );
+        { status: 401 }
+      )
     }
 
-    const url = new URL(request.url);
+    const url =
+      new URL(request.url)
 
     const fileId =
-      url.searchParams.get('id')?.trim();
-
-    const fileName =
-      url.searchParams.get('name')?.trim() ||
-      'document';
-
-    const mimeType =
-      url.searchParams.get('mimeType')?.trim() ||
-      'application/octet-stream';
+      url.searchParams
+        .get('id')
+        ?.trim()
 
     if (!fileId) {
       return NextResponse.json(
@@ -187,112 +110,118 @@ export async function GET(request: Request) {
             'L’identifiant du fichier est obligatoire.',
         },
         { status: 400 }
-      );
+      )
     }
 
     const accessToken =
-      await getGoogleAccessToken(userId);
+      await getGoogleAccessToken(
+        access.userId
+      )
 
-    const exportFormat =
-      EXPORT_FORMATS[mimeType];
-
-    let googleUrl: string;
-    let downloadName =
-      cleanDownloadName(fileName);
-
-    if (exportFormat) {
-      googleUrl =
+    const driveResponse =
+      await fetch(
         `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(
           fileId
-        )}/export?mimeType=${encodeURIComponent(
-          exportFormat.mimeType
-        )}`;
+        )}?alt=media&supportsAllDrives=true`,
+        {
+          method: 'GET',
+          headers: {
+            Authorization:
+              `Bearer ${accessToken}`,
+          },
+          cache: 'no-store',
+        }
+      )
 
-      downloadName =
-        addExtensionIfNeeded(
-          downloadName,
-          exportFormat.extension
-        );
-    } else {
-      googleUrl =
-        `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(
-          fileId
-        )}?alt=media&supportsAllDrives=true`;
-    }
-
-    const googleResponse = await fetch(
-      googleUrl,
-      {
-        method: 'GET',
-        headers: {
-          Authorization:
-            `Bearer ${accessToken}`,
-        },
-        cache: 'no-store',
-      }
-    );
-
-    if (!googleResponse.ok) {
+    if (!driveResponse.ok) {
       const errorText =
-        await googleResponse.text();
+        await driveResponse.text()
 
       console.error(
         'Erreur téléchargement Google Drive:',
         errorText
-      );
+      )
 
       return NextResponse.json(
         {
           error:
-            'Impossible de télécharger ce fichier depuis Google Drive.',
+            'Impossible de télécharger le fichier depuis Google Drive.',
         },
         {
           status:
-            googleResponse.status || 500,
+            driveResponse.status || 500,
         }
-      );
+      )
     }
 
-    const fileBlob =
-      await googleResponse.blob();
+    const contentType =
+      driveResponse.headers.get(
+        'content-type'
+      ) ||
+      'application/octet-stream'
 
-    const responseHeaders =
-      new Headers();
+    const contentDisposition =
+      driveResponse.headers.get(
+        'content-disposition'
+      )
 
-    responseHeaders.set(
+    const headers =
+      new Headers()
+
+    headers.set(
       'Content-Type',
-      exportFormat
-        ? exportFormat.mimeType
-        : googleResponse.headers.get(
-            'content-type'
-          ) ||
-            'application/octet-stream'
-    );
+      contentType
+    )
 
-    responseHeaders.set(
-      'Content-Disposition',
-      `attachment; filename="${encodeURIComponent(
-        downloadName
-      )}"`
-    );
-
-    responseHeaders.set(
-      'Cache-Control',
-      'no-store'
-    );
+    if (contentDisposition) {
+      headers.set(
+        'Content-Disposition',
+        contentDisposition
+      )
+    }
 
     return new NextResponse(
-      fileBlob,
+      driveResponse.body,
       {
         status: 200,
-        headers: responseHeaders,
+        headers,
       }
-    );
+    )
   } catch (error) {
+    if (error instanceof Error) {
+      if (
+        error.message ===
+        'AUTHENTICATION_REQUIRED'
+      ) {
+        return NextResponse.json(
+          {
+            error:
+              'Non authentifié.',
+          },
+          { status: 401 }
+        )
+      }
+
+      if (
+        error.message ===
+          'OFFICE_ACCESS_DENIED' ||
+        error.message ===
+          'OFFICE_PERMISSION_DENIED'
+      ) {
+        return NextResponse.json(
+          {
+            error:
+              'Compte non autorisé.',
+          },
+          { status: 403 }
+        )
+      }
+    }
+
     console.error(
       'Erreur API téléchargement Google Drive:',
       error
-    );
+    )
 
     return NextResponse.json(
       {
@@ -302,6 +231,6 @@ export async function GET(request: Request) {
             : 'Impossible de télécharger le fichier.',
       },
       { status: 500 }
-    );
+    )
   }
 }
