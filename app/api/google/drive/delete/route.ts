@@ -2,51 +2,6 @@ import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { requireOfficePermission } from '@/lib/office-auth'
 
-async function requireDriveAccess() {
-  try {
-    await requireOfficePermission('drive')
-    return { userId: true }
-  } catch (error) {
-    if (error instanceof Error) {
-      if (error.message === 'AUTHENTICATION_REQUIRED') {
-        return {
-          error: NextResponse.json(
-            { error: 'Non authentifié.' },
-            { status: 401 }
-          ),
-        }
-      }
-
-      if (
-        error.message === 'OFFICE_ACCESS_DENIED' ||
-        error.message === 'OFFICE_PERMISSION_DENIED'
-      ) {
-        return {
-          error: NextResponse.json(
-            { error: 'Compte non autorisé.' },
-            { status: 403 }
-          ),
-        }
-      }
-    }
-
-    console.error(
-      'Erreur contrôle accès Google Drive:',
-      error
-    )
-
-    return {
-      error: NextResponse.json(
-        {
-          error:
-            'Erreur de contrôle des accès.',
-        },
-        { status: 500 }
-      ),
-    }
-  }
-}
-
 type GoogleTokenResponse = {
   access_token?: string
   error?: string
@@ -59,20 +14,15 @@ type GoogleDriveErrorResponse = {
   }
 }
 
-async function getGoogleAccessToken(
-  userId: string
-) {
-  const adminClient =
-    createAdminClient()
+async function getGoogleAccessToken(userId: string) {
+  const adminClient = createAdminClient()
 
-  const {
-    data: connection,
-    error,
-  } = await adminClient
-    .from('google_drive_connections')
-    .select('refresh_token')
-    .eq('user_id', userId)
-    .maybeSingle()
+  const { data: connection, error } =
+    await adminClient
+      .from('google_drive_connections')
+      .select('refresh_token')
+      .eq('user_id', userId)
+      .maybeSingle()
 
   if (error) {
     throw new Error(
@@ -98,28 +48,24 @@ async function getGoogleAccessToken(
     )
   }
 
-  const tokenResponse =
-    await fetch(
-      'https://oauth2.googleapis.com/token',
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type':
-            'application/x-www-form-urlencoded',
-        },
-        body:
-          new URLSearchParams({
-            client_id: clientId,
-            client_secret:
-              clientSecret,
-            refresh_token:
-              connection.refresh_token,
-            grant_type:
-              'refresh_token',
-          }).toString(),
-        cache: 'no-store',
-      }
-    )
+  const tokenResponse = await fetch(
+    'https://oauth2.googleapis.com/token',
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type':
+          'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({
+        client_id: clientId,
+        client_secret: clientSecret,
+        refresh_token:
+          connection.refresh_token,
+        grant_type: 'refresh_token',
+      }).toString(),
+      cache: 'no-store',
+    }
+  )
 
   const tokenData =
     (await tokenResponse.json()) as GoogleTokenResponse
@@ -141,15 +87,19 @@ async function getGoogleAccessToken(
   return tokenData.access_token
 }
 
-export async function DELETE(
-  request: Request
-) {
+export async function DELETE(request: Request) {
   try {
-    const auth =
-      await requireDriveAccess()
+    const access =
+      await requireOfficePermission('drive')
 
-    if (auth.error) {
-      return auth.error
+    if (!access.userId) {
+      return NextResponse.json(
+        {
+          error:
+            'Utilisateur non identifié.',
+        },
+        { status: 401 }
+      )
     }
 
     const url =
@@ -172,11 +122,7 @@ export async function DELETE(
 
     const accessToken =
       await getGoogleAccessToken(
-        // requireOfficePermission a déjà
-        // authentifié l'utilisateur.
-        // On récupère son ID depuis Supabase
-        // uniquement pour accéder à sa connexion Drive.
-        await getCurrentUserId()
+        access.userId
       )
 
     const driveResponse =
@@ -221,6 +167,36 @@ export async function DELETE(
       id: fileId,
     })
   } catch (error) {
+    if (error instanceof Error) {
+      if (
+        error.message ===
+        'AUTHENTICATION_REQUIRED'
+      ) {
+        return NextResponse.json(
+          {
+            error:
+              'Non authentifié.',
+          },
+          { status: 401 }
+        )
+      }
+
+      if (
+        error.message ===
+          'OFFICE_ACCESS_DENIED' ||
+        error.message ===
+          'OFFICE_PERMISSION_DENIED'
+      ) {
+        return NextResponse.json(
+          {
+            error:
+              'Compte non autorisé.',
+          },
+          { status: 403 }
+        )
+      }
+    }
+
     console.error(
       'Erreur API suppression Google Drive:',
       error
