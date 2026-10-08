@@ -1,48 +1,51 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { requireOfficePermission } from '@/lib/office-auth'
 
-async function requireAdmin() {
-  const supabase = await createClient()
-  const { data: authData } = await supabase.auth.getClaims()
-  const userId = authData?.claims?.sub
+async function requireSchoolingAccess() {
+  try {
+    const access = await requireOfficePermission('schooling')
 
-  if (!userId) {
     return {
-      error: NextResponse.json(
-        { error: 'Non authentifié.' },
-        { status: 401 }
-      ),
+      admin: createAdminClient(),
+      access,
     }
-  }
+  } catch (error) {
+    if (error instanceof Error) {
+      if (error.message === 'AUTHENTICATION_REQUIRED') {
+        return {
+          error: NextResponse.json(
+            { error: 'Non authentifié.' },
+            { status: 401 }
+          ),
+        }
+      }
 
-  const admin = createAdminClient()
+      if (
+        error.message === 'OFFICE_ACCESS_DENIED' ||
+        error.message === 'OFFICE_PERMISSION_DENIED'
+      ) {
+        return {
+          error: NextResponse.json(
+            { error: 'Compte non autorisé.' },
+            { status: 403 }
+          ),
+        }
+      }
+    }
 
-  const { data, error } = await admin
-    .from('gipe_admins')
-    .select('user_id')
-    .eq('user_id', userId)
-    .maybeSingle()
+    console.error(
+      'Erreur contrôle accès Scolarité :',
+      error
+    )
 
-  if (error) {
     return {
       error: NextResponse.json(
-        { error: 'Impossible de vérifier les droits administrateur.' },
+        { error: 'Erreur de contrôle des accès.' },
         { status: 500 }
       ),
     }
   }
-
-  if (!data) {
-    return {
-      error: NextResponse.json(
-        { error: 'Compte non autorisé.' },
-        { status: 403 }
-      ),
-    }
-  }
-
-  return { admin }
 }
 
 function clean(value: unknown) {
@@ -59,7 +62,7 @@ export async function GET(
   _request: Request,
   { params }: RouteContext
 ) {
-  const auth = await requireAdmin()
+  const auth = await requireSchoolingAccess()
 
   if ('error' in auth) {
     return auth.error
@@ -67,7 +70,10 @@ export async function GET(
 
   const { id } = await params
 
-  const { data, error } = await auth.admin
+  const {
+    data,
+    error,
+  } = await auth.admin
     .from('instance_meetings')
     .select(
       'id,type,subject,meeting_date,meeting_time,location,school_year_id,summary'
@@ -78,7 +84,8 @@ export async function GET(
   if (error) {
     return NextResponse.json(
       {
-        error: `Impossible de charger la réunion : ${error.message}`,
+        error:
+          `Impossible de charger la réunion : ${error.message}`,
       },
       { status: 500 }
     )
@@ -86,7 +93,9 @@ export async function GET(
 
   if (!data) {
     return NextResponse.json(
-      { error: 'Réunion introuvable.' },
+      {
+        error: 'Réunion introuvable.',
+      },
       { status: 404 }
     )
   }
@@ -100,7 +109,7 @@ export async function PUT(
   request: Request,
   { params }: RouteContext
 ) {
-  const auth = await requireAdmin()
+  const auth = await requireSchoolingAccess()
 
   if ('error' in auth) {
     return auth.error
@@ -108,13 +117,19 @@ export async function PUT(
 
   try {
     const { id } = await params
-    const body = (await request.json()) as {
-      summary?: unknown
-    }
 
-    const summary = clean(body.summary)
+    const body =
+      (await request.json()) as {
+        summary?: unknown
+      }
 
-    const { data, error } = await auth.admin
+    const summary =
+      clean(body.summary)
+
+    const {
+      data,
+      error,
+    } = await auth.admin
       .from('instance_meetings')
       .update({
         summary,
@@ -128,7 +143,8 @@ export async function PUT(
     if (error) {
       return NextResponse.json(
         {
-          error: `Impossible d’enregistrer le résumé : ${error.message}`,
+          error:
+            `Impossible d’enregistrer le résumé : ${error.message}`,
         },
         { status: 500 }
       )
