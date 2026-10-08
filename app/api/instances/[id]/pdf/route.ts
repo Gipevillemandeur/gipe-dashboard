@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { requireOfficePermission } from '@/lib/office-auth'
 import { buildInstanceMeetingPdf } from '@/lib/instance-meeting-pdf'
 
 type RouteContext = {
@@ -9,51 +9,50 @@ type RouteContext = {
   }>
 }
 
-async function requireAdmin() {
-  const supabase = await createClient()
+async function requireSchoolingAccess() {
+  try {
+    const access = await requireOfficePermission('schooling')
 
-  const { data: authData } = await supabase.auth.getClaims()
-  const userId = authData?.claims?.sub
-
-  if (!userId) {
     return {
-      error: NextResponse.json(
-        { error: 'Non authentifié.' },
-        { status: 401 }
-      ),
+      admin: createAdminClient(),
+      access,
     }
-  }
+  } catch (error) {
+    if (error instanceof Error) {
+      if (error.message === 'AUTHENTICATION_REQUIRED') {
+        return {
+          error: NextResponse.json(
+            { error: 'Non authentifié.' },
+            { status: 401 }
+          ),
+        }
+      }
 
-  const admin = createAdminClient()
+      if (
+        error.message === 'OFFICE_ACCESS_DENIED' ||
+        error.message === 'OFFICE_PERMISSION_DENIED'
+      ) {
+        return {
+          error: NextResponse.json(
+            { error: 'Compte non autorisé.' },
+            { status: 403 }
+          ),
+        }
+      }
+    }
 
-  const { data, error } = await admin
-    .from('gipe_admins')
-    .select('user_id')
-    .eq('user_id', userId)
-    .maybeSingle()
+    console.error(
+      'Erreur contrôle accès Scolarité :',
+      error
+    )
 
-  if (error) {
     return {
       error: NextResponse.json(
-        {
-          error:
-            'Impossible de vérifier les droits administrateur.',
-        },
+        { error: 'Erreur de contrôle des accès.' },
         { status: 500 }
       ),
     }
   }
-
-  if (!data) {
-    return {
-      error: NextResponse.json(
-        { error: 'Compte non autorisé.' },
-        { status: 403 }
-      ),
-    }
-  }
-
-  return { admin }
 }
 
 function clean(value: unknown) {
@@ -64,18 +63,23 @@ export async function GET(
   _request: Request,
   { params }: RouteContext
 ) {
-  const auth = await requireAdmin()
+  const auth =
+    await requireSchoolingAccess()
 
   if ('error' in auth) {
     return auth.error
   }
 
   try {
-    const { id } = await params
+    const { id } =
+      await params
 
     if (!id) {
       return NextResponse.json(
-        { error: 'Identifiant de réunion manquant.' },
+        {
+          error:
+            'Identifiant de réunion manquant.',
+        },
         { status: 400 }
       )
     }
@@ -84,10 +88,14 @@ export async function GET(
     // Réunion
     // ------------------------------------------------------------
 
-    const { data: meeting, error: meetingError } = await auth.admin
-      .from('instance_meetings')
-      .select(
-        `
+    const {
+      data: meeting,
+      error: meetingError,
+    } =
+      await auth.admin
+        .from('instance_meetings')
+        .select(
+          `
           id,
           school_year_id,
           type,
@@ -97,14 +105,18 @@ export async function GET(
           location,
           summary
         `
-      )
-      .eq('id', id)
-      .maybeSingle()
+        )
+        .eq(
+          'id',
+          id
+        )
+        .maybeSingle()
 
     if (meetingError) {
       return NextResponse.json(
         {
-          error: `Impossible de charger la réunion : ${meetingError.message}`,
+          error:
+            `Impossible de charger la réunion : ${meetingError.message}`,
         },
         { status: 500 }
       )
@@ -112,7 +124,10 @@ export async function GET(
 
     if (!meeting) {
       return NextResponse.json(
-        { error: 'Réunion introuvable.' },
+        {
+          error:
+            'Réunion introuvable.',
+        },
         { status: 404 }
       )
     }
@@ -121,17 +136,24 @@ export async function GET(
     // Année scolaire
     // ------------------------------------------------------------
 
-    const { data: schoolYear, error: schoolYearError } =
+    const {
+      data: schoolYear,
+      error: schoolYearError,
+    } =
       await auth.admin
         .from('school_years')
         .select('label')
-        .eq('id', meeting.school_year_id)
+        .eq(
+          'id',
+          meeting.school_year_id
+        )
         .maybeSingle()
 
     if (schoolYearError) {
       return NextResponse.json(
         {
-          error: `Impossible de charger l'année scolaire : ${schoolYearError.message}`,
+          error:
+            `Impossible de charger l'année scolaire : ${schoolYearError.message}`,
         },
         { status: 500 }
       )
@@ -139,7 +161,10 @@ export async function GET(
 
     if (!schoolYear) {
       return NextResponse.json(
-        { error: 'Année scolaire introuvable.' },
+        {
+          error:
+            'Année scolaire introuvable.',
+        },
         { status: 404 }
       )
     }
@@ -148,17 +173,33 @@ export async function GET(
     // Documents associés
     // ------------------------------------------------------------
 
-    const { data: documents, error: documentsError } =
+    const {
+      data: documents,
+      error: documentsError,
+    } =
       await auth.admin
-        .from('instance_meeting_documents')
-        .select('file_name')
-        .eq('meeting_id', id)
-        .order('created_at', { ascending: true })
+        .from(
+          'instance_meeting_documents'
+        )
+        .select(
+          'file_name'
+        )
+        .eq(
+          'meeting_id',
+          id
+        )
+        .order(
+          'created_at',
+          {
+            ascending: true,
+          }
+        )
 
     if (documentsError) {
       return NextResponse.json(
         {
-          error: `Impossible de récupérer les documents associés : ${documentsError.message}`,
+          error:
+            `Impossible de récupérer les documents associés : ${documentsError.message}`,
         },
         { status: 500 }
       )
@@ -168,45 +209,79 @@ export async function GET(
     // Génération du PDF
     // ------------------------------------------------------------
 
-    const pdf = await buildInstanceMeetingPdf({
-      schoolYear: schoolYear.label,
-      type: meeting.type,
-      subject: meeting.subject,
-      meetingDate: meeting.meeting_date,
-      meetingTime: meeting.meeting_time,
-      location: meeting.location,
-      summary: meeting.summary,
-      documents: (documents ?? []).map((document) => ({
-        fileName: document.file_name,
-      })),
-    })
+    const pdf =
+      await buildInstanceMeetingPdf({
+        schoolYear:
+          schoolYear.label,
+        type:
+          meeting.type,
+        subject:
+          meeting.subject,
+        meetingDate:
+          meeting.meeting_date,
+        meetingTime:
+          meeting.meeting_time,
+        location:
+          meeting.location,
+        summary:
+          meeting.summary,
+        documents:
+          (documents ?? []).map(
+            (document) => ({
+              fileName:
+                document.file_name,
+            })
+          ),
+      })
 
     // ------------------------------------------------------------
     // Nom du fichier
     // ------------------------------------------------------------
 
     const safeSubject =
-      clean(meeting.subject)
+      clean(
+        meeting.subject
+      )
         .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '')
-        .replace(/[^a-zA-Z0-9]+/g, '-')
-        .replace(/^-+|-+$/g, '')
-        .slice(0, 80) || 'reunion'
+        .replace(
+          /[\u0300-\u036f]/g,
+          ''
+        )
+        .replace(
+          /[^a-zA-Z0-9]+/g,
+          '-'
+        )
+        .replace(
+          /^-+|-+$/g,
+          ''
+        )
+        .slice(
+          0,
+          80
+        ) ||
+      'reunion'
 
-    const fileName = `Fiche-reunion-${safeSubject}.pdf`
+    const fileName =
+      `Fiche-reunion-${safeSubject}.pdf`
 
     // ------------------------------------------------------------
     // Retour du PDF
     // ------------------------------------------------------------
 
-    return new NextResponse(pdf as BodyInit, {
-      status: 200,
-      headers: {
-        'Content-Type': 'application/pdf',
-        'Content-Disposition': `inline; filename="${fileName}"`,
-        'Cache-Control': 'no-store, max-age=0',
-      },
-    })
+    return new NextResponse(
+      pdf as BodyInit,
+      {
+        status: 200,
+        headers: {
+          'Content-Type':
+            'application/pdf',
+          'Content-Disposition':
+            `inline; filename="${fileName}"`,
+          'Cache-Control':
+            'no-store, max-age=0',
+        },
+      }
+    )
   } catch (error) {
     console.error(
       'Erreur génération PDF réunion :',
