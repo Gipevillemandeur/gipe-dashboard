@@ -47,7 +47,7 @@ export default async function DashboardPage() {
         <div className="topbar-right">
 
           <span className="user-pill">
-            Administrateur GIPE
+            {snapshot.role}
           </span>
 
         </div>
@@ -248,4 +248,3 @@ export default async function DashboardPage() {
     </>
   );
 }
-
