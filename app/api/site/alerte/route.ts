@@ -1,47 +1,64 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { requireOfficePermission } from '@/lib/office-auth';
 
 type AlertType = 'info' | 'urgent';
 
-async function requireAdmin() {
-  const supabase = await createClient();
+async function requireWebsiteAccess() {
+  try {
+    await requireOfficePermission('website');
 
-  const { data: authData } =
-    await supabase.auth.getClaims();
-
-  const userId = authData?.claims?.sub;
-
-  if (!userId) {
     return {
-      error: NextResponse.json(
-        {
-          error: 'Non authentifié.',
-        },
-        {
-          status: 401,
-        }
-      ),
+      admin: createAdminClient(),
     };
-  }
+  } catch (error) {
+    if (error instanceof Error) {
+      if (
+        error.message ===
+        'AUTHENTICATION_REQUIRED'
+      ) {
+        return {
+          error: NextResponse.json(
+            {
+              error: 'Non authentifié.',
+            },
+            {
+              status: 401,
+            }
+          ),
+        };
+      }
 
-  const admin = createAdminClient();
+      if (
+        error.message ===
+          'OFFICE_ACCESS_DENIED' ||
+        error.message ===
+          'OFFICE_PERMISSION_DENIED'
+      ) {
+        return {
+          error: NextResponse.json(
+            {
+              error:
+                'Compte non autorisé.',
+            },
+            {
+              status: 403,
+            }
+          ),
+        };
+      }
+    }
 
-  const {
-    data,
-    error,
-  } = await admin
-    .from('gipe_admins')
-    .select('user_id')
-    .eq('user_id', userId)
-    .maybeSingle();
+    console.error(
+      'Erreur contrôle accès site:',
+      error
+    );
 
-  if (error) {
     return {
       error: NextResponse.json(
         {
           error:
-            'Impossible de vérifier les droits administrateur.',
+            'Erreur de contrôle des accès.',
         },
         {
           status: 500,
@@ -49,23 +66,6 @@ async function requireAdmin() {
       ),
     };
   }
-
-  if (!data) {
-    return {
-      error: NextResponse.json(
-        {
-          error: 'Compte non autorisé.',
-        },
-        {
-          status: 403,
-        }
-      ),
-    };
-  }
-
-  return {
-    admin,
-  };
 }
 
 /* =========================================================
@@ -73,7 +73,8 @@ async function requireAdmin() {
    ========================================================= */
 
 export async function GET() {
-  const auth = await requireAdmin();
+  const auth =
+    await requireWebsiteAccess();
 
   if ('error' in auth) {
     return auth.error;
@@ -105,23 +106,29 @@ export async function GET() {
     );
   }
 
-  const settings: Record<string, string> = {};
+  const settings: Record<
+    string,
+    string
+  > = {};
 
   for (const row of data ?? []) {
     if (row.key) {
-      settings[row.key] = row.value ?? '';
+      settings[row.key] =
+        row.value ?? '';
     }
   }
 
   return NextResponse.json({
     enabled:
-      settings.alert_enabled === 'true',
+      settings.alert_enabled ===
+      'true',
 
     message:
       settings.alert_message ?? '',
 
     type:
-      settings.alert_type === 'urgent'
+      settings.alert_type ===
+      'urgent'
         ? 'urgent'
         : 'info',
   });
@@ -134,7 +141,8 @@ export async function GET() {
 export async function PUT(
   request: Request
 ) {
-  const auth = await requireAdmin();
+  const auth =
+    await requireWebsiteAccess();
 
   if ('error' in auth) {
     return auth.error;
@@ -154,7 +162,8 @@ export async function PUT(
   if (!body) {
     return NextResponse.json(
       {
-        error: 'Données invalides.',
+        error:
+          'Données invalides.',
       },
       {
         status: 400,
