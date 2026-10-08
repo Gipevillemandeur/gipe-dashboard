@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { requireOfficePermission } from '@/lib/office-auth';
 import { createAdminClient } from '@/lib/supabase/admin';
 
 type GoogleTokenResponse = {
@@ -63,22 +64,16 @@ export async function GET(
         new URL('/login', request.url)
       );
     }
-
-    const { data: admin } =
-      await supabase
-        .from('gipe_admins')
-        .select('user_id')
-        .eq('user_id', user.id)
-        .maybeSingle();
-
-    if (!admin) {
-      return NextResponse.json(
-        {
-          error:
-            'Accès réservé aux administrateurs.',
-        },
-        { status: 403 }
-      );
+    try {
+      await requireOfficePermission('drive')
+    } catch (error) {
+      if (error instanceof Error && error.message === 'AUTHENTICATION_REQUIRED') {
+        return NextResponse.redirect(new URL('/login', request.url))
+      }
+      if (error instanceof Error && (error.message === 'OFFICE_ACCESS_DENIED' || error.message === 'OFFICE_PERMISSION_DENIED')) {
+        return NextResponse.json({ error: 'Compte non autorisé.' }, { status: 403 })
+      }
+      throw error
     }
 
     const clientId =
