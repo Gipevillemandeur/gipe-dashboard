@@ -1,54 +1,25 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { requireOfficePermission } from '@/lib/office-auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 
 const MAX_FILE_SIZE = 8 * 1024 * 1024
 
-async function requireAdmin() {
-  const supabase = await createClient()
-
-  const { data: authData } = await supabase.auth.getClaims()
-  const userId = authData?.claims?.sub
-
-  if (!userId) {
-    return {
-      error: NextResponse.json(
-        { error: 'Non authentifié.' },
-        { status: 401 }
-      ),
+async function requireOfficeAccess(permission: string) {
+  try {
+    await requireOfficePermission(permission)
+    return { ok: true }
+  } catch (error) {
+    if (error instanceof Error) {
+      if (error.message === 'AUTHENTICATION_REQUIRED') {
+        return { error: NextResponse.json({ error: 'Non authentifié.' }, { status: 401 }) }
+      }
+      if (error.message === 'OFFICE_ACCESS_DENIED' || error.message === 'OFFICE_PERMISSION_DENIED') {
+        return { error: NextResponse.json({ error: 'Compte non autorisé.' }, { status: 403 }) }
+      }
     }
+    console.error('Erreur contrôle accès bureau:', error)
+    return { error: NextResponse.json({ error: 'Erreur de contrôle des accès.' }, { status: 500 }) }
   }
-
-  const admin = createAdminClient()
-
-  const { data, error } = await admin
-    .from('gipe_admins')
-    .select('user_id')
-    .eq('user_id', userId)
-    .maybeSingle()
-
-  if (error) {
-    return {
-      error: NextResponse.json(
-        {
-          error:
-            'Impossible de vérifier les droits administrateur.',
-        },
-        { status: 500 }
-      ),
-    }
-  }
-
-  if (!data) {
-    return {
-      error: NextResponse.json(
-        { error: 'Compte non autorisé.' },
-        { status: 403 }
-      ),
-    }
-  }
-
-  return { admin }
 }
 
 function cleanString(value: unknown) {
@@ -193,7 +164,7 @@ function validateEventInput(values: {
 }
 
 export async function GET() {
-  const auth = await requireAdmin()
+  const auth = await requireOfficeAccess('agenda')
 
   if ('error' in auth) {
     return auth.error
@@ -259,7 +230,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const auth = await requireAdmin()
+  const auth = await requireOfficeAccess('agenda')
 
   if ('error' in auth) {
     return auth.error
@@ -407,7 +378,7 @@ export async function POST(request: Request) {
 }
 
 export async function PUT(request: Request) {
-  const auth = await requireAdmin()
+  const auth = await requireOfficeAccess('agenda')
 
   if ('error' in auth) {
     return auth.error
@@ -578,7 +549,7 @@ export async function PUT(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-  const auth = await requireAdmin()
+  const auth = await requireOfficeAccess('agenda')
 
   if ('error' in auth) {
     return auth.error
