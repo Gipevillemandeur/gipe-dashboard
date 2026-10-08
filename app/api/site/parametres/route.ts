@@ -1,275 +1,205 @@
-import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
-import { createAdminClient } from '@/lib/supabase/admin';
+import { NextResponse } from 'next/server'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { requireOfficePermission } from '@/lib/office-auth'
 
-const ALLOWED_KEYS = [
-  'adresse',
-  'email',
-  'rna',
-  'president',
-  'facebook',
-  'instagram',
-] as const;
+async function requireWebsiteAccess() {
+  try {
+    await requireOfficePermission('website')
 
-type SettingKey = (typeof ALLOWED_KEYS)[number];
-
-async function requireAdmin() {
-  const supabase = await createClient();
-
-  const { data: authData } =
-    await supabase.auth.getClaims();
-
-  const userId = authData?.claims?.sub;
-
-  if (!userId) {
     return {
-      error: NextResponse.json(
-        {
-          error: 'Non authentifié.',
-        },
-        {
-          status: 401,
+      admin: createAdminClient(),
+    }
+  } catch (error) {
+    if (error instanceof Error) {
+      if (
+        error.message ===
+        'AUTHENTICATION_REQUIRED'
+      ) {
+        return {
+          error: NextResponse.json(
+            {
+              error: 'Non authentifié.',
+            },
+            { status: 401 }
+          ),
         }
-      ),
-    };
-  }
+      }
 
-  const admin = createAdminClient();
+      if (
+        error.message ===
+          'OFFICE_ACCESS_DENIED' ||
+        error.message ===
+          'OFFICE_PERMISSION_DENIED'
+      ) {
+        return {
+          error: NextResponse.json(
+            {
+              error:
+                'Compte non autorisé.',
+            },
+            { status: 403 }
+          ),
+        }
+      }
+    }
 
-  const {
-    data,
-    error,
-  } = await admin
-    .from('gipe_admins')
-    .select('user_id')
-    .eq('user_id', userId)
-    .maybeSingle();
+    console.error(
+      'Erreur contrôle accès paramètres du site:',
+      error
+    )
 
-  if (error) {
     return {
       error: NextResponse.json(
         {
           error:
-            'Impossible de vérifier les droits administrateur.',
+            'Erreur de contrôle des accès.',
         },
-        {
-          status: 500,
-        }
+        { status: 500 }
       ),
-    };
+    }
   }
-
-  if (!data) {
-    return {
-      error: NextResponse.json(
-        {
-          error: 'Compte non autorisé.',
-        },
-        {
-          status: 403,
-        }
-      ),
-    };
-  }
-
-  return {
-    admin,
-  };
 }
 
-/* =========================================================
-   GET
-   ========================================================= */
-
 export async function GET() {
-  const auth = await requireAdmin();
+  const auth =
+    await requireWebsiteAccess()
 
   if ('error' in auth) {
-    return auth.error;
+    return auth.error
   }
 
-  const { admin } = auth;
+  const { admin } = auth
 
-  const {
-    data,
-    error,
-  } = await admin
-    .from('settings')
-    .select('key,value')
-    .in('key', ALLOWED_KEYS);
+  const { data, error } =
+    await admin
+      .from('site_settings')
+      .select('*')
+      .maybeSingle()
 
   if (error) {
+    console.error(
+      'Erreur chargement paramètres site:',
+      error
+    )
+
     return NextResponse.json(
       {
         error:
-          'Impossible de charger les paramètres.',
+          'Impossible de charger les paramètres du site.',
       },
-      {
-        status: 500,
-      }
-    );
+      { status: 500 }
+    )
   }
 
-  const settings: Record<
-    SettingKey,
-    string
-  > = {
-    adresse: '',
-    email: '',
-    rna: '',
-    president: '',
-    facebook: '',
-    instagram: '',
-  };
-
-  for (const row of data ?? []) {
-    if (
-      ALLOWED_KEYS.includes(
-        row.key as SettingKey
-      )
-    ) {
-      settings[
-        row.key as SettingKey
-      ] = row.value ?? '';
-    }
-  }
-
-  return NextResponse.json(
-    settings
-  );
+  return NextResponse.json({
+    settings: data || null,
+  })
 }
-
-/* =========================================================
-   PUT
-   ========================================================= */
 
 export async function PUT(
   request: Request
 ) {
-  const auth = await requireAdmin();
+  const auth =
+    await requireWebsiteAccess()
 
   if ('error' in auth) {
-    return auth.error;
+    return auth.error
   }
 
-  const { admin } = auth;
+  const { admin } = auth
 
-  const body =
-    await request
-      .json()
-      .catch(() => null);
+  try {
+    const body =
+      (await request.json()) as Record<
+        string,
+        unknown
+      >
 
-  if (
-    !body ||
-    typeof body !== 'object'
-  ) {
-    return NextResponse.json(
-      {
-        error: 'Données invalides.',
-      },
-      {
-        status: 400,
-      }
-    );
-  }
-
-  /*
-   * On ne prend que les six paramètres
-   * autorisés.
-   */
-
-  const values =
-    ALLOWED_KEYS.map(
-      (key) => ({
-        key,
-        value: String(
-          body[key] ?? ''
-        ).trim(),
-      })
-    );
-
-  /*
-   * Même principe que pour le bandeau :
-   * on ne dépend pas d'une contrainte UNIQUE
-   * sur la colonne key.
-   */
-
-  for (const item of values) {
-    const {
-      data: existingRows,
-      error: selectError,
-    } = await admin
-      .from('settings')
-      .select('key')
-      .eq('key', item.key);
-
-    if (selectError) {
+    if (!body || typeof body !== 'object') {
       return NextResponse.json(
         {
           error:
-            `Impossible de lire le paramètre ${item.key} : ${selectError.message}`,
+            'Données invalides.',
         },
+        { status: 400 }
+      )
+    }
+
+    const {
+      data: existing,
+      error: existingError,
+    } = await admin
+      .from('site_settings')
+      .select('id')
+      .maybeSingle()
+
+    if (existingError) {
+      console.error(
+        'Erreur lecture paramètres site:',
+        existingError
+      )
+
+      return NextResponse.json(
         {
-          status: 500,
-        }
-      );
+          error:
+            'Impossible de lire les paramètres du site.',
+        },
+        { status: 500 }
+      )
     }
 
-    if (
-      existingRows &&
-      existingRows.length > 0
-    ) {
-      const {
-        error: updateError,
-      } = await admin
-        .from('settings')
-        .update({
-          value: item.value,
-        })
-        .eq('key', item.key);
+    let result
 
-      if (updateError) {
-        return NextResponse.json(
-          {
-            error:
-              `Impossible de modifier le paramètre ${item.key} : ${updateError.message}`,
-          },
-          {
-            status: 500,
-          }
-        );
-      }
+    if (existing?.id) {
+      result =
+        await admin
+          .from('site_settings')
+          .update(body)
+          .eq('id', existing.id)
+          .select('*')
+          .single()
     } else {
-      const {
-        error: insertError,
-      } = await admin
-        .from('settings')
-        .insert({
-          key: item.key,
-          value: item.value,
-        });
-
-      if (insertError) {
-        return NextResponse.json(
-          {
-            error:
-              `Impossible de créer le paramètre ${item.key} : ${insertError.message}`,
-          },
-          {
-            status: 500,
-          }
-        );
-      }
+      result =
+        await admin
+          .from('site_settings')
+          .insert(body)
+          .select('*')
+          .single()
     }
-  }
 
-  return NextResponse.json({
-    ok: true,
-    settings: Object.fromEntries(
-      values.map((item) => [
-        item.key,
-        item.value,
-      ])
-    ),
-  });
+    if (result.error) {
+      console.error(
+        'Erreur sauvegarde paramètres site:',
+        result.error
+      )
+
+      return NextResponse.json(
+        {
+          error:
+            'Impossible de sauvegarder les paramètres du site.',
+        },
+        { status: 500 }
+      )
+    }
+
+    return NextResponse.json({
+      ok: true,
+      settings: result.data,
+    })
+  } catch (error) {
+    console.error(
+      'Erreur API paramètres site:',
+      error
+    )
+
+    return NextResponse.json(
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : 'Impossible de sauvegarder les paramètres du site.',
+      },
+      { status: 500 }
+    )
+  }
 }
