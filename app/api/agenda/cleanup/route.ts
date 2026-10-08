@@ -1,28 +1,80 @@
 import { NextResponse } from 'next/server';
-import { requireOfficePermission } from '@/lib/office-auth';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { requireOfficePermission } from '@/lib/office-auth';
 
-async function requireOfficeAccess(permission: string) {
+async function requireAgendaAccess() {
   try {
-    await requireOfficePermission(permission)
-    return { ok: true }
+    await requireOfficePermission('agenda');
+
+    return {
+      admin: createAdminClient(),
+    };
   } catch (error) {
     if (error instanceof Error) {
-      if (error.message === 'AUTHENTICATION_REQUIRED') {
-        return { error: NextResponse.json({ error: 'Non authentifié.' }, { status: 401 }) }
+      if (
+        error.message ===
+        'AUTHENTICATION_REQUIRED'
+      ) {
+        return {
+          error: NextResponse.json(
+            {
+              error:
+                'Non authentifié.',
+            },
+            {
+              status: 401,
+            }
+          ),
+        };
       }
-      if (error.message === 'OFFICE_ACCESS_DENIED' || error.message === 'OFFICE_PERMISSION_DENIED') {
-        return { error: NextResponse.json({ error: 'Compte non autorisé.' }, { status: 403 }) }
+
+      if (
+        error.message ===
+          'OFFICE_ACCESS_DENIED' ||
+        error.message ===
+          'OFFICE_PERMISSION_DENIED'
+      ) {
+        return {
+          error: NextResponse.json(
+            {
+              error:
+                'Compte non autorisé.',
+            },
+            {
+              status: 403,
+            }
+          ),
+        };
       }
     }
-    console.error('Erreur contrôle accès bureau:', error)
-    return { error: NextResponse.json({ error: 'Erreur de contrôle des accès.' }, { status: 500 }) }
+
+    console.error(
+      'Erreur contrôle accès agenda:',
+      error
+    );
+
+    return {
+      error: NextResponse.json(
+        {
+          error:
+            'Erreur de contrôle des accès.',
+        },
+        {
+          status: 500,
+        }
+      ),
+    };
   }
 }
 
 async function deleteSupabaseImage(
-  admin: ReturnType<typeof createAdminClient>,
-  imageUrl: string | null | undefined
+  admin: ReturnType<
+    typeof createAdminClient
+  >,
+  imageUrl:
+    | string
+    | null
+    | undefined
 ) {
   if (
     !imageUrl ||
@@ -43,19 +95,21 @@ async function deleteSupabaseImage(
     return;
   }
 
-  const path = decodeURIComponent(
-    imageUrl.slice(
-      index + marker.length
-    )
-  );
+  const path =
+    decodeURIComponent(
+      imageUrl.slice(
+        index + marker.length
+      )
+    );
 
   if (!path) {
     return;
   }
 
-  const { error } = await admin.storage
-    .from('images')
-    .remove([path]);
+  const { error } =
+    await admin.storage
+      .from('images')
+      .remove([path]);
 
   if (error) {
     console.error(
@@ -66,13 +120,15 @@ async function deleteSupabaseImage(
 }
 
 export async function GET() {
-  const auth = await requireOfficeAccess('agenda');
+  const auth =
+    await requireAgendaAccess();
 
   if ('error' in auth) {
     return auth.error;
   }
 
-  const { admin } = auth;
+  const { admin } =
+    auth;
 
   try {
     /*
@@ -90,16 +146,23 @@ export async function GET() {
     // ---------------------------------------------------------
     const {
       data: publicEvents,
-      error: publicEventsError,
+      error:
+        publicEventsError,
     } = await admin
       .from('events')
       .select(
         'id,title,date,image_url'
       )
-      .lt('date', today)
-      .order('date', {
-        ascending: true,
-      });
+      .lt(
+        'date',
+        today
+      )
+      .order(
+        'date',
+        {
+          ascending: true,
+        }
+      );
 
     if (publicEventsError) {
       return NextResponse.json(
@@ -107,7 +170,9 @@ export async function GET() {
           error:
             `Impossible de récupérer les événements publics expirés : ${publicEventsError.message}`,
         },
-        { status: 500 }
+        {
+          status: 500,
+        }
       );
     }
 
@@ -116,16 +181,25 @@ export async function GET() {
     // ---------------------------------------------------------
     const {
       data: internalEvents,
-      error: internalEventsError,
+      error:
+        internalEventsError,
     } = await admin
-      .from('internal_agenda_events')
+      .from(
+        'internal_agenda_events'
+      )
       .select(
         'id,title,event_date,image_url,published_on_site,site_event_id'
       )
-      .lt('event_date', today)
-      .order('event_date', {
-        ascending: true,
-      });
+      .lt(
+        'event_date',
+        today
+      )
+      .order(
+        'event_date',
+        {
+          ascending: true,
+        }
+      );
 
     if (internalEventsError) {
       return NextResponse.json(
@@ -133,20 +207,26 @@ export async function GET() {
           error:
             `Impossible de récupérer les événements internes expirés : ${internalEventsError.message}`,
         },
-        { status: 500 }
+        {
+          status: 500,
+        }
       );
     }
 
     return NextResponse.json({
       ok: true,
       today,
-      publicEvents: publicEvents || [],
-      internalEvents: internalEvents || [],
+      publicEvents:
+        publicEvents || [],
+      internalEvents:
+        internalEvents || [],
       counts: {
         public:
-          publicEvents?.length || 0,
+          publicEvents?.length ||
+          0,
         internal:
-          internalEvents?.length || 0,
+          internalEvents?.length ||
+          0,
       },
     });
   } catch (error) {
@@ -157,19 +237,23 @@ export async function GET() {
             ? error.message
             : 'Impossible de préparer le nettoyage de l’agenda.',
       },
-      { status: 500 }
+      {
+        status: 500,
+      }
     );
   }
 }
 
 export async function POST() {
-  const auth = await requireOfficeAccess('agenda');
+  const auth =
+    await requireAgendaAccess();
 
   if ('error' in auth) {
     return auth.error;
   }
 
-  const { admin } = auth;
+  const { admin } =
+    auth;
 
   try {
     /*
@@ -187,16 +271,23 @@ export async function POST() {
     // ---------------------------------------------------------
     const {
       data: publicEvents,
-      error: publicEventsError,
+      error:
+        publicEventsError,
     } = await admin
       .from('events')
       .select(
         'id,title,date,image_url'
       )
-      .lt('date', today)
-      .order('date', {
-        ascending: true,
-      });
+      .lt(
+        'date',
+        today
+      )
+      .order(
+        'date',
+        {
+          ascending: true,
+        }
+      );
 
     if (publicEventsError) {
       return NextResponse.json(
@@ -204,32 +295,49 @@ export async function POST() {
           error:
             `Impossible de récupérer les événements publics expirés : ${publicEventsError.message}`,
         },
-        { status: 500 }
+        {
+          status: 500,
+        }
       );
     }
 
     // ---------------------------------------------------------
     // 2. Suppression des événements publics expirés
     // ---------------------------------------------------------
-    const deletedPublic: string[] = [];
-    const publicErrors: string[] = [];
+    const deletedPublic:
+      string[] = [];
 
-    for (const event of publicEvents || []) {
-      const { error } = await admin
-        .from('events')
-        .delete()
-        .eq('id', event.id);
+    const publicErrors:
+      string[] = [];
+
+    for (
+      const event of
+        publicEvents || []
+    ) {
+      const { error } =
+        await admin
+          .from('events')
+          .delete()
+          .eq(
+            'id',
+            event.id
+          );
 
       if (error) {
         publicErrors.push(
           `${event.title} : ${error.message}`
         );
+
         continue;
       }
 
-      deletedPublic.push(event.id);
+      deletedPublic.push(
+        event.id
+      );
 
-      if (event.image_url) {
+      if (
+        event.image_url
+      ) {
         await deleteSupabaseImage(
           admin,
           event.image_url
@@ -242,51 +350,81 @@ export async function POST() {
     // ---------------------------------------------------------
     const {
       data: internalEvents,
-      error: internalEventsError,
+      error:
+        internalEventsError,
     } = await admin
-      .from('internal_agenda_events')
+      .from(
+        'internal_agenda_events'
+      )
       .select(
         'id,title,event_date,image_url,published_on_site,site_event_id'
       )
-      .lt('event_date', today)
-      .order('event_date', {
-        ascending: true,
-      });
+      .lt(
+        'event_date',
+        today
+      )
+      .order(
+        'event_date',
+        {
+          ascending: true,
+        }
+      );
 
     if (internalEventsError) {
       return NextResponse.json(
         {
           error:
             `Les événements publics ont été traités, mais impossible de récupérer les événements internes expirés : ${internalEventsError.message}`,
+
           deletedPublic,
+
           publicErrors,
         },
-        { status: 500 }
+        {
+          status: 500,
+        }
       );
     }
 
     // ---------------------------------------------------------
     // 4. Suppression des événements internes expirés
     // ---------------------------------------------------------
-    const deletedInternal: string[] = [];
-    const internalErrors: string[] = [];
+    const deletedInternal:
+      string[] = [];
 
-    for (const event of internalEvents || []) {
-      const { error } = await admin
-        .from('internal_agenda_events')
-        .delete()
-        .eq('id', event.id);
+    const internalErrors:
+      string[] = [];
+
+    for (
+      const event of
+        internalEvents || []
+    ) {
+      const { error } =
+        await admin
+          .from(
+            'internal_agenda_events'
+          )
+          .delete()
+          .eq(
+            'id',
+            event.id
+          );
 
       if (error) {
         internalErrors.push(
           `${event.title} : ${error.message}`
         );
+
         continue;
       }
 
-      deletedInternal.push(event.id);
+      deletedInternal.push(
+        event.id
+      );
 
-      if (event.image_url) {
+      if (
+        event.image_url
+      ) {
         await deleteSupabaseImage(
           admin,
           event.image_url
@@ -296,14 +434,23 @@ export async function POST() {
 
     return NextResponse.json({
       ok:
-        publicErrors.length === 0 &&
-        internalErrors.length === 0,
+        publicErrors.length ===
+          0 &&
+        internalErrors.length ===
+          0,
+
       today,
+
       deleted: {
-        public: deletedPublic.length,
-        internal: deletedInternal.length,
+        public:
+          deletedPublic.length,
+
+        internal:
+          deletedInternal.length,
       },
+
       publicErrors,
+
       internalErrors,
     });
   } catch (error) {
@@ -314,7 +461,9 @@ export async function POST() {
             ? error.message
             : 'Impossible de nettoyer automatiquement l’agenda.',
       },
-      { status: 500 }
+      {
+        status: 500,
+      }
     );
   }
 }
