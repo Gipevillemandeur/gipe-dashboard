@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { requireOfficePermission } from '@/lib/office-auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 
 function getExtensionFromUrl(url: string) {
@@ -14,55 +14,10 @@ function getExtensionFromUrl(url: string) {
 }
 
 export async function POST(request: Request) {
-  const supabase = await createClient()
   const admin = createAdminClient()
 
   try {
-    // ---------------------------------------------------------
-    // Vérification de l'utilisateur connecté
-    // ---------------------------------------------------------
-    const { data: claimsData, error: claimsError } =
-      await supabase.auth.getClaims()
-
-    if (claimsError || !claimsData?.claims?.sub) {
-      return NextResponse.json(
-        { error: 'Non authentifié.' },
-        { status: 401 }
-      )
-    }
-
-    const userId = claimsData.claims.sub
-
-    // ---------------------------------------------------------
-    // Vérification administrateur
-    // ---------------------------------------------------------
-    const { data: adminUser, error: adminError } = await admin
-      .from('gipe_admins')
-      .select('user_id')
-      .eq('user_id', userId)
-      .maybeSingle()
-
-    if (adminError) {
-      console.error(
-        'Erreur vérification administrateur:',
-        adminError
-      )
-
-      return NextResponse.json(
-        {
-          error:
-            'Impossible de vérifier les droits administrateur.',
-        },
-        { status: 500 }
-      )
-    }
-
-    if (!adminUser) {
-      return NextResponse.json(
-        { error: 'Accès refusé.' },
-        { status: 403 }
-      )
-    }
+    await requireOfficePermission('agenda')
 
     // ---------------------------------------------------------
     // Lecture de la demande
@@ -354,6 +309,15 @@ export async function POST(request: Request) {
         'Événement envoyé sur le site.',
     })
   } catch (error) {
+    if (error instanceof Error) {
+      if (error.message === 'AUTHENTICATION_REQUIRED') {
+        return NextResponse.json({ error: 'Non authentifié.' }, { status: 401 })
+      }
+      if (error.message === 'OFFICE_ACCESS_DENIED' || error.message === 'OFFICE_PERMISSION_DENIED') {
+        return NextResponse.json({ error: 'Compte non autorisé.' }, { status: 403 })
+      }
+    }
+
     console.error(
       'Erreur API /api/agenda/publish:',
       error
