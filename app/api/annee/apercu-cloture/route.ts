@@ -1,56 +1,60 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { requireOfficePermission } from '@/lib/office-auth';
 import { createAdminClient } from '@/lib/supabase/admin';
 
-async function requireAdmin() {
-  const supabase = await createClient();
+async function requireConfigurationAccess() {
+  try {
+    await requireOfficePermission('configuration');
 
-  const { data: authData } = await supabase.auth.getClaims();
-  const userId = authData?.claims?.sub;
-
-  if (!userId) {
     return {
-      error: NextResponse.json(
-        { error: 'Non authentifié.' },
-        { status: 401 }
-      ),
+      admin: createAdminClient(),
     };
-  }
+  } catch (error) {
+    if (error instanceof Error) {
+      if (
+        error.message === 'AUTHENTICATION_REQUIRED'
+      ) {
+        return {
+          error: NextResponse.json(
+            { error: 'Non authentifié.' },
+            { status: 401 }
+          ),
+        };
+      }
 
-  const admin = createAdminClient();
+      if (
+        error.message === 'OFFICE_ACCESS_DENIED' ||
+        error.message === 'OFFICE_PERMISSION_DENIED'
+      ) {
+        return {
+          error: NextResponse.json(
+            { error: 'Compte non autorisé.' },
+            { status: 403 }
+          ),
+        };
+      }
+    }
 
-  const { data, error } = await admin
-    .from('gipe_admins')
-    .select('user_id')
-    .eq('user_id', userId)
-    .maybeSingle();
+    console.error(
+      'Erreur contrôle accès configuration :',
+      error
+    );
 
-  if (error) {
     return {
       error: NextResponse.json(
         {
           error:
-            'Impossible de vérifier les droits administrateur.',
+            'Erreur de contrôle des accès.',
         },
         { status: 500 }
       ),
     };
   }
-
-  if (!data) {
-    return {
-      error: NextResponse.json(
-        { error: 'Compte non autorisé.' },
-        { status: 403 }
-      ),
-    };
-  }
-
-  return { admin };
 }
 
 export async function GET() {
-  const auth = await requireAdmin();
+  const auth =
+    await requireConfigurationAccess();
 
   if ('error' in auth) {
     return auth.error;
@@ -58,11 +62,12 @@ export async function GET() {
 
   const { admin } = auth;
 
-  const { data: year, error: yearError } = await admin
-    .from('school_years')
-    .select('id,label')
-    .eq('is_active', true)
-    .maybeSingle();
+  const { data: year, error: yearError } =
+    await admin
+      .from('school_years')
+      .select('id,label')
+      .eq('is_active', true)
+      .maybeSingle();
 
   if (yearError) {
     return NextResponse.json(
@@ -73,28 +78,36 @@ export async function GET() {
 
   if (!year) {
     return NextResponse.json(
-      { error: 'Aucune année scolaire active.' },
+      {
+        error:
+          'Aucune année scolaire active.',
+      },
       { status: 409 }
     );
   }
 
-  const { data: memberships, error: membershipsError } =
-    await admin
-      .from('gipe_memberships')
-      .select(`
-        id,
-        gipe_membership_children (
-          class_id,
-          classes (
-            name
-          )
+  const {
+    data: memberships,
+    error: membershipsError,
+  } = await admin
+    .from('gipe_memberships')
+    .select(`
+      id,
+      gipe_membership_children (
+        class_id,
+        classes (
+          name
         )
-      `)
-      .eq('school_year_id', year.id);
+      )
+    `)
+    .eq('school_year_id', year.id);
 
   if (membershipsError) {
     return NextResponse.json(
-      { error: membershipsError.message },
+      {
+        error:
+          membershipsError.message,
+      },
       { status: 500 }
     );
   }
@@ -120,7 +133,8 @@ export async function GET() {
    * Deux enfants dans deux classes différentes :
    * → présent dans les deux classes.
    */
-  const byClass = new Map<string, Set<string>>();
+  const byClass =
+    new Map<string, Set<string>>();
 
   for (const membership of rows) {
     const children = Array.isArray(
@@ -129,41 +143,54 @@ export async function GET() {
       ? membership.gipe_membership_children
       : [];
 
-    const classesForMember = new Set<string>();
+    const classesForMember =
+      new Set<string>();
 
     for (const child of children) {
-      const classData = Array.isArray(child.classes)
-        ? child.classes[0]
-        : child.classes;
+      const classData =
+        Array.isArray(child.classes)
+          ? child.classes[0]
+          : child.classes;
 
-      const className = classData?.name;
+      const className =
+        classData?.name;
 
       if (className) {
-        classesForMember.add(className);
+        classesForMember.add(
+          className
+        );
       }
     }
 
     for (const className of classesForMember) {
       if (!byClass.has(className)) {
-        byClass.set(className, new Set<string>());
+        byClass.set(
+          className,
+          new Set<string>()
+        );
       }
 
-      byClass.get(className)!.add(membership.id);
+      byClass
+        .get(className)!
+        .add(membership.id);
     }
   }
 
-  const adherentsByClass = Array.from(byClass.entries())
-    .map(([className, memberIds]) => ({
-      className,
-      count: memberIds.size,
-    }))
-    .sort((a, b) =>
-      a.className.localeCompare(
-        b.className,
-        'fr',
-        { numeric: true }
+  const adherentsByClass =
+    Array.from(byClass.entries())
+      .map(
+        ([className, memberIds]) => ({
+          className,
+          count: memberIds.size,
+        })
       )
-    );
+      .sort((a, b) =>
+        a.className.localeCompare(
+          b.className,
+          'fr',
+          { numeric: true }
+        )
+      );
 
   return NextResponse.json({
     schoolYear: year.label,
