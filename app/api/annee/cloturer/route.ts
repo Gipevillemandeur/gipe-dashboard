@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { requireOfficePermission } from '@/lib/office-auth';
 import { createAdminClient } from '@/lib/supabase/admin';
 import {
   buildAnnualReportPdf,
@@ -7,96 +7,123 @@ import {
 } from '@/lib/annual-report-pdf';
 import { archiveInstanceMeeting } from '@/lib/instance-meeting-drive';
 
-async function requireAdmin() {
-  const supabase = await createClient();
+async function requireConfigurationAccess() {
+  try {
+    await requireOfficePermission('configuration');
 
-  const { data: authData } = await supabase.auth.getClaims();
-  const userId = authData?.claims?.sub;
-
-  if (!userId) {
     return {
-      error: NextResponse.json(
-        { error: 'Non authentifié.' },
-        { status: 401 }
-      ),
+      admin: createAdminClient(),
     };
-  }
+  } catch (error) {
+    if (error instanceof Error) {
+      if (
+        error.message === 'AUTHENTICATION_REQUIRED'
+      ) {
+        return {
+          error: NextResponse.json(
+            { error: 'Non authentifié.' },
+            { status: 401 }
+          ),
+        };
+      }
 
-  const admin = createAdminClient();
+      if (
+        error.message === 'OFFICE_ACCESS_DENIED' ||
+        error.message === 'OFFICE_PERMISSION_DENIED'
+      ) {
+        return {
+          error: NextResponse.json(
+            { error: 'Compte non autorisé.' },
+            { status: 403 }
+          ),
+        };
+      }
+    }
 
-  const { data, error } = await admin
-    .from('gipe_admins')
-    .select('user_id')
-    .eq('user_id', userId)
-    .maybeSingle();
+    console.error(
+      'Erreur contrôle accès configuration :',
+      error
+    );
 
-  if (error) {
     return {
       error: NextResponse.json(
         {
           error:
-            'Impossible de vérifier les droits administrateur.',
+            'Erreur de contrôle des accès.',
         },
         { status: 500 }
       ),
     };
   }
-
-  if (!data) {
-    return {
-      error: NextResponse.json(
-        { error: 'Compte non autorisé.' },
-        { status: 403 }
-      ),
-    };
-  }
-
-  return { admin, userId };
 }
 
-function sanitizeFileNamePart(value: string) {
+function sanitizeFileNamePart(
+  value: string
+) {
   return value
-    .replace(/[\\/:*?"<>|]/g, '-')
+    .replace(
+      /[\\/:*?"<>|]/g,
+      '-'
+    )
     .trim();
 }
 
 async function buildCurrentAnnualReport(
-  admin: ReturnType<typeof createAdminClient>
+  admin: ReturnType<
+    typeof createAdminClient
+  >
 ) {
-  const { data: year, error: yearError } = await admin
+  const {
+    data: year,
+    error: yearError,
+  } = await admin
     .from('school_years')
     .select('id,label')
     .eq('is_active', true)
     .maybeSingle();
 
   if (yearError) {
-    throw new Error(yearError.message);
+    throw new Error(
+      yearError.message
+    );
   }
 
   if (!year) {
-    throw new Error('Aucune année scolaire active.');
+    throw new Error(
+      'Aucune année scolaire active.'
+    );
   }
 
-  const { data: memberships, error: membershipsError } =
-    await admin
-      .from('gipe_memberships')
-      .select(`
-        id,
-        gipe_membership_children (
-          class_id,
-          classes (
-            name
-          )
+  const {
+    data: memberships,
+    error: membershipsError,
+  } = await admin
+    .from('gipe_memberships')
+    .select(`
+      id,
+      gipe_membership_children (
+        class_id,
+        classes (
+          name
         )
-      `)
-      .eq('school_year_id', year.id);
+      )
+    `)
+    .eq(
+      'school_year_id',
+      year.id
+    );
 
   if (membershipsError) {
-    throw new Error(membershipsError.message);
+    throw new Error(
+      membershipsError.message
+    );
   }
 
-  const rows = memberships || [];
-  const byClass = new Map<string, Set<string>>();
+  const rows =
+    memberships || [];
+
+  const byClass =
+    new Map<string, Set<string>>();
 
   for (const membership of rows) {
     const children = Array.isArray(
@@ -105,48 +132,67 @@ async function buildCurrentAnnualReport(
       ? membership.gipe_membership_children
       : [];
 
-    const classesForMember = new Set<string>();
+    const classesForMember =
+      new Set<string>();
 
     for (const child of children) {
-      const classData = Array.isArray(child.classes)
-        ? child.classes[0]
-        : child.classes;
+      const classData =
+        Array.isArray(child.classes)
+          ? child.classes[0]
+          : child.classes;
 
-      const className = classData?.name;
+      const className =
+        classData?.name;
 
       if (className) {
-        classesForMember.add(className);
+        classesForMember.add(
+          className
+        );
       }
     }
 
     for (const className of classesForMember) {
       if (!byClass.has(className)) {
-        byClass.set(className, new Set<string>());
+        byClass.set(
+          className,
+          new Set<string>()
+        );
       }
 
-      byClass.get(className)!.add(membership.id);
+      byClass
+        .get(className)!
+        .add(membership.id);
     }
   }
 
-  const adherentsByClass = Array.from(byClass.entries())
-    .map(([className, memberIds]) => ({
-      className,
-      count: memberIds.size,
-    }))
-    .sort((a, b) =>
-      a.className.localeCompare(b.className, 'fr', {
-        numeric: true,
-      })
-    );
+  const adherentsByClass =
+    Array.from(byClass.entries())
+      .map(
+        ([className, memberIds]) => ({
+          className,
+          count: memberIds.size,
+        })
+      )
+      .sort((a, b) =>
+        a.className.localeCompare(
+          b.className,
+          'fr',
+          {
+            numeric: true,
+          }
+        )
+      );
 
   const report: AnnualReportData = {
     schoolYear: year.label,
-    totalAdherents: rows.length,
+    totalAdherents:
+      rows.length,
     adherentsByClass,
     totalRecettes: null,
     totalDepenses: null,
     solde: null,
-    closedAt: new Date().toISOString(),
+    closedAt:
+      new Date().toISOString(),
   };
 
   return {
@@ -171,43 +217,61 @@ async function archivePdfInDrive(
     );
   }
 
-  const safeYear = sanitizeFileNamePart(schoolYear);
+  const safeYear =
+    sanitizeFileNamePart(
+      schoolYear
+    );
 
   const fileName =
     `Bilan-annuel-GIPE-${safeYear}.pdf`;
 
   const pdfBase64 =
-    Buffer.from(pdf).toString('base64');
+    Buffer.from(pdf).toString(
+      'base64'
+    );
 
-  const response = await fetch(scriptUrl, {
-    method: 'POST',
-    redirect: 'follow',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      action: 'upload_annual_report',
-      token,
-      schoolYear,
-      fileName,
-      pdfBase64,
-    }),
-    cache: 'no-store',
-  });
+  const response =
+    await fetch(
+      scriptUrl,
+      {
+        method: 'POST',
+        redirect: 'follow',
+        headers: {
+          'Content-Type':
+            'application/json',
+        },
+        body: JSON.stringify({
+          action:
+            'upload_annual_report',
+          token,
+          schoolYear,
+          fileName,
+          pdfBase64,
+        }),
+        cache: 'no-store',
+      }
+    );
 
-  const responseText = await response.text();
+  const responseText =
+    await response.text();
 
   let result: any;
 
   try {
-    result = JSON.parse(responseText);
+    result =
+      JSON.parse(
+        responseText
+      );
   } catch {
     throw new Error(
       `Réponse Apps Script inattendue (HTTP ${response.status}).`
     );
   }
 
-  if (!response.ok || !result?.ok) {
+  if (
+    !response.ok ||
+    !result?.ok
+  ) {
     throw new Error(
       result?.error ||
         `Archivage Drive impossible (HTTP ${response.status}).`
@@ -218,19 +282,35 @@ async function archivePdfInDrive(
 }
 
 async function archiveCurrentYearInstances(
-  admin: ReturnType<typeof createAdminClient>,
+  admin: ReturnType<
+    typeof createAdminClient
+  >,
   schoolYearId: string
 ) {
-  const { data: meetings, error } = await admin
+  const {
+    data: meetings,
+    error,
+  } = await admin
     .from('instance_meetings')
-    .select('id, meeting_date, meeting_time, type, subject')
-    .eq('school_year_id', schoolYearId)
-    .order('meeting_date', {
-      ascending: true,
-    })
-    .order('meeting_time', {
-      ascending: true,
-    });
+    .select(
+      'id, meeting_date, meeting_time, type, subject'
+    )
+    .eq(
+      'school_year_id',
+      schoolYearId
+    )
+    .order(
+      'meeting_date',
+      {
+        ascending: true,
+      }
+    )
+    .order(
+      'meeting_time',
+      {
+        ascending: true,
+      }
+    );
 
   if (error) {
     throw new Error(
@@ -238,18 +318,22 @@ async function archiveCurrentYearInstances(
     );
   }
 
-  const rows = meetings || [];
+  const rows =
+    meetings || [];
 
   const archived = [];
 
   for (const meeting of rows) {
     try {
-      const result = await archiveInstanceMeeting(
-        admin,
-        meeting.id
-      );
+      const result =
+        await archiveInstanceMeeting(
+          admin,
+          meeting.id
+        );
 
-      archived.push(result);
+      archived.push(
+        result
+      );
     } catch (error) {
       const message =
         error instanceof Error
@@ -265,22 +349,33 @@ async function archiveCurrentYearInstances(
   return archived;
 }
 
-export async function POST(request: Request) {
-  const auth = await requireAdmin();
+export async function POST(
+  request: Request
+) {
+  const auth =
+    await requireConfigurationAccess();
 
   if ('error' in auth) {
     return auth.error;
   }
 
-  const { admin } = auth;
+  const { admin } =
+    auth;
 
-  const body = (await request.json().catch(() => null)) as {
-    newYearLabel?: string;
-  } | null;
+  const body =
+    (await request
+      .json()
+      .catch(
+        () => null
+      )) as {
+        newYearLabel?: string;
+      } | null;
 
-  const newYearLabel = String(
-    body?.newYearLabel || ''
-  ).trim();
+  const newYearLabel =
+    String(
+      body?.newYearLabel ||
+        ''
+    ).trim();
 
   if (!newYearLabel) {
     return NextResponse.json(
@@ -292,7 +387,10 @@ export async function POST(request: Request) {
     );
   }
 
-  if (newYearLabel.length > 30) {
+  if (
+    newYearLabel.length >
+    30
+  ) {
     return NextResponse.json(
       {
         error:
@@ -302,7 +400,11 @@ export async function POST(request: Request) {
     );
   }
 
-  if (!/^\d{4}-\d{4}$/.test(newYearLabel)) {
+  if (
+    !/^\d{4}-\d{4}$/.test(
+      newYearLabel
+    )
+  ) {
     return NextResponse.json(
       {
         error:
@@ -318,8 +420,13 @@ export async function POST(request: Request) {
      *
      * Aucune modification de Supabase n'est encore effectuée.
      */
-    const { year, report } =
-      await buildCurrentAnnualReport(admin);
+    const {
+      year,
+      report,
+    } =
+      await buildCurrentAnnualReport(
+        admin
+      );
 
     /*
      * 2. Archivage de toutes les réunions de l'année active.
@@ -345,7 +452,9 @@ export async function POST(request: Request) {
      * 3. Génération du bilan annuel.
      */
     const pdf =
-      await buildAnnualReportPdf(report);
+      await buildAnnualReportPdf(
+        report
+      );
 
     /*
      * 4. Archivage du bilan annuel dans Drive.
@@ -367,7 +476,10 @@ export async function POST(request: Request) {
      *
      * on effectue la vraie clôture SQL.
      */
-    const { data, error } =
+    const {
+      data,
+      error,
+    } =
       await admin.rpc(
         'gipe_cloturer_annee',
         {
