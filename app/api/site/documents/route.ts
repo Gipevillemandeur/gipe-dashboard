@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { requireOfficePermission } from '@/lib/office-auth';
 
 const MAX_FILE_SIZE = 8 * 1024 * 1024;
 
@@ -14,53 +14,57 @@ type CloudinaryUploadResponse = {
   resource_type?: string;
 };
 
-async function requireAdmin() {
-  const supabase = await createClient();
+async function requireWebsiteAccess() {
+  try {
+    await requireOfficePermission('website');
 
-  const { data: authData } =
-    await supabase.auth.getClaims();
-
-  const userId = authData?.claims?.sub;
-
-  if (!userId) {
     return {
-      error: NextResponse.json(
-        { error: 'Non authentifié.' },
-        { status: 401 }
-      ),
+      admin: createAdminClient(),
     };
-  }
+  } catch (error) {
+    if (error instanceof Error) {
+      if (
+        error.message ===
+        'AUTHENTICATION_REQUIRED'
+      ) {
+        return {
+          error: NextResponse.json(
+            { error: 'Non authentifié.' },
+            { status: 401 }
+          ),
+        };
+      }
 
-  const admin = createAdminClient();
+      if (
+        error.message ===
+          'OFFICE_ACCESS_DENIED' ||
+        error.message ===
+          'OFFICE_PERMISSION_DENIED'
+      ) {
+        return {
+          error: NextResponse.json(
+            { error: 'Compte non autorisé.' },
+            { status: 403 }
+          ),
+        };
+      }
+    }
 
-  const { data, error } = await admin
-    .from('gipe_admins')
-    .select('user_id')
-    .eq('user_id', userId)
-    .maybeSingle();
+    console.error(
+      'Erreur contrôle accès site:',
+      error
+    );
 
-  if (error) {
     return {
       error: NextResponse.json(
         {
           error:
-            'Impossible de vérifier les droits administrateur.',
+            'Erreur de contrôle des accès.',
         },
         { status: 500 }
       ),
     };
   }
-
-  if (!data) {
-    return {
-      error: NextResponse.json(
-        { error: 'Compte non autorisé.' },
-        { status: 403 }
-      ),
-    };
-  }
-
-  return { admin };
 }
 
 function cleanString(value: unknown) {
@@ -72,49 +76,67 @@ function validDate(value: string) {
     return false;
   }
 
-  const date = new Date(`${value}T00:00:00`);
+  const date = new Date(
+    `${value}T00:00:00`
+  );
 
-  return !Number.isNaN(date.getTime());
+  return !Number.isNaN(
+    date.getTime()
+  );
 }
 
-async function uploadPdfToCloudinary(file: File) {
+async function uploadPdfToCloudinary(
+  file: File
+) {
   if (
     file.type !== 'application/pdf' &&
-    !file.name.toLowerCase().endsWith('.pdf')
+    !file.name
+      .toLowerCase()
+      .endsWith('.pdf')
   ) {
     throw new Error(
       'Le document doit être au format PDF.'
     );
   }
 
-  if (file.size > MAX_FILE_SIZE) {
+  if (
+    file.size > MAX_FILE_SIZE
+  ) {
     throw new Error(
       'Le PDF ne doit pas dépasser 8 Mo.'
     );
   }
 
-  const formData = new FormData();
+  const formData =
+    new FormData();
 
-  formData.append('file', file);
+  formData.append(
+    'file',
+    file
+  );
+
   formData.append(
     'upload_preset',
     CLOUDINARY_UPLOAD_PRESET
   );
+
   formData.append(
     'folder',
     'documents'
   );
 
-  const response = await fetch(
-    `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`,
-    {
-      method: 'POST',
-      body: formData,
-    }
-  );
+  const response =
+    await fetch(
+      `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`,
+      {
+        method: 'POST',
+        body: formData,
+      }
+    );
 
   if (!response.ok) {
-    const text = await response.text();
+    const text =
+      await response.text();
 
     throw new Error(
       `Erreur Cloudinary : ${text}`
@@ -142,13 +164,15 @@ async function uploadPdfToCloudinary(file: File) {
       );
 
   return {
-    fileUrl: data.secure_url,
+    fileUrl:
+      data.secure_url,
     thumbnailUrl,
   };
 }
 
 export async function GET() {
-  const auth = await requireAdmin();
+  const auth =
+    await requireWebsiteAccess();
 
   if ('error' in auth) {
     return auth.error;
@@ -156,7 +180,10 @@ export async function GET() {
 
   const { admin } = auth;
 
-  const { data, error } = await admin
+  const {
+    data,
+    error,
+  } = await admin
     .from('documents')
     .select(
       'id,title,description,file_url,thumbnail_url,date,category'
@@ -186,7 +213,8 @@ export async function GET() {
 export async function POST(
   request: Request
 ) {
-  const auth = await requireAdmin();
+  const auth =
+    await requireWebsiteAccess();
 
   if ('error' in auth) {
     return auth.error;
@@ -198,21 +226,25 @@ export async function POST(
     const formData =
       await request.formData();
 
-    const title = cleanString(
-      formData.get('title')
-    );
+    const title =
+      cleanString(
+        formData.get('title')
+      );
 
-    const description = cleanString(
-      formData.get('description')
-    );
+    const description =
+      cleanString(
+        formData.get('description')
+      );
 
-    const date = cleanString(
-      formData.get('date')
-    );
+    const date =
+      cleanString(
+        formData.get('date')
+      );
 
-    const category = cleanString(
-      formData.get('category')
-    );
+    const category =
+      cleanString(
+        formData.get('category')
+      );
 
     const file =
       formData.get('file');
@@ -272,25 +304,27 @@ export async function POST(
         file
       );
 
-    const { data, error } =
-      await admin
-        .from('documents')
-        .insert({
-          title,
-          description:
-            description || null,
-          file_url:
-            uploaded.fileUrl,
-          thumbnail_url:
-            uploaded.thumbnailUrl,
-          date,
-          category:
-            category || null,
-        })
-        .select(
-          'id,title,description,file_url,thumbnail_url,date,category'
-        )
-        .single();
+    const {
+      data,
+      error,
+    } = await admin
+      .from('documents')
+      .insert({
+        title,
+        description:
+          description || null,
+        file_url:
+          uploaded.fileUrl,
+        thumbnail_url:
+          uploaded.thumbnailUrl,
+        date,
+        category:
+          category || null,
+      })
+      .select(
+        'id,title,description,file_url,thumbnail_url,date,category'
+      )
+      .single();
 
     if (error) {
       return NextResponse.json(
@@ -325,7 +359,8 @@ export async function POST(
 export async function PUT(
   request: Request
 ) {
-  const auth = await requireAdmin();
+  const auth =
+    await requireWebsiteAccess();
 
   if ('error' in auth) {
     return auth.error;
@@ -337,25 +372,30 @@ export async function PUT(
     const formData =
       await request.formData();
 
-    const id = cleanString(
-      formData.get('id')
-    );
+    const id =
+      cleanString(
+        formData.get('id')
+      );
 
-    const title = cleanString(
-      formData.get('title')
-    );
+    const title =
+      cleanString(
+        formData.get('title')
+      );
 
-    const description = cleanString(
-      formData.get('description')
-    );
+    const description =
+      cleanString(
+        formData.get('description')
+      );
 
-    const date = cleanString(
-      formData.get('date')
-    );
+    const date =
+      cleanString(
+        formData.get('date')
+      );
 
-    const category = cleanString(
-      formData.get('category')
-    );
+    const category =
+      cleanString(
+        formData.get('category')
+      );
 
     const file =
       formData.get('file');
@@ -422,10 +462,12 @@ export async function PUT(
     }
 
     let fileUrl =
-      existing.file_url || null;
+      existing.file_url ||
+      null;
 
     let thumbnailUrl =
-      existing.thumbnail_url || null;
+      existing.thumbnail_url ||
+      null;
 
     if (
       file instanceof File &&
@@ -443,26 +485,28 @@ export async function PUT(
         uploaded.thumbnailUrl;
     }
 
-    const { data, error } =
-      await admin
-        .from('documents')
-        .update({
-          title,
-          description:
-            description || null,
-          file_url:
-            fileUrl,
-          thumbnail_url:
-            thumbnailUrl,
-          date,
-          category:
-            category || null,
-        })
-        .eq('id', id)
-        .select(
-          'id,title,description,file_url,thumbnail_url,date,category'
-        )
-        .single();
+    const {
+      data,
+      error,
+    } = await admin
+      .from('documents')
+      .update({
+        title,
+        description:
+          description || null,
+        file_url:
+          fileUrl,
+        thumbnail_url:
+          thumbnailUrl,
+        date,
+        category:
+          category || null,
+      })
+      .eq('id', id)
+      .select(
+        'id,title,description,file_url,thumbnail_url,date,category'
+      )
+      .single();
 
     if (error) {
       return NextResponse.json(
@@ -494,7 +538,8 @@ export async function PUT(
 export async function DELETE(
   request: Request
 ) {
-  const auth = await requireAdmin();
+  const auth =
+    await requireWebsiteAccess();
 
   if ('error' in auth) {
     return auth.error;
@@ -506,9 +551,10 @@ export async function DELETE(
     const body =
       await request.json();
 
-    const id = cleanString(
-      body?.id
-    );
+    const id =
+      cleanString(
+        body?.id
+      );
 
     if (!id) {
       return NextResponse.json(
