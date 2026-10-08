@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 
+const APP_URL = 'https://admin.gipevillemandeur.com';
+
 async function getAuthenticatedClient() {
   const supabase = await createClient();
 
@@ -641,18 +643,22 @@ export async function POST(
     const adminClient =
       createAdminClient();
 
-    const origin =
-      new URL(request.url).origin;
-
+    /*
+     * IMPORTANT :
+     * On utilise toujours l'adresse publique du dashboard.
+     *
+     * Il ne faut surtout pas utiliser request.url ici,
+     * car l'invitation pourrait être envoyée depuis
+     * localhost pendant un test local.
+     */
     const redirectTo =
-      `${origin}/auth/callback?next=/set-password`;
+      `${APP_URL}/auth/callback?next=/set-password`;
 
     /*
-     * On recherche d'abord si cette adresse possède
-     * déjà un compte Supabase.
+     * Recherche d'un compte Supabase existant.
      *
-     * Cela permet à un même compte de changer de poste
-     * sans créer un deuxième utilisateur.
+     * Si l'adresse existe déjà, on réutilise
+     * le même compte au lieu d'en créer un autre.
      */
     let existingUser:
       | {
@@ -716,13 +722,11 @@ export async function POST(
     }
 
     /*
-     * CAS 1 :
-     * Le compte existe déjà.
+     * COMPTE EXISTANT
      *
-     * On ne recrée surtout pas le compte.
-     * On rattache simplement l'utilisateur au poste
-     * et on lui envoie un mail de récupération
-     * pour lui permettre de définir son mot de passe.
+     * On garde le même compte Supabase.
+     * On lui envoie simplement un mail de récupération
+     * avec le bon lien de production.
      */
     if (existingUser) {
       const {
@@ -784,10 +788,7 @@ export async function POST(
     }
 
     /*
-     * CAS 2 :
-     * Aucun compte n'existe encore pour cette adresse.
-     *
-     * On crée alors le compte via l'invitation Supabase.
+     * NOUVEAU COMPTE
      */
     const {
       data: invitationData,
