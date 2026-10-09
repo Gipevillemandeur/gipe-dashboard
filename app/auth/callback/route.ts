@@ -100,6 +100,20 @@ export async function GET(
     }
   }
 
+  /*
+   * Lien d'invitation ou de réinitialisation
+   * « classique » de Supabase : la session arrive
+   * après le # de l'adresse, que le serveur ne voit
+   * pas. On envoie donc vers /set-password : le
+   * navigateur conserve automatiquement la partie
+   * après le #, et la page s'occupe de la lire.
+   */
+  if (next === '/set-password') {
+    return NextResponse.redirect(
+      `${origin}/set-password`
+    );
+  }
+
   return NextResponse.redirect(
     `${origin}/login?error=invite`
   );
