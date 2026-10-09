@@ -75,7 +75,7 @@ export async function GET() {
     }
 
     const supabase =
-      await createClient()
+      createAdminClient()
 
     const [
       positionsResult,
