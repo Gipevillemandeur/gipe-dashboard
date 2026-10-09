@@ -126,6 +126,26 @@ export default function Sidebar() {
     };
   }, []);
 
+  /*
+   * Pas de menu sur les pages de connexion :
+   * la page occupe tout l'écran.
+   */
+  const isAuthPage =
+    pathname === '/login' ||
+    pathname === '/set-password';
+
+  if (isAuthPage) {
+    return (
+      <style jsx global>{`
+        .content {
+          margin-left: 0 !important;
+          width: 100% !important;
+          padding: 0 !important;
+        }
+      `}</style>
+    );
+  }
+
   return (
     <>
       <header className="mobile-header">
