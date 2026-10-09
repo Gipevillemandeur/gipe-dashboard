@@ -11,10 +11,7 @@ async function requireTreasuryAccess() {
     }
   } catch (error) {
     if (error instanceof Error) {
-      if (
-        error.message ===
-        'AUTHENTICATION_REQUIRED'
-      ) {
+      if (error.message === 'AUTHENTICATION_REQUIRED') {
         return {
           error: NextResponse.json(
             {
@@ -26,16 +23,13 @@ async function requireTreasuryAccess() {
       }
 
       if (
-        error.message ===
-          'OFFICE_ACCESS_DENIED' ||
-        error.message ===
-          'OFFICE_PERMISSION_DENIED'
+        error.message === 'OFFICE_ACCESS_DENIED' ||
+        error.message === 'OFFICE_PERMISSION_DENIED'
       ) {
         return {
           error: NextResponse.json(
             {
-              error:
-                'Compte non autorisé.',
+              error: 'Compte non autorisé.',
             },
             { status: 403 }
           ),
@@ -51,8 +45,7 @@ async function requireTreasuryAccess() {
     return {
       error: NextResponse.json(
         {
-          error:
-            'Erreur de contrôle des accès.',
+          error: 'Erreur de contrôle des accès.',
         },
         { status: 500 }
       ),
@@ -61,8 +54,7 @@ async function requireTreasuryAccess() {
 }
 
 export async function GET() {
-  const auth =
-    await requireTreasuryAccess()
+  const auth = await requireTreasuryAccess()
 
   if ('error' in auth) {
     return auth.error
@@ -71,15 +63,59 @@ export async function GET() {
   const { admin } = auth
 
   const {
+    data: schoolYear,
+    error: schoolYearError,
+  } = await admin
+    .from('school_years')
+    .select('id,label')
+    .eq('is_active', true)
+    .maybeSingle()
+
+  if (schoolYearError) {
+    console.error(
+      'Erreur chargement année scolaire:',
+      schoolYearError
+    )
+
+    return NextResponse.json(
+      {
+        error:
+          `Impossible de charger l'année scolaire : ${schoolYearError.message}`,
+      },
+      { status: 500 }
+    )
+  }
+
+  if (!schoolYear) {
+    return NextResponse.json({
+      schoolYear: null,
+      transactions: [],
+    })
+  }
+
+  const {
     data,
     error,
   } = await admin
-    .from('treasury_transactions')
-    .select('*')
-    .order('date', {
+    .from('gipe_transactions')
+    .select(`
+      id,
+      school_year_id,
+      transaction_date,
+      transaction_type,
+      category,
+      label,
+      amount,
+      payment_method,
+      note,
+      created_at,
+      updated_at
+    `)
+    .eq('school_year_id', schoolYear.id)
+    .order('transaction_date', {
       ascending: false,
     })
-    .order('id', {
+    .order('created_at', {
       ascending: false,
     })
 
@@ -98,16 +134,29 @@ export async function GET() {
     )
   }
 
+  const transactions = (data || []).map(
+    (transaction) => ({
+      id: transaction.id,
+      date: transaction.transaction_date,
+      type: transaction.transaction_type,
+      category: transaction.category,
+      label: transaction.label,
+      amount: Number(transaction.amount),
+      paymentMethod: transaction.payment_method,
+      note: transaction.note,
+    })
+  )
+
   return NextResponse.json({
-    transactions: data || [],
+    schoolYear: schoolYear.label,
+    transactions,
   })
 }
 
 export async function POST(
   request: Request
 ) {
-  const auth =
-    await requireTreasuryAccess()
+  const auth = await requireTreasuryAccess()
 
   if ('error' in auth) {
     return auth.error
@@ -116,35 +165,49 @@ export async function POST(
   const { admin } = auth
 
   try {
-    const body =
-      await request.json()
+    const body = await request.json()
 
     const {
       date,
       label,
-      description,
       category,
       amount,
       type,
-      payment_method,
-      reference,
+      paymentMethod,
+      note,
     } = body
 
     if (!date) {
       return NextResponse.json(
         {
-          error:
-            'La date est obligatoire.',
+          error: 'La date est obligatoire.',
         },
         { status: 400 }
       )
     }
 
-    if (!label) {
+    if (!label || !String(label).trim()) {
       return NextResponse.json(
         {
-          error:
-            'Le libellé est obligatoire.',
+          error: 'Le libellé est obligatoire.',
+        },
+        { status: 400 }
+      )
+    }
+
+    if (!category || !String(category).trim()) {
+      return NextResponse.json(
+        {
+          error: 'La catégorie est obligatoire.',
+        },
+        { status: 400 }
+      )
+    }
+
+    if (type !== 'income' && type !== 'expense') {
+      return NextResponse.json(
+        {
+          error: 'Le type de transaction est invalide.',
         },
         { status: 400 }
       )
@@ -157,27 +220,45 @@ export async function POST(
     ) {
       return NextResponse.json(
         {
-          error:
-            'Le montant est obligatoire.',
+          error: 'Le montant est obligatoire.',
         },
         { status: 400 }
       )
     }
 
-    const numericAmount =
-      Number(amount)
+    const numericAmount = Number(
+      String(amount).replace(',', '.')
+    )
 
     if (
-      !Number.isFinite(
-        numericAmount
-      )
+      !Number.isFinite(numericAmount) ||
+      numericAmount < 0
     ) {
       return NextResponse.json(
         {
-          error:
-            'Le montant est invalide.',
+          error: 'Le montant est invalide.',
         },
         { status: 400 }
+      )
+    }
+
+    const {
+      data: schoolYear,
+      error: schoolYearError,
+    } = await admin
+      .from('school_years')
+      .select('id,label')
+      .eq('is_active', true)
+      .maybeSingle()
+
+    if (schoolYearError || !schoolYear) {
+      return NextResponse.json(
+        {
+          error:
+            schoolYearError?.message ||
+            "Aucune année scolaire active n'est définie.",
+        },
+        { status: 409 }
       )
     }
 
@@ -185,26 +266,31 @@ export async function POST(
       data,
       error,
     } = await admin
-      .from(
-        'treasury_transactions'
-      )
+      .from('gipe_transactions')
       .insert({
-        date,
-        label,
-        description:
-          description || null,
-        category:
-          category || null,
-        amount:
-          numericAmount,
-        type:
-          type || null,
+        school_year_id: schoolYear.id,
+        transaction_date: date,
+        transaction_type: type,
+        category: String(category).trim(),
+        label: String(label).trim(),
+        amount: numericAmount,
         payment_method:
-          payment_method || null,
-        reference:
-          reference || null,
+          paymentMethod || null,
+        note: note || null,
       })
-      .select('*')
+      .select(`
+        id,
+        school_year_id,
+        transaction_date,
+        transaction_type,
+        category,
+        label,
+        amount,
+        payment_method,
+        note,
+        created_at,
+        updated_at
+      `)
       .single()
 
     if (error) {
@@ -225,7 +311,16 @@ export async function POST(
     return NextResponse.json(
       {
         ok: true,
-        transaction: data,
+        transaction: {
+          id: data.id,
+          date: data.transaction_date,
+          type: data.transaction_type,
+          category: data.category,
+          label: data.label,
+          amount: Number(data.amount),
+          paymentMethod: data.payment_method,
+          note: data.note,
+        },
       },
       { status: 201 }
     )
@@ -240,7 +335,7 @@ export async function POST(
         error:
           error instanceof Error
             ? error.message
-            : 'Impossible d’ajouter la transaction.',
+            : "Impossible d'ajouter la transaction.",
       },
       { status: 500 }
     )
@@ -250,8 +345,7 @@ export async function POST(
 export async function PUT(
   request: Request
 ) {
-  const auth =
-    await requireTreasuryAccess()
+  const auth = await requireTreasuryAccess()
 
   if ('error' in auth) {
     return auth.error
@@ -260,16 +354,11 @@ export async function PUT(
   const { admin } = auth
 
   try {
-    const body =
-      await request.json()
+    const body = await request.json()
 
-    const id =
-      Number(body?.id)
+    const id = String(body?.id || '').trim()
 
-    if (
-      !Number.isInteger(id) ||
-      id <= 0
-    ) {
+    if (!id) {
       return NextResponse.json(
         {
           error:
@@ -284,88 +373,95 @@ export async function PUT(
       unknown
     > = {}
 
-    if (
-      body.date !== undefined
-    ) {
-      updateData.date =
+    if (body.date !== undefined) {
+      updateData.transaction_date =
         body.date
     }
 
-    if (
-      body.label !== undefined
-    ) {
-      updateData.label =
-        body.label
-    }
+    if (body.label !== undefined) {
+      const label =
+        String(body.label || '').trim()
 
-    if (
-      body.description !==
-      undefined
-    ) {
-      updateData.description =
-        body.description || null
-    }
-
-    if (
-      body.category !==
-      undefined
-    ) {
-      updateData.category =
-        body.category || null
-    }
-
-    if (
-      body.amount !==
-      undefined
-    ) {
-      const numericAmount =
-        Number(body.amount)
-
-      if (
-        !Number.isFinite(
-          numericAmount
-        )
-      ) {
+      if (!label) {
         return NextResponse.json(
           {
             error:
-              'Le montant est invalide.',
+              'Le libellé est obligatoire.',
           },
           { status: 400 }
         )
       }
 
-      updateData.amount =
-        numericAmount
+      updateData.label = label
     }
 
-    if (
-      body.type !== undefined
-    ) {
-      updateData.type =
-        body.type || null
+    if (body.category !== undefined) {
+      const category =
+        String(body.category || '').trim()
+
+      if (!category) {
+        return NextResponse.json(
+          {
+            error:
+              'La catégorie est obligatoire.',
+          },
+          { status: 400 }
+        )
+      }
+
+      updateData.category = category
     }
 
-    if (
-      body.payment_method !==
-      undefined
-    ) {
+    if (body.amount !== undefined) {
+      const numericAmount = Number(
+        String(body.amount).replace(',', '.')
+      )
+
+      if (
+        !Number.isFinite(numericAmount) ||
+        numericAmount < 0
+      ) {
+        return NextResponse.json(
+          {
+            error: 'Le montant est invalide.',
+          },
+          { status: 400 }
+        )
+      }
+
+      updateData.amount = numericAmount
+    }
+
+    if (body.type !== undefined) {
+      if (
+        body.type !== 'income' &&
+        body.type !== 'expense'
+      ) {
+        return NextResponse.json(
+          {
+            error:
+              'Le type de transaction est invalide.',
+          },
+          { status: 400 }
+        )
+      }
+
+      updateData.transaction_type =
+        body.type
+    }
+
+    if (body.paymentMethod !== undefined) {
       updateData.payment_method =
-        body.payment_method ||
-        null
+        body.paymentMethod || null
+    }
+
+    if (body.note !== undefined) {
+      updateData.note =
+        body.note || null
     }
 
     if (
-      body.reference !==
-      undefined
-    ) {
-      updateData.reference =
-        body.reference || null
-    }
-
-    if (
-      Object.keys(updateData)
-        .length === 0
+      Object.keys(updateData).length === 0
     ) {
       return NextResponse.json(
         {
@@ -380,12 +476,22 @@ export async function PUT(
       data,
       error,
     } = await admin
-      .from(
-        'treasury_transactions'
-      )
+      .from('gipe_transactions')
       .update(updateData)
       .eq('id', id)
-      .select('*')
+      .select(`
+        id,
+        school_year_id,
+        transaction_date,
+        transaction_type,
+        category,
+        label,
+        amount,
+        payment_method,
+        note,
+        created_at,
+        updated_at
+      `)
       .single()
 
     if (error) {
@@ -405,7 +511,16 @@ export async function PUT(
 
     return NextResponse.json({
       ok: true,
-      transaction: data,
+      transaction: {
+        id: data.id,
+        date: data.transaction_date,
+        type: data.transaction_type,
+        category: data.category,
+        label: data.label,
+        amount: Number(data.amount),
+        paymentMethod: data.payment_method,
+        note: data.note,
+      },
     })
   } catch (error) {
     console.error(
@@ -428,8 +543,7 @@ export async function PUT(
 export async function DELETE(
   request: Request
 ) {
-  const auth =
-    await requireTreasuryAccess()
+  const auth = await requireTreasuryAccess()
 
   if ('error' in auth) {
     return auth.error
@@ -438,16 +552,11 @@ export async function DELETE(
   const { admin } = auth
 
   try {
-    const body =
-      await request.json()
+    const body = await request.json()
 
-    const id =
-      Number(body?.id)
+    const id = String(body?.id || '').trim()
 
-    if (
-      !Number.isInteger(id) ||
-      id <= 0
-    ) {
+    if (!id) {
       return NextResponse.json(
         {
           error:
@@ -460,9 +569,7 @@ export async function DELETE(
     const {
       error,
     } = await admin
-      .from(
-        'treasury_transactions'
-      )
+      .from('gipe_transactions')
       .delete()
       .eq('id', id)
 
