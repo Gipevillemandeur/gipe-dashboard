@@ -1048,7 +1048,9 @@ export default function AgendaPage() {
                     />
 
                     <span>
-                      Créer également une réunion dans les Instances
+                      <span>
+                       Créer également la réunion dans les Instances ?
+                      </span>
                     </span>
                   </label>
 
@@ -1505,8 +1507,9 @@ export default function AgendaPage() {
           align-items: flex-start;
           gap: 9px;
           cursor: pointer;
-          color: var(--gipe-text, #2f2926);
+          color: #8f211c;
           font-size: 14px;
+          font-weight: 600;
           line-height: 1.4;
           user-select: none;
         }
