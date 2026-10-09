@@ -1,12 +1,11 @@
 'use client';
 
 import { FormEvent, Suspense, useState } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { LogIn, ShieldCheck } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 
 function LoginContent() {
-  const router = useRouter();
   const searchParams = useSearchParams();
 
   const requestedNext = searchParams.get('next') || '/';
@@ -45,8 +44,9 @@ function LoginContent() {
       return;
     }
 
-    router.replace(next);
-    router.refresh();
+    // Rechargement complet de la page : le site relit la session
+    // fraîchement créée, sans rester bloqué sur l'écran de connexion.
+    window.location.assign(next);
   }
 
   return (
