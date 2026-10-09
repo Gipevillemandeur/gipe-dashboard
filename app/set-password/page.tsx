@@ -20,6 +20,11 @@ type LinkStatus =
   | 'ready'
   | 'invalid';
 
+type PendingLink = {
+  tokenHash: string;
+  type: 'invite' | 'recovery';
+};
+
 export default function SetPasswordPage() {
   /*
    * Au chargement : on lit le lien reçu par e-mail.
@@ -33,6 +38,19 @@ export default function SetPasswordPage() {
 
   const [linkError, setLinkError] =
     useState('');
+
+  /*
+   * Lien reçu par e-mail, gardé de côté.
+   *
+   * Il n'est utilisé QU'AU CLIC sur « Créer mon
+   * mot de passe ». Certaines messageries (Hotmail,
+   * Outlook…) ouvrent les liens toutes seules pour
+   * les vérifier : si le lien était utilisé dès
+   * l'ouverture de la page, il serait « grillé »
+   * avant que la personne ne clique.
+   */
+  const [pendingLink, setPendingLink] =
+    useState<PendingLink | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -48,6 +66,39 @@ export default function SetPasswordPage() {
 
       const supabase =
         createClient();
+
+      const query =
+        new URLSearchParams(
+          window.location.search
+        );
+
+      const tokenHash =
+        query.get('token_hash');
+
+      const tokenType =
+        query.get('type');
+
+      if (
+        tokenHash &&
+        (tokenType === 'invite' ||
+          tokenType === 'recovery')
+      ) {
+        // On retire le jeton de la barre d'adresse.
+        window.history.replaceState(
+          null,
+          '',
+          window.location.pathname
+        );
+
+        if (!cancelled) {
+          setPendingLink({
+            tokenHash,
+            type: tokenType,
+          });
+          setLinkStatus('ready');
+        }
+        return;
+      }
 
       if (
         params.get('error') ||
@@ -178,6 +229,35 @@ export default function SetPasswordPage() {
     try {
       const supabase =
         createClient();
+
+      /*
+       * C'est ici, au clic, que le lien de l'e-mail
+       * est réellement utilisé.
+       */
+      if (pendingLink) {
+        const { error: verifyError } =
+          await supabase.auth.verifyOtp({
+            token_hash:
+              pendingLink.tokenHash,
+            type: pendingLink.type,
+          });
+
+        if (verifyError) {
+          console.error(
+            'Erreur vérification lien e-mail:',
+            verifyError
+          );
+
+          setPendingLink(null);
+          setLinkError(
+            'Ce lien n’est plus valide : il a déjà été utilisé ou il a expiré. Demande un nouvel envoi de l’accès.'
+          );
+          setLinkStatus('invalid');
+          return;
+        }
+
+        setPendingLink(null);
+      }
 
       const {
         data: {
