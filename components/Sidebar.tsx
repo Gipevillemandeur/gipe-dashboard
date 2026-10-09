@@ -23,36 +23,43 @@ import LogoutButton from '@/components/LogoutButton';
 const items = [
   {
     href: '/',
+    permission: 'dashboard',
     label: 'Tableau de bord',
     icon: Home,
   },
   {
     href: '/conseils',
+    permission: 'schooling',
     label: 'Scolarité',
     icon: Users,
   },
   {
     href: '/adherents',
+    permission: 'members',
     label: 'Adhérents',
     icon: UserRoundPlus,
   },
   {
     href: '/tresorerie',
+    permission: 'treasury',
     label: 'Trésorerie',
     icon: WalletCards,
   },
   {
     href: '/site',
+    permission: 'website',
     label: 'Site internet',
     icon: Globe2,
   },
   {
     href: '/agenda',
+    permission: 'agenda',
     label: 'Agenda',
     icon: CalendarDays,
   },
   {
     href: '/documents',
+    permission: 'drive',
     label: 'Docs Drive',
     icon: FileText,
   },
@@ -66,6 +73,14 @@ export default function Sidebar() {
 
   const [role, setRole] =
     useState<string | null>(null);
+
+  /*
+   * Autorisations de la personne connectée :
+   * le menu n'affiche que les rubriques permises.
+   * (null = pas encore chargé)
+   */
+  const [permissions, setPermissions] =
+    useState<string[] | null>(null);
 
   useEffect(() => {
     setMobileOpen(false);
@@ -106,10 +121,14 @@ export default function Sidebar() {
 
         if (
           !cancelled &&
-          data?.authorized &&
-          data?.role
+          data?.authorized
         ) {
-          setRole(data.role);
+          setRole(data.role || null);
+          setPermissions(
+            Array.isArray(data.permissions)
+              ? data.permissions
+              : []
+          );
         }
       } catch (error) {
         console.error(
@@ -133,6 +152,20 @@ export default function Sidebar() {
   const isAuthPage =
     pathname === '/login' ||
     pathname === '/set-password';
+
+  function can(permission: string) {
+    return (
+      permissions !== null &&
+      permissions.includes(permission)
+    );
+  }
+
+  const configurationHref =
+    can('configuration')
+      ? '/configuration'
+      : can('office_members')
+        ? '/configuration/membres-bureau'
+        : null;
 
   if (isAuthPage) {
     return (
@@ -269,7 +302,11 @@ export default function Sidebar() {
             </div>
           )}
 
-          {items.map((item) => {
+          {items
+            .filter((item) =>
+              can(item.permission)
+            )
+            .map((item) => {
             const Icon = item.icon;
 
             const active =
@@ -300,6 +337,7 @@ export default function Sidebar() {
 
           <div className="nav-sep" />
 
+          {configurationHref && (
           <Link
             className={
               pathname ===
@@ -312,11 +350,12 @@ export default function Sidebar() {
                 ? 'active'
                 : ''
             }
-            href="/configuration"
+            href={configurationHref}
           >
             <Settings size={18} />
             Configuration
           </Link>
+          )}
 
           <Link href="#">
             <BookOpen size={18} />

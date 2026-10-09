@@ -8,7 +8,9 @@ import {
   CalendarDays,
 } from 'lucide-react';
 
-import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
+import { requireOfficePermission } from '@/lib/office-auth';
+import { redirect } from 'next/navigation';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,7 +22,20 @@ export default async function ConseilClassePage({
   params,
 }: PageProps) {
   const { classId } = await params;
-  const supabase = await createClient();
+  /*
+   * Accès réservé aux postes ayant l'autorisation
+   * « Scolarité ». Les données sont ensuite lues avec
+   * le client serveur, comme le reste du dashboard
+   * (avant, cette page ne fonctionnait que pour
+   * l'ancien compte « Administrateur »).
+   */
+  try {
+    await requireOfficePermission('schooling');
+  } catch {
+    redirect('/');
+  }
+
+  const supabase = createAdminClient();
 
   const { data: activeYear } = await supabase
     .from('school_years')

@@ -1,18 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
+import { resolveOfficeAccess } from '@/lib/access-core';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { classes as mockClasses, type ClassRow } from '@/lib/mock-data';
-
-const FULL_PERMISSIONS = [
-  'dashboard',
-  'schooling',
-  'members',
-  'treasury',
-  'website',
-  'agenda',
-  'drive',
-  'configuration',
-  'office_members',
-];
 
 export type DashboardSnapshot = {
   connected: boolean;
@@ -21,122 +10,6 @@ export type DashboardSnapshot = {
   adherents: number;
   role: string;
 };
-
-async function getCurrentRole(
-  adminClient: ReturnType<typeof createAdminClient>,
-  userId: string,
-  email: string | null
-): Promise<string> {
-  /*
-   * Ancien compte administrateur
-   */
-  const { data: adminRow } = await adminClient
-    .from('gipe_admins')
-    .select('user_id')
-    .eq('user_id', userId)
-    .maybeSingle();
-
-  if (adminRow) {
-    return 'Administrateur';
-  }
-
-  /*
-   * SUPER ADMIN
-   */
-  const { data: superAdmins } = await adminClient
-    .from('office_super_admin')
-    .select('user_id, email, active')
-    .eq('active', true);
-
-  const superAdmin = superAdmins?.find(
-    (item) =>
-      item.user_id === userId ||
-      (
-        email &&
-        item.email?.trim().toLowerCase() === email
-      )
-  );
-
-  if (superAdmin) {
-    return 'SUPER ADMIN';
-  }
-
-  /*
-   * Membre du bureau
-   */
-  const { data: member } = await adminClient
-    .from('office_position_members')
-    .select(`
-      user_id,
-      email,
-      position_id,
-      active,
-      office_positions (
-        id,
-        name,
-        active
-      )
-    `)
-    .eq('user_id', userId)
-    .eq('active', true)
-    .maybeSingle();
-
-  if (!member) {
-    return 'Administrateur GIPE';
-  }
-
-  const position = Array.isArray(member.office_positions)
-    ? member.office_positions[0]
-    : member.office_positions;
-
-  if (!position || !position.active) {
-    return 'Administrateur GIPE';
-  }
-
-  /*
-   * Le Président possède tous les droits,
-   * comme prévu dans le système des membres du bureau.
-   */
-  if (position.name === 'Président') {
-    return 'Président';
-  }
-
-  /*
-   * Pour les autres postes, on vérifie simplement
-   * que le poste possède bien ses permissions.
-   */
-  const { data: permissionLinks } = await adminClient
-    .from('office_position_permissions')
-    .select(`
-      permission_id,
-      office_permissions (
-        code
-      )
-    `)
-    .eq('position_id', position.id);
-
-  const permissions =
-    (permissionLinks || [])
-      .map((link) => {
-        const permission = Array.isArray(
-          link.office_permissions
-        )
-          ? link.office_permissions[0]
-          : link.office_permissions;
-
-        return permission?.code || null;
-      })
-      .filter(
-        (code): code is string =>
-          Boolean(code)
-      );
-
-  if (permissions.length >= FULL_PERMISSIONS.length) {
-    return position.name;
-  }
-
-  return position.name;
-}
 
 export async function getDashboardSnapshot(): Promise<DashboardSnapshot> {
   try {
@@ -173,11 +46,14 @@ export async function getDashboardSnapshot(): Promise<DashboardSnapshot> {
     const email =
       user.email?.trim().toLowerCase() || null;
 
-    const role = await getCurrentRole(
+    const access = await resolveOfficeAccess(
       admin,
       user.id,
       email
     );
+
+    const role =
+      access.positionName || 'Membre du bureau';
 
     /*
      * Année scolaire active

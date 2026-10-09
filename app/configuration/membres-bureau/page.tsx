@@ -43,9 +43,6 @@ export default function MembresBureauPage() {
   const [savingId, setSavingId] =
     useState<string | null>(null);
 
-  const [savingSuperAdmin, setSavingSuperAdmin] =
-    useState(false);
-
   const [invitingId, setInvitingId] =
     useState<string | null>(null);
 
@@ -304,55 +301,6 @@ export default function MembresBureauPage() {
     }
   }
 
-  async function saveSuperAdmin() {
-    setSavingSuperAdmin(true);
-    setError('');
-    setMessage('');
-
-    try {
-      const response = await fetch(
-        '/api/configuration/membres-bureau',
-        {
-          method: 'PUT',
-          headers: {
-            'Content-Type':
-              'application/json',
-          },
-          body: JSON.stringify({
-            type: 'super-admin',
-            email:
-              superAdminEmail.trim() ||
-              null,
-          }),
-        }
-      );
-
-      const data =
-        await response.json();
-
-      if (!response.ok) {
-        throw new Error(
-          data?.error ||
-            'Impossible d’enregistrer le compte SUPER ADMIN.'
-        );
-      }
-
-      setMessage(
-        'Le compte SUPER ADMIN a été enregistré.'
-      );
-
-      await load();
-    } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : 'Impossible d’enregistrer le compte SUPER ADMIN.'
-      );
-    } finally {
-      setSavingSuperAdmin(false);
-    }
-  }
-
   if (loading) {
     return (
       <>
@@ -444,6 +392,10 @@ export default function MembresBureauPage() {
           </div>
         </div>
 
+        {/*
+          * Lecture seule : le SUPER ADMIN se modifie
+          * uniquement dans Supabase.
+          */}
         <div className="bureau-super-admin-form">
           <div className="bureau-field">
             <label htmlFor="super-admin-email">
@@ -454,31 +406,16 @@ export default function MembresBureauPage() {
               id="super-admin-email"
               className="input"
               type="email"
-              value={superAdminEmail}
-              onChange={(event) =>
-                setSuperAdminEmail(
-                  event.target.value
-                )
-              }
-              placeholder="adresse de récupération de l’association"
+              value={superAdminEmail || 'Aucun compte défini'}
+              readOnly
+              disabled
             />
           </div>
-
-          <button
-            type="button"
-            className="btn btn-primary"
-            onClick={saveSuperAdmin}
-            disabled={
-              savingSuperAdmin
-            }
-          >
-            <Save size={14} />
-
-            {savingSuperAdmin
-              ? 'Enregistrement…'
-              : 'Enregistrer'}
-          </button>
         </div>
+
+        <p className="section-sub bureau-super-admin-note">
+          Ce compte a tous les droits et ne peut pas être modifié depuis le dashboard.
+        </p>
       </section>
 
       <section className="bureau-positions">
@@ -679,10 +616,14 @@ export default function MembresBureauPage() {
           align-items: flex-start;
         }
 
+        .bureau-super-admin-note {
+          margin-top: 10px;
+        }
+
         .bureau-super-admin-form {
           display: grid;
           grid-template-columns:
-            minmax(0, 1fr) auto;
+            minmax(0, 1fr);
           align-items: end;
           gap: 16px;
           margin-top: 20px;

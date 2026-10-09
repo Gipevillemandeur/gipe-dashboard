@@ -4,82 +4,103 @@ import {
 } from 'next/server';
 
 import { updateSession } from '@/lib/supabase/proxy';
+import {
+  firstAllowedPage,
+  permissionForPage,
+} from '@/lib/access-core';
+
+/*
+ * GARDE D'ENTRÉE DU SITE
+ *
+ * - Pages publiques : laissées passer.
+ * - API : il faut être connecté ; chaque route vérifie
+ *   ensuite elle-même les autorisations.
+ * - Pages : il faut être connecté, autorisé, ET avoir
+ *   l'autorisation correspondant à la page.
+ */
+
+const PUBLIC_PATHS = new Set([
+  '/login',
+  '/auth/callback',
+  '/set-password',
+  '/api/agenda/cleanup-cron',
+  '/api/conseils/public',
+  '/api/conseils/send-pdf',
+  '/favicon.ico',
+]);
+
+const PUBLIC_PREFIXES = [
+  '/_next/',
+  '/images/',
+  '/icons/',
+];
 
 export async function middleware(
   request: NextRequest
 ) {
-  const pathname =
-    request.nextUrl.pathname;
+  const pathname = request.nextUrl.pathname;
 
   if (
-    pathname ===
-    '/api/agenda/cleanup-cron'
+    PUBLIC_PATHS.has(pathname) ||
+    PUBLIC_PREFIXES.some((prefix) =>
+      pathname.startsWith(prefix)
+    )
   ) {
     return NextResponse.next();
   }
 
-  if (
-    pathname.startsWith('/_next/') ||
-    pathname === '/favicon.ico' ||
-    pathname.startsWith('/images/') ||
-    pathname.startsWith('/icons/')
-  ) {
-    return NextResponse.next();
-  }
+  const isApi = pathname.startsWith('/api/');
 
-  if (
-    pathname ===
-      '/api/conseils/public' ||
-    pathname ===
-      '/api/conseils/send-pdf'
-  ) {
-    return NextResponse.next();
-  }
-
-  if (
-    pathname === '/login' ||
-    pathname === '/auth/callback' ||
-    pathname === '/set-password'
-  ) {
-    return NextResponse.next();
-  }
-
-  const {
-    response,
-    authenticated,
-    authorized,
-  } = await updateSession(
-    request
+  const { response, access } = await updateSession(
+    request,
+    !isApi
   );
 
-  if (
-    !authenticated ||
-    !authorized
-  ) {
-    const loginUrl =
-      new URL(
-        '/login',
-        request.url
-      );
-
-    if (
-      authenticated &&
-      !authorized
-    ) {
-      loginUrl.searchParams.set(
-        'error',
-        'unauthorized'
+  if (!access.authenticated) {
+    if (isApi) {
+      return NextResponse.json(
+        { error: 'Non authentifié.' },
+        { status: 401 }
       );
     }
 
-    loginUrl.searchParams.set(
-      'next',
-      pathname
+    const loginUrl = new URL('/login', request.url);
+    loginUrl.searchParams.set('next', pathname);
+
+    return NextResponse.redirect(loginUrl);
+  }
+
+  if (isApi) {
+    return response;
+  }
+
+  if (!access.authorized) {
+    const loginUrl = new URL('/login', request.url);
+    loginUrl.searchParams.set('error', 'unauthorized');
+
+    return NextResponse.redirect(loginUrl);
+  }
+
+  const required = permissionForPage(pathname);
+
+  if (
+    required &&
+    !access.permissions.includes(required)
+  ) {
+    const fallback = firstAllowedPage(
+      access.permissions
     );
 
-    return NextResponse.redirect(
-      loginUrl
-    );
+    if (fallback && fallback !== pathname) {
+      return NextResponse.redirect(
+        new URL(fallback, request.url)
+      );
+    }
+
+    const loginUrl = new URL('/login', request.url);
+    loginUrl.searchParams.set('error', 'unauthorized');
+
+    return NextResponse.redirect(loginUrl);
   }
 
   return response;

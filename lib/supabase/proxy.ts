@@ -1,136 +1,115 @@
 import { createServerClient } from '@supabase/ssr';
+import { createClient } from '@supabase/supabase-js';
 import {
   type NextRequest,
   NextResponse,
 } from 'next/server';
 
+import {
+  anonymousAccess,
+  resolveOfficeAccess,
+  type OfficeAccess,
+} from '@/lib/access-core';
+
+/*
+ * Rafraîchit la session (cookies) et calcule les droits
+ * de la personne connectée, avec les mêmes règles que
+ * le reste du site (lib/access-core.ts).
+ *
+ * `withAccess = false` : on vérifie seulement que la
+ * personne est connectée (utilisé pour l'API, dont
+ * chaque route vérifie elle-même les autorisations).
+ */
 export async function updateSession(
-  request: NextRequest
-) {
-  let supabaseResponse =
-    NextResponse.next({
-      request,
-    });
+  request: NextRequest,
+  withAccess = true
+): Promise<{
+  response: NextResponse;
+  access: OfficeAccess;
+}> {
+  let supabaseResponse = NextResponse.next({
+    request,
+  });
 
-  const supabase =
-    createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env
-        .NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
-      {
-        cookies: {
-          getAll() {
-            return request.cookies.getAll();
-          },
-
-          setAll(cookiesToSet) {
-            cookiesToSet.forEach(
-              ({
-                name,
-                value,
-                options,
-              }) => {
-                request.cookies.set({
-                  name,
-                  value,
-                  ...options,
-                });
-              }
-            );
-
-            supabaseResponse =
-              NextResponse.next({
-                request,
-              });
-
-            cookiesToSet.forEach(
-              ({
-                name,
-                value,
-                options,
-              }) => {
-                supabaseResponse.cookies.set(
-                  name,
-                  value,
-                  options
-                );
-              }
-            );
-          },
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return request.cookies.getAll();
         },
-      }
-    );
 
-  const { data } =
-    await supabase.auth.getClaims();
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value }) => {
+            request.cookies.set(name, value);
+          });
 
-  const userId =
-    data?.claims?.sub;
+          supabaseResponse = NextResponse.next({
+            request,
+          });
+
+          cookiesToSet.forEach(
+            ({ name, value, options }) => {
+              supabaseResponse.cookies.set(
+                name,
+                value,
+                options
+              );
+            }
+          );
+        },
+      },
+    }
+  );
+
+  const { data } = await supabase.auth.getClaims();
+
+  const userId = data?.claims?.sub;
 
   if (!userId) {
     return {
       response: supabaseResponse,
-      authenticated: false,
-      authorized: false,
-      admin: false,
+      access: anonymousAccess(),
     };
   }
 
-  /*
-   * Les anciens administrateurs du dashboard
-   * restent autorisés.
-   */
-  const { data: adminRow } =
-    await supabase
-      .from('gipe_admins')
-      .select('user_id')
-      .eq('user_id', userId)
-      .maybeSingle();
+  const email =
+    typeof data?.claims?.email === 'string'
+      ? data.claims.email
+      : null;
 
-  if (adminRow) {
+  if (!withAccess) {
     return {
       response: supabaseResponse,
-      authenticated: true,
-      authorized: true,
-      admin: true,
+      access: {
+        ...anonymousAccess(),
+        authenticated: true,
+        userId,
+        email,
+      },
     };
   }
 
-  /*
-   * Vérification des membres du bureau.
-   *
-   * La fonction SQL est SECURITY DEFINER :
-   * elle peut donc consulter les tables du bureau
-   * même si les politiques RLS de ces tables
-   * restent réservées aux administrateurs historiques.
-   */
-  const { data: officeAccess, error } =
-    await supabase.rpc(
-      'get_my_office_access'
-    );
+  const admin = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SECRET_KEY!,
+    {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    }
+  );
 
-  if (error) {
-    console.error(
-      'Erreur vérification accès bureau:',
-      error
-    );
-
-    return {
-      response: supabaseResponse,
-      authenticated: true,
-      authorized: false,
-      admin: false,
-    };
-  }
-
-  const hasOfficeAccess =
-    Array.isArray(officeAccess) &&
-    officeAccess.length > 0;
+  const access = await resolveOfficeAccess(
+    admin,
+    userId,
+    email
+  );
 
   return {
     response: supabaseResponse,
-    authenticated: true,
-    authorized: hasOfficeAccess,
-    admin: false,
+    access,
   };
 }

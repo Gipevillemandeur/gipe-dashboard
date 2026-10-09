@@ -1,107 +1,37 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getOfficeAccess } from '@/lib/office-auth';
 
 async function requireConfigurationAccess() {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return {
-      error: NextResponse.json(
-        {
-          error: 'Non authentifié.',
-        },
-        {
-          status: 401,
-        }
-      ),
-    };
-  }
-
-  const admin = createAdminClient();
-
   /*
-   * ---------------------------------------------------------
-   * ANCIEN SYSTÈME ADMINISTRATEUR
-   * ---------------------------------------------------------
-   *
-   * On conserve l'accès des comptes présents dans
-   * gipe_admins.
+   * Règles d'accès communes : lib/access-core.ts
    */
-
-  const {
-    data: adminUser,
-    error: adminError,
-  } = await admin
-    .from('gipe_admins')
-    .select('user_id')
-    .eq('user_id', user.id)
-    .maybeSingle();
-
-  if (adminError) {
-    console.error(
-      'Erreur vérification gipe_admins:',
-      adminError
-    );
-
-    return {
-      error: NextResponse.json(
-        {
-          error:
-            'Impossible de vérifier les droits administrateur.',
-        },
-        {
-          status: 500,
-        }
-      ),
-    };
-  }
-
-  if (adminUser) {
-    return {
-      admin,
-    };
-  }
-
-  /*
-   * ---------------------------------------------------------
-   * NOUVEAU SYSTÈME DES MEMBRES DU BUREAU
-   * ---------------------------------------------------------
-   *
-   * Président / SUPER ADMIN :
-   * accès complet.
-   *
-   * Autres postes :
-   * accès uniquement si la permission
-   * "configuration" est attribuée.
-   */
-
   const access = await getOfficeAccess();
 
+  if (!access.authenticated) {
+    return {
+      error: NextResponse.json(
+        { error: 'Non authentifié.' },
+        { status: 401 }
+      ),
+    };
+  }
+
   if (
-    access.authorized &&
-    access.permissions.includes('configuration')
+    !access.authorized ||
+    !access.permissions.includes('configuration')
   ) {
     return {
-      admin,
-      access,
+      error: NextResponse.json(
+        { error: 'Compte non autorisé.' },
+        { status: 403 }
+      ),
     };
   }
 
   return {
-    error: NextResponse.json(
-      {
-        error: 'Compte non autorisé.',
-      },
-      {
-        status: 403,
-      }
-    ),
+    admin: createAdminClient(),
+    access,
   };
 }
 

@@ -1,13 +1,14 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { requireOfficePermission } from '@/lib/office-auth'
+import { isPresidentName } from '@/lib/access-core'
 
 const APP_URL = 'https://admin.gipevillemandeur.com'
 
 async function requireConfigurationAccess() {
   try {
     const access =
-      await requireOfficePermission('configuration')
+      await requireOfficePermission('office_members')
 
     return {
       access,
@@ -264,87 +265,19 @@ export async function PUT(
     const type =
       body?.type
 
+    /*
+     * Le compte SUPER ADMIN est intouchable depuis
+     * le dashboard : il se modifie uniquement dans
+     * Supabase (table office_super_admin).
+     */
     if (type === 'super-admin') {
-      const email =
-        typeof body.email ===
-          'string' &&
-        body.email.trim()
-          ? body.email
-              .trim()
-              .toLowerCase()
-          : null
-
-      const {
-        data: existing,
-      } =
-        await supabase
-          .from(
-            'office_super_admin'
-          )
-          .select('id')
-          .eq('active', true)
-          .maybeSingle()
-
-      if (existing) {
-        const { error } =
-          await supabase
-            .from(
-              'office_super_admin'
-            )
-            .update({
-              email,
-              updated_at:
-                new Date().toISOString(),
-            })
-            .eq(
-              'id',
-              existing.id
-            )
-
-        if (error) {
-          console.error(
-            'Erreur mise à jour SUPER ADMIN:',
-            error
-          )
-
-          return NextResponse.json(
-            {
-              error:
-                'Impossible d’enregistrer le compte SUPER ADMIN.',
-            },
-            { status: 500 }
-          )
-        }
-      } else {
-        const { error } =
-          await supabase
-            .from(
-              'office_super_admin'
-            )
-            .insert({
-              email,
-              active: true,
-            })
-
-        if (error) {
-          console.error(
-            'Erreur création SUPER ADMIN:',
-            error
-          )
-
-          return NextResponse.json(
-            {
-              error:
-                'Impossible de créer le compte SUPER ADMIN.',
-            },
-            { status: 500 }
-          )
-        }
-      }
-
-      return NextResponse.json({
-        success: true,
-      })
+      return NextResponse.json(
+        {
+          error:
+            'Le compte SUPER ADMIN ne peut pas être modifié depuis le dashboard.',
+        },
+        { status: 403 }
+      )
     }
 
     if (type !== 'position') {
@@ -421,6 +354,25 @@ export async function PUT(
         { status: 404 }
       )
     }
+
+    /*
+     * Seuls le SUPER ADMIN et le Président peuvent
+     * modifier ou inviter le poste de Président.
+     */
+    if (
+      isPresidentName(position.name) &&
+      !auth.access.isSuperAdmin &&
+      !auth.access.isPresident
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            'Seul le Président (ou le SUPER ADMIN) peut modifier ce poste.',
+        },
+        { status: 403 }
+      )
+    }
+
 
     const {
       data: validPermissions,
@@ -730,6 +682,25 @@ export async function POST(
         { status: 404 }
       )
     }
+
+    /*
+     * Seuls le SUPER ADMIN et le Président peuvent
+     * modifier ou inviter le poste de Président.
+     */
+    if (
+      isPresidentName(position.name) &&
+      !auth.access.isSuperAdmin &&
+      !auth.access.isPresident
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            'Seul le Président (ou le SUPER ADMIN) peut modifier ce poste.',
+        },
+        { status: 403 }
+      )
+    }
+
 
     const {
       data: member,
