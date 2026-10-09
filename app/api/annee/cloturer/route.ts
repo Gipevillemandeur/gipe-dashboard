@@ -1,7 +1,10 @@
 import { NextResponse } from 'next/server';
 import { requireOfficePermission } from '@/lib/office-auth';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { buildAnnualReportPdf, type AnnualReportData } from '@/lib/annual-report-pdf';
+import {
+  buildAnnualReportPdf,
+  type AnnualReportData,
+} from '@/lib/annual-report-pdf';
 
 async function requireConfigurationAccess() {
   try {
@@ -105,6 +108,9 @@ async function buildCurrentAnnualReport(): Promise<AnnualReportData> {
 
   /*
    * Répartition des adhérents par classe.
+   *
+   * Cette variable reste volontairement
+   * sous forme de tableau.
    */
   const byClass =
     new Map<string, Set<string>>();
@@ -149,10 +155,6 @@ async function buildCurrentAnnualReport(): Promise<AnnualReportData> {
     }
   }
 
-  /*
-   * On conserve d'abord le format utilisé
-   * par la logique existante.
-   */
   const adherentsByClassArray =
     Array.from(byClass.entries())
       .map(
@@ -173,14 +175,20 @@ async function buildCurrentAnnualReport(): Promise<AnnualReportData> {
       );
 
   /*
-   * Le PDF attend :
+   * Conversion explicite vers le format
+   * attendu par AnnualReportData.
    *
+   * Tableau :
+   * [
+   *   { className: '6A', count: 12 }
+   * ]
+   *
+   * devient :
    * {
-   *   "6A": 12,
-   *   "6B": 9
+   *   '6A': 12
    * }
    */
-  const adherentsByClass:
+  const adherentsByClassRecord:
     Record<string, number> =
     Object.fromEntries(
       adherentsByClassArray.map(
@@ -315,7 +323,7 @@ async function buildCurrentAnnualReport(): Promise<AnnualReportData> {
     ) / 100;
 
   /*
-   * Détail financier par catégorie.
+   * Détail financier par catégorie
    */
   const financialByCategoryList =
     Array.from(
@@ -347,7 +355,7 @@ async function buildCurrentAnnualReport(): Promise<AnnualReportData> {
       );
 
   /*
-   * Rapport annuel complet
+   * Rapport annuel
    */
   return {
     schoolYear: year.label,
@@ -355,7 +363,8 @@ async function buildCurrentAnnualReport(): Promise<AnnualReportData> {
     totalAdherents:
       rows.length,
 
-    adherentsByClass,
+    adherentsByClass:
+      adherentsByClassRecord,
 
     initialBalance,
 
@@ -406,7 +415,8 @@ export async function POST(
       createAdminClient();
 
     /*
-     * On construit le bilan AVANT la clôture.
+     * On construit le bilan avant
+     * la clôture réelle.
      */
     const report =
       await buildCurrentAnnualReport();
@@ -432,16 +442,9 @@ export async function POST(
     ).set(pdf);
 
     /*
-     * Clôture réelle de l'année
-     *
-     * La fonction SQL :
-     * - enregistre le bilan
-     * - ferme l'ancienne année
-     * - crée la nouvelle année
-     * - transmet le solde
+     * Clôture réelle de l'année.
      */
     const {
-      data: closure,
       error: closureError,
     } = await admin.rpc(
       'gipe_cloturer_annee',
