@@ -1,12 +1,6 @@
 import { NextResponse } from 'next/server'
-import { createAdminClient } from '@/lib/supabase/admin'
 import { requireOfficePermission } from '@/lib/office-auth'
-
-type GoogleTokenResponse = {
-  access_token?: string
-  error?: string
-  error_description?: string
-}
+import { getGoogleAccessToken } from '@/lib/google-drive'
 
 type GoogleDriveErrorResponse = {
   error?: {
@@ -14,93 +8,9 @@ type GoogleDriveErrorResponse = {
   }
 }
 
-async function getGoogleAccessToken(userId: string) {
-  const adminClient = createAdminClient()
-
-  const { data: connection, error } =
-    await adminClient
-      .from('google_drive_connections')
-      .select('refresh_token')
-      .eq('user_id', userId)
-      .maybeSingle()
-
-  if (error) {
-    throw new Error(
-      'Impossible de récupérer la connexion Google Drive.'
-    )
-  }
-
-  if (!connection?.refresh_token) {
-    throw new Error(
-      'Google Drive n’est pas connecté.'
-    )
-  }
-
-  const clientId =
-    process.env.GOOGLE_CLIENT_ID
-
-  const clientSecret =
-    process.env.GOOGLE_CLIENT_SECRET
-
-  if (!clientId || !clientSecret) {
-    throw new Error(
-      'La configuration Google OAuth est incomplète.'
-    )
-  }
-
-  const tokenResponse = await fetch(
-    'https://oauth2.googleapis.com/token',
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type':
-          'application/x-www-form-urlencoded',
-      },
-      body: new URLSearchParams({
-        client_id: clientId,
-        client_secret: clientSecret,
-        refresh_token:
-          connection.refresh_token,
-        grant_type: 'refresh_token',
-      }).toString(),
-      cache: 'no-store',
-    }
-  )
-
-  const tokenData =
-    (await tokenResponse.json()) as GoogleTokenResponse
-
-  if (
-    !tokenResponse.ok ||
-    !tokenData.access_token
-  ) {
-    console.error(
-      'Erreur renouvellement token Google:',
-      tokenData
-    )
-
-    throw new Error(
-      'Impossible d’obtenir un accès au Google Drive.'
-    )
-  }
-
-  return tokenData.access_token
-}
-
 export async function DELETE(request: Request) {
   try {
-    const access =
-      await requireOfficePermission('drive')
-
-    if (!access.userId) {
-      return NextResponse.json(
-        {
-          error:
-            'Utilisateur non identifié.',
-        },
-        { status: 401 }
-      )
-    }
+    await requireOfficePermission('drive')
 
     const url =
       new URL(request.url)
@@ -121,9 +31,7 @@ export async function DELETE(request: Request) {
     }
 
     const accessToken =
-      await getGoogleAccessToken(
-        access.userId
-      )
+      await getGoogleAccessToken()
 
     const driveResponse =
       await fetch(
