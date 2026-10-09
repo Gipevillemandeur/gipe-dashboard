@@ -67,7 +67,7 @@ export async function GET() {
     error: schoolYearError,
   } = await admin
     .from('school_years')
-    .select('id,label')
+    .select('id,label,initial_balance')
     .eq('is_active', true)
     .maybeSingle()
 
@@ -89,6 +89,7 @@ export async function GET() {
   if (!schoolYear) {
     return NextResponse.json({
       schoolYear: null,
+      initialBalance: 0,
       transactions: [],
     })
   }
@@ -149,6 +150,7 @@ export async function GET() {
 
   return NextResponse.json({
     schoolYear: schoolYear.label,
+    initialBalance: Number(schoolYear.initial_balance || 0),
     transactions,
   })
 }
@@ -335,7 +337,7 @@ export async function POST(
         error:
           error instanceof Error
             ? error.message
-            : "Impossible d'ajouter la transaction.",
+            : "Impossible d’ajouter la transaction.",
       },
       { status: 500 }
     )
@@ -355,6 +357,99 @@ export async function PUT(
 
   try {
     const body = await request.json()
+
+    /*
+     * Mise à jour du solde initial de l'année scolaire active.
+     *
+     * Le solde initial n'est pas une transaction :
+     * il est stocké directement dans school_years.
+     */
+    if (
+      body.initialBalance !== undefined &&
+      body.id === undefined
+    ) {
+      const numericInitialBalance = Number(
+        String(body.initialBalance).replace(',', '.')
+      )
+
+      if (!Number.isFinite(numericInitialBalance)) {
+        return NextResponse.json(
+          {
+            error: 'Le solde initial est invalide.',
+          },
+          { status: 400 }
+        )
+      }
+
+      const {
+        data: schoolYear,
+        error: schoolYearError,
+      } = await admin
+        .from('school_years')
+        .select('id,label,initial_balance')
+        .eq('is_active', true)
+        .maybeSingle()
+
+      if (schoolYearError) {
+        console.error(
+          'Erreur chargement année scolaire:',
+          schoolYearError
+        )
+
+        return NextResponse.json(
+          {
+            error:
+              `Impossible de charger l'année scolaire : ${schoolYearError.message}`,
+          },
+          { status: 500 }
+        )
+      }
+
+      if (!schoolYear) {
+        return NextResponse.json(
+          {
+            error:
+              "Aucune année scolaire active n'est définie.",
+          },
+          { status: 409 }
+        )
+      }
+
+      const {
+        data: updatedSchoolYear,
+        error: updateSchoolYearError,
+      } = await admin
+        .from('school_years')
+        .update({
+          initial_balance: numericInitialBalance,
+        })
+        .eq('id', schoolYear.id)
+        .select('id,label,initial_balance')
+        .single()
+
+      if (updateSchoolYearError) {
+        console.error(
+          'Erreur modification solde initial:',
+          updateSchoolYearError
+        )
+
+        return NextResponse.json(
+          {
+            error:
+              `Impossible d'enregistrer le solde initial : ${updateSchoolYearError.message}`,
+          },
+          { status: 500 }
+        )
+      }
+
+      return NextResponse.json({
+        ok: true,
+        schoolYear: updatedSchoolYear.label,
+        initialBalance: Number(
+          updatedSchoolYear.initial_balance || 0
+        ),
+      })
+    }
 
     const id = String(body?.id || '').trim()
 
