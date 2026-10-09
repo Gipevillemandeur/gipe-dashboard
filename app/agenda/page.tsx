@@ -36,6 +36,14 @@ type EventItem = {
   updated_at?: string | null;
 };
 
+const INSTANCE_TYPES = [
+  'Réunion GIPE',
+  'Conseil de classe',
+  'Conseil de discipline',
+  "Conseil d'administration",
+  'Autre',
+];
+
 function today() {
   return new Date().toISOString().slice(0, 10);
 }
@@ -64,14 +72,17 @@ export default function AgendaPage() {
   const [events, setEvents] = useState<EventItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [publishingId, setPublishingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] =
+    useState<string | null>(null);
+  const [publishingId, setPublishingId] =
+    useState<string | null>(null);
 
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
 
   const [showForm, setShowForm] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingId, setEditingId] =
+    useState<string | null>(null);
 
   const [showPublishModal, setShowPublishModal] =
     useState(false);
@@ -86,6 +97,13 @@ export default function AgendaPage() {
   const [location, setLocation] =
     useState('');
   const [category, setCategory] =
+    useState('');
+
+  const [createAsInstance, setCreateAsInstance] =
+    useState(false);
+  const [instanceType, setInstanceType] =
+    useState('');
+  const [instanceSubject, setInstanceSubject] =
     useState('');
 
   const [imageFile, setImageFile] =
@@ -164,6 +182,11 @@ export default function AgendaPage() {
     setTime('');
     setLocation('');
     setCategory('');
+
+    setCreateAsInstance(false);
+    setInstanceType('');
+    setInstanceSubject('');
+
     setImageFile(null);
     setCurrentImage(null);
 
@@ -196,6 +219,11 @@ export default function AgendaPage() {
     setTime(item.start_time || '');
     setLocation(item.location || '');
     setCategory(item.category || '');
+
+    setCreateAsInstance(false);
+    setInstanceType('');
+    setInstanceSubject('');
+
     setImageFile(null);
     setCurrentImage(
       item.image_url || null
@@ -218,8 +246,39 @@ export default function AgendaPage() {
   ) {
     event.preventDefault();
 
-    setSaving(true);
     setError('');
+
+    /*
+     * La création dans Instances concerne uniquement
+     * les nouveaux événements.
+     */
+    if (
+      editingId === null &&
+      createAsInstance
+    ) {
+      if (!instanceType) {
+        setError(
+          "Le type d'instance est obligatoire."
+        );
+        return;
+      }
+
+      if (!instanceSubject.trim()) {
+        setError(
+          "L'objet de la réunion est obligatoire."
+        );
+        return;
+      }
+
+      if (!time) {
+        setError(
+          "L'heure est obligatoire pour créer une réunion dans les Instances."
+        );
+        return;
+      }
+    }
+
+    setSaving(true);
 
     try {
       const formData = new FormData();
@@ -287,6 +346,44 @@ export default function AgendaPage() {
           data?.error ||
             "Impossible d'enregistrer l'événement."
         );
+      }
+
+      /*
+       * Si demandé, on crée maintenant une nouvelle
+       * réunion indépendante dans instance_meetings.
+       */
+      if (
+        editingId === null &&
+        createAsInstance
+      ) {
+        const instanceResponse =
+          await fetch(
+            '/api/agenda/send-to-instance',
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type':
+                  'application/json',
+              },
+              body: JSON.stringify({
+                eventId:
+                  data?.event?.id,
+                type: instanceType,
+                subject:
+                  instanceSubject.trim(),
+              }),
+            }
+          );
+
+        const instanceData =
+          await instanceResponse.json();
+
+        if (!instanceResponse.ok) {
+          throw new Error(
+            instanceData?.error ||
+              "L'événement a été créé dans l'Agenda, mais impossible de créer la réunion dans les Instances."
+          );
+        }
       }
 
       await loadEvents();
@@ -927,6 +1024,99 @@ export default function AgendaPage() {
                 )}
               </div>
 
+              {editingId === null && (
+                <div className="agenda-instance-section">
+                  <label className="agenda-instance-checkbox">
+                    <input
+                      type="checkbox"
+                      checked={
+                        createAsInstance
+                      }
+                      onChange={(e) => {
+                        const checked =
+                          e.target.checked;
+
+                        setCreateAsInstance(
+                          checked
+                        );
+
+                        if (!checked) {
+                          setInstanceType('');
+                          setInstanceSubject('');
+                        }
+                      }}
+                    />
+
+                    <span>
+                      Créer également une réunion dans les Instances
+                    </span>
+                  </label>
+
+                  {createAsInstance && (
+                    <div className="agenda-instance-fields">
+                      <div className="agenda-form-field">
+                        <label className="label">
+                          Type d’instance
+                        </label>
+
+                        <select
+                          className="input"
+                          value={
+                            instanceType
+                          }
+                          onChange={(e) =>
+                            setInstanceType(
+                              e.target.value
+                            )
+                          }
+                          required={
+                            createAsInstance
+                          }
+                        >
+                          <option value="">
+                            Sélectionner un type
+                          </option>
+
+                          {INSTANCE_TYPES.map(
+                            (type) => (
+                              <option
+                                key={type}
+                                value={type}
+                              >
+                                {type}
+                              </option>
+                            )
+                          )}
+                        </select>
+                      </div>
+
+                      <div className="agenda-form-field">
+                        <label className="label">
+                          Objet de la réunion
+                        </label>
+
+                        <input
+                          className="input"
+                          value={
+                            instanceSubject
+                          }
+                          onChange={(e) =>
+                            setInstanceSubject(
+                              e.target.value
+                            )
+                          }
+                          maxLength={200}
+                          required={
+                            createAsInstance
+                          }
+                          placeholder="Objet de la réunion"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {error && (
                 <div className="notice notice-error agenda-form-error">
                   {error}
@@ -1304,6 +1494,45 @@ export default function AgendaPage() {
           margin-top: 8px;
         }
 
+        .agenda-instance-section {
+          display: grid;
+          gap: 14px;
+          padding-top: 4px;
+        }
+
+        .agenda-instance-checkbox {
+          display: flex;
+          align-items: flex-start;
+          gap: 9px;
+          cursor: pointer;
+          color: var(--gipe-text, #2f2926);
+          font-size: 14px;
+          line-height: 1.4;
+          user-select: none;
+        }
+
+        .agenda-instance-checkbox input {
+          width: 17px;
+          height: 17px;
+          flex: 0 0 17px;
+          margin: 1px 0 0;
+          accent-color: #8f211c;
+          cursor: pointer;
+        }
+
+        .agenda-instance-fields {
+          display: grid;
+          grid-template-columns: repeat(
+            2,
+            minmax(0, 1fr)
+          );
+          gap: 16px;
+          padding: 14px;
+          border: 1px solid var(--gipe-line);
+          border-radius: 10px;
+          background: #fafafa;
+        }
+
         .agenda-form-error {
           margin-top: 2px;
         }
@@ -1456,6 +1685,11 @@ export default function AgendaPage() {
           }
 
           .agenda-two-columns {
+            grid-template-columns: minmax(0, 1fr);
+            gap: 16px;
+          }
+
+          .agenda-instance-fields {
             grid-template-columns: minmax(0, 1fr);
             gap: 16px;
           }
