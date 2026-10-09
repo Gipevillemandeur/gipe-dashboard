@@ -79,23 +79,34 @@ export async function GET(
         ? (typeParam as EmailOtpType)
         : null;
 
+    /*
+     * On ne « consomme » PAS le lien ici.
+     *
+     * Les messageries (Hotmail, Outlook…) ouvrent
+     * parfois les liens toutes seules pour les
+     * vérifier. Le lien est donc transmis tel quel
+     * à la page /set-password, qui ne l'utilise
+     * qu'au clic sur « Créer mon mot de passe ».
+     */
     if (type) {
-      const { error } =
-        await supabase.auth.verifyOtp({
-          token_hash:
-            tokenHash,
-          type,
-        });
-
-      if (!error) {
-        return NextResponse.redirect(
-          `${origin}${next}`
+      const target =
+        new URL(
+          '/set-password',
+          origin
         );
-      }
 
-      console.error(
-        'Erreur vérification token Supabase:',
-        error
+      target.searchParams.set(
+        'token_hash',
+        tokenHash
+      );
+
+      target.searchParams.set(
+        'type',
+        type
+      );
+
+      return NextResponse.redirect(
+        target
       );
     }
   }
