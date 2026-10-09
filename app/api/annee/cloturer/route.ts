@@ -16,9 +16,7 @@ async function requireConfigurationAccess() {
     };
   } catch (error) {
     if (error instanceof Error) {
-      if (
-        error.message === 'AUTHENTICATION_REQUIRED'
-      ) {
+      if (error.message === 'AUTHENTICATION_REQUIRED') {
         return {
           error: NextResponse.json(
             { error: 'Non authentifié.' },
@@ -57,35 +55,26 @@ async function requireConfigurationAccess() {
   }
 }
 
-function sanitizeFileNamePart(
-  value: string
-) {
+function sanitizeFileNamePart(value: string) {
   return value
-    .replace(
-      /[\\/:*?"<>|]/g,
-      '-'
-    )
+    .replace(/[\\/:*?"<>|]/g, '-')
     .trim();
 }
 
 async function buildCurrentAnnualReport(
-  admin: ReturnType<
-    typeof createAdminClient
-  >
+  admin: ReturnType<typeof createAdminClient>
 ) {
   const {
     data: year,
     error: yearError,
   } = await admin
     .from('school_years')
-    .select('id,label')
+    .select('id,label,initial_balance')
     .eq('is_active', true)
     .maybeSingle();
 
   if (yearError) {
-    throw new Error(
-      yearError.message
-    );
+    throw new Error(yearError.message);
   }
 
   if (!year) {
@@ -119,8 +108,7 @@ async function buildCurrentAnnualReport(
     );
   }
 
-  const rows =
-    memberships || [];
+  const rows = memberships || [];
 
   const byClass =
     new Map<string, Set<string>>();
@@ -183,14 +171,162 @@ async function buildCurrentAnnualReport(
         )
       );
 
+  /*
+   * Bilan financier
+   *
+   * Toutes les opérations de l'année active
+   * sont regroupées par catégorie.
+   */
+  const {
+    data: transactions,
+    error: transactionsError,
+  } = await admin
+    .from('gipe_transactions')
+    .select(
+      'transaction_type, category, amount'
+    )
+    .eq(
+      'school_year_id',
+      year.id
+    );
+
+  if (transactionsError) {
+    throw new Error(
+      transactionsError.message
+    );
+  }
+
+  const financialByCategory =
+    new Map<
+      string,
+      {
+        recettes: number;
+        depenses: number;
+      }
+    >();
+
+  let totalRecettes = 0;
+  let totalDepenses = 0;
+
+  for (const transaction of transactions || []) {
+    const amount =
+      Number(transaction.amount || 0);
+
+    const category =
+      String(
+        transaction.category || 'Autre'
+      ).trim() || 'Autre';
+
+    if (
+      !financialByCategory.has(category)
+    ) {
+      financialByCategory.set(
+        category,
+        {
+          recettes: 0,
+          depenses: 0,
+        }
+      );
+    }
+
+    const entry =
+      financialByCategory.get(
+        category
+      )!;
+
+    if (
+      transaction.transaction_type ===
+      'income'
+    ) {
+      entry.recettes += amount;
+      totalRecettes += amount;
+    }
+
+    if (
+      transaction.transaction_type ===
+      'expense'
+    ) {
+      entry.depenses += amount;
+      totalDepenses += amount;
+    }
+  }
+
+  const financialByCategoryList =
+    Array.from(
+      financialByCategory.entries()
+    )
+      .map(
+        ([category, values]) => ({
+          category,
+          recettes:
+            Math.round(
+              values.recettes * 100
+            ) / 100,
+          depenses:
+            Math.round(
+              values.depenses * 100
+            ) / 100,
+        })
+      )
+      .sort((a, b) =>
+        a.category.localeCompare(
+          b.category,
+          'fr',
+          {
+            numeric: true,
+          }
+        )
+      );
+
+  const initialBalance =
+    Number(
+      year.initial_balance || 0
+    );
+
+  const roundedRecettes =
+    Math.round(
+      totalRecettes * 100
+    ) / 100;
+
+  const roundedDepenses =
+    Math.round(
+      totalDepenses * 100
+    ) / 100;
+
+  const solde =
+    Math.round(
+      (
+        initialBalance +
+        roundedRecettes -
+        roundedDepenses
+      ) * 100
+    ) / 100;
+
   const report: AnnualReportData = {
-    schoolYear: year.label,
+    schoolYear:
+      year.label,
+
     totalAdherents:
       rows.length,
+
     adherentsByClass,
-    totalRecettes: null,
-    totalDepenses: null,
-    solde: null,
+
+    initialBalance:
+      Math.round(
+        initialBalance * 100
+      ) / 100,
+
+    totalRecettes:
+      roundedRecettes,
+
+    totalDepenses:
+      roundedDepenses,
+
+    solde,
+
+    financialByCategory:
+      financialByCategoryList,
+
     closedAt:
       new Date().toISOString(),
   };
@@ -416,9 +552,10 @@ export async function POST(
 
   try {
     /*
-     * 1. Lecture et préparation du bilan
+     * 1. Lecture et préparation du bilan.
      *
-     * Aucune modification de Supabase n'est encore effectuée.
+     * Aucune modification de Supabase
+     * n'est encore effectuée.
      */
     const {
       year,
@@ -429,18 +566,8 @@ export async function POST(
       );
 
     /*
-     * 2. Archivage de toutes les réunions de l'année active.
-     *
-     * Chaque réunion est envoyée dans :
-     *
-     * Archives/
-     *   année/
-     *     Instances/
-     *       réunion/
-     *         Fiche-reunion.pdf
-     *         documents associés...
-     *
-     * Cette étape ne modifie ni ne supprime les données Supabase.
+     * 2. Archivage de toutes les réunions
+     * de l'année active.
      */
     const archivedInstances =
       await archiveCurrentYearInstances(
@@ -458,8 +585,6 @@ export async function POST(
 
     /*
      * 4. Archivage du bilan annuel dans Drive.
-     *
-     * Si cette étape échoue, la clôture est interrompue.
      */
     const drive =
       await archivePdfInDrive(
@@ -468,13 +593,8 @@ export async function POST(
       );
 
     /*
-     * 5. Seulement si :
-     *
-     * - toutes les réunions ont été archivées ;
-     * - tous leurs documents ont été archivés ;
-     * - le bilan annuel a été archivé ;
-     *
-     * on effectue la vraie clôture SQL.
+     * 5. Seulement si toutes les archives
+     * sont réussies, on effectue la clôture SQL.
      */
     const {
       data,
