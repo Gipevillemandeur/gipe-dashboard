@@ -257,7 +257,7 @@ export async function PUT(
     }
 
     const supabase =
-      await createClient()
+      createAdminClient()
 
     const body =
       await request.json()
@@ -681,6 +681,9 @@ export async function POST(
     const supabase =
       await createClient()
 
+    const adminClient =
+      createAdminClient()
+
     const body =
       await request.json()
 
@@ -705,7 +708,7 @@ export async function POST(
       error:
         positionError,
     } =
-      await supabase
+      await adminClient
         .from(
           'office_positions'
         )
@@ -737,7 +740,7 @@ export async function POST(
       error:
         memberError,
     } =
-      await supabase
+      await adminClient
         .from(
           'office_position_members'
         )
@@ -783,9 +786,6 @@ export async function POST(
       member.email
         .trim()
         .toLowerCase()
-
-    const adminClient =
-      createAdminClient()
 
     const redirectTo =
       `${APP_URL}/auth/callback?next=/set-password`
@@ -887,7 +887,7 @@ export async function POST(
         error:
           updateMemberError,
       } =
-        await supabase
+        await adminClient
           .from(
             'office_position_members'
           )
@@ -965,7 +965,7 @@ export async function POST(
         error:
           updateMemberError,
       } =
-        await supabase
+        await adminClient
           .from(
             'office_position_members'
           )
