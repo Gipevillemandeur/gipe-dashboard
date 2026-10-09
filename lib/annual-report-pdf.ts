@@ -1,373 +1,747 @@
-import {
-  PDFDocument,
-  StandardFonts,
-  rgb,
-  type PDFImage,
-  type PDFPage,
-  type PDFFont,
-} from 'pdf-lib';
+import { PDFDocument, StandardFonts, rgb, PDFPage } from 'pdf-lib';
 
 export type AnnualReportData = {
   schoolYear: string;
   totalAdherents: number;
-  adherentsByClass: Array<{
-    className: string;
-    count: number;
-  }>;
-  totalRecettes: number | null;
-  totalDepenses: number | null;
-  solde: number | null;
-  closedAt?: string | null;
+  adherentsByClass: Record<string, number>;
+
+  initialBalance: number;
+  totalRecettes: number;
+  totalDepenses: number;
+  solde: number;
+
+  financialByCategory: {
+    category: string;
+    recettes: number;
+    depenses: number;
+  }[];
+
+  closedAt: string;
 };
 
 const PAGE_WIDTH = 595.28;
 const PAGE_HEIGHT = 841.89;
-const MARGIN_X = 42;
-const BURGUNDY = rgb(0.49, 0.125, 0.105);
-const CREAM = rgb(0.985, 0.97, 0.94);
-const CREAM_BORDER = rgb(0.91, 0.86, 0.80);
-const TEXT = rgb(0.18, 0.20, 0.24);
-const MUTED = rgb(0.38, 0.41, 0.46);
-const LIGHT = rgb(0.965, 0.97, 0.975);
-const WHITE = rgb(1, 1, 1);
-const SITE_LOGO_URL = 'https://gipevillemandeur.com/images/logogipe.png';
 
-function currency(value: number | null) {
-  if (value === null || Number.isNaN(value)) return '-';
+const MARGIN_LEFT = 45;
+const MARGIN_RIGHT = 45;
+const CONTENT_WIDTH = PAGE_WIDTH - MARGIN_LEFT - MARGIN_RIGHT;
 
+const DARK = rgb(0.12, 0.12, 0.16);
+const GREY = rgb(0.45, 0.45, 0.48);
+const LIGHT_GREY = rgb(0.93, 0.93, 0.95);
+const BORDER = rgb(0.78, 0.78, 0.82);
+const BURGUNDY = rgb(0.45, 0.05, 0.12);
+const GREEN = rgb(0.08, 0.42, 0.20);
+const RED = rgb(0.65, 0.08, 0.08);
+
+function euro(value: number) {
   return new Intl.NumberFormat('fr-FR', {
     style: 'currency',
     currency: 'EUR',
-    minimumFractionDigits: 2,
   }).format(value);
 }
 
-async function loadSiteLogo(pdf: PDFDocument): Promise<PDFImage | null> {
-  try {
-    const response = await fetch(SITE_LOGO_URL, {
-      cache: 'no-store',
-    });
+function dateFr(value: string) {
+  const date = new Date(value);
 
-    if (!response.ok) return null;
-
-    const buffer = await response.arrayBuffer();
-    return await pdf.embedPng(new Uint8Array(buffer));
-  } catch {
-    return null;
+  if (Number.isNaN(date.getTime())) {
+    return value;
   }
+
+  return new Intl.DateTimeFormat('fr-FR', {
+    dateStyle: 'long',
+    timeStyle: 'short',
+  }).format(date);
+}
+
+function drawText(
+  page: PDFPage,
+  text: string,
+  x: number,
+  y: number,
+  size: number,
+  font: any,
+  color = DARK
+) {
+  page.drawText(text, {
+    x,
+    y,
+    size,
+    font,
+    color,
+  });
 }
 
 function drawHeader(
   page: PDFPage,
-  regular: PDFFont,
-  bold: PDFFont,
-  year: string,
-  logo: PDFImage | null
+  regular: any,
+  bold: any,
+  report: AnnualReportData
 ) {
-  const headerHeight = 135;
+  drawText(
+    page,
+    'GIPE VILLEMANDEUR',
+    MARGIN_LEFT,
+    PAGE_HEIGHT - 48,
+    16,
+    bold,
+    BURGUNDY
+  );
+
+  drawText(
+    page,
+    'RAPPORT ANNUEL',
+    MARGIN_LEFT,
+    PAGE_HEIGHT - 70,
+    10,
+    bold,
+    GREY
+  );
+
+  drawText(
+    page,
+    `Exercice ${report.schoolYear}`,
+    PAGE_WIDTH - MARGIN_RIGHT - 150,
+    PAGE_HEIGHT - 58,
+    10,
+    regular,
+    GREY
+  );
+
+  page.drawLine({
+    start: {
+      x: MARGIN_LEFT,
+      y: PAGE_HEIGHT - 88,
+    },
+    end: {
+      x: PAGE_WIDTH - MARGIN_RIGHT,
+      y: PAGE_HEIGHT - 88,
+    },
+    thickness: 1,
+    color: BORDER,
+  });
+}
+
+function drawFooter(page: PDFPage, regular: any) {
+  page.drawLine({
+    start: {
+      x: MARGIN_LEFT,
+      y: 35,
+    },
+    end: {
+      x: PAGE_WIDTH - MARGIN_RIGHT,
+      y: 35,
+    },
+    thickness: 0.7,
+    color: BORDER,
+  });
+
+  drawText(
+    page,
+    'Rapport annuel GIPE Villemandeur',
+    MARGIN_LEFT,
+    20,
+    8,
+    regular,
+    GREY
+  );
+}
+
+function addReportPage(
+  pdf: PDFDocument,
+  regular: any,
+  bold: any,
+  report: AnnualReportData
+) {
+  const page = pdf.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
+
+  drawHeader(page, regular, bold, report);
+
+  return page;
+}
+
+function drawSectionTitle(
+  page: PDFPage,
+  title: string,
+  y: number,
+  bold: any
+) {
+  drawText(page, title, MARGIN_LEFT, y, 15, bold, DARK);
+
+  page.drawLine({
+    start: {
+      x: MARGIN_LEFT,
+      y: y - 7,
+    },
+    end: {
+      x: PAGE_WIDTH - MARGIN_RIGHT,
+      y: y - 7,
+    },
+    thickness: 1,
+    color: BURGUNDY,
+  });
+
+  return y - 30;
+}
+
+function drawMetricBox(
+  page: PDFPage,
+  x: number,
+  y: number,
+  width: number,
+  label: string,
+  value: string,
+  regular: any,
+  bold: any,
+  valueColor = DARK
+) {
+  const height = 58;
 
   page.drawRectangle({
-    x: 0,
-    y: PAGE_HEIGHT - headerHeight,
-    width: PAGE_WIDTH,
+    x,
+    y: y - height,
+    width,
+    height,
+    color: LIGHT_GREY,
+    borderColor: BORDER,
+    borderWidth: 0.8,
+  });
+
+  drawText(page, label, x + 10, y - 18, 8.5, regular, GREY);
+
+  drawText(page, value, x + 10, y - 42, 14, bold, valueColor);
+}
+
+function drawFinancialTable(
+  page: PDFPage,
+  report: AnnualReportData,
+  regular: any,
+  bold: any,
+  startY: number
+) {
+  let y = startY;
+
+  const categoryWidth = 270;
+  const depensesWidth = 105;
+  const recettesWidth = CONTENT_WIDTH - categoryWidth - depensesWidth;
+
+  const xCategory = MARGIN_LEFT;
+  const xDepenses = xCategory + categoryWidth;
+  const xRecettes = xDepenses + depensesWidth;
+
+  const headerHeight = 28;
+  const rowHeight = 24;
+
+  // En-tête
+  page.drawRectangle({
+    x: MARGIN_LEFT,
+    y: y - headerHeight,
+    width: CONTENT_WIDTH,
     height: headerHeight,
     color: BURGUNDY,
   });
 
-  // Logo du site GIPE à gauche du bandeau.
-  if (logo) {
-    const logoSize = 84;
-    page.drawImage(logo, {
-      x: MARGIN_X,
-      y: PAGE_HEIGHT - 110,
-      width: logoSize,
-      height: logoSize,
+  drawText(
+    page,
+    'Catégorie',
+    xCategory + 8,
+    y - 18,
+    9,
+    bold,
+    rgb(1, 1, 1)
+  );
+
+  drawText(
+    page,
+    'Dépenses',
+    xDepenses + 8,
+    y - 18,
+    9,
+    bold,
+    rgb(1, 1, 1)
+  );
+
+  drawText(
+    page,
+    'Recettes',
+    xRecettes + 8,
+    y - 18,
+    9,
+    bold,
+    rgb(1, 1, 1)
+  );
+
+  y -= headerHeight;
+
+  const rows = [...report.financialByCategory];
+
+  for (const row of rows) {
+    page.drawRectangle({
+      x: MARGIN_LEFT,
+      y: y - rowHeight,
+      width: CONTENT_WIDTH,
+      height: rowHeight,
+      color: rgb(1, 1, 1),
+      borderColor: BORDER,
+      borderWidth: 0.5,
     });
+
+    drawText(
+      page,
+      row.category || 'Sans catégorie',
+      xCategory + 8,
+      y - 16,
+      8.5,
+      regular,
+      DARK
+    );
+
+    drawText(
+      page,
+      euro(row.depenses),
+      xDepenses + 8,
+      y - 16,
+      8.5,
+      regular,
+      row.depenses > 0 ? RED : GREY
+    );
+
+    drawText(
+      page,
+      euro(row.recettes),
+      xRecettes + 8,
+      y - 16,
+      8.5,
+      regular,
+      row.recettes > 0 ? GREEN : GREY
+    );
+
+    y -= rowHeight;
   }
 
-  // Bloc de titre parfaitement centré dans le bandeau.
-  const centerX = PAGE_WIDTH / 2;
-
-  const title = 'BILAN ANNUEL';
-  const association = 'GIPE VILLEMANDEUR';
-  const yearText = year;
-
-  page.drawText(title, {
-    x: centerX - bold.widthOfTextAtSize(title, 22) / 2,
-    y: PAGE_HEIGHT - 48,
-    size: 22,
-    font: bold,
-    color: WHITE,
+  // Ligne de total
+  page.drawRectangle({
+    x: MARGIN_LEFT,
+    y: y - rowHeight,
+    width: CONTENT_WIDTH,
+    height: rowHeight,
+    color: LIGHT_GREY,
+    borderColor: BORDER,
+    borderWidth: 0.8,
   });
 
-  page.drawText(association, {
-    x: centerX - bold.widthOfTextAtSize(association, 10.5) / 2,
-    y: PAGE_HEIGHT - 75,
-    size: 10.5,
-    font: bold,
-    color: WHITE,
-  });
+  drawText(
+    page,
+    'TOTAL',
+    xCategory + 8,
+    y - 16,
+    8.5,
+    bold,
+    DARK
+  );
 
-  page.drawText(yearText, {
-    x: centerX - regular.widthOfTextAtSize(yearText, 11) / 2,
-    y: PAGE_HEIGHT - 99,
-    size: 11,
-    font: regular,
-    color: WHITE,
-  });
-}
+  drawText(
+    page,
+    euro(report.totalDepenses),
+    xDepenses + 8,
+    y - 16,
+    8.5,
+    bold,
+    RED
+  );
 
-function drawSectionLabel(
-  page: PDFPage,
-  bold: PDFFont,
-  text: string,
-  x: number,
-  y: number,
-  align: 'left' | 'center' = 'left'
-) {
-  const size = 9.5;
-  const textWidth = bold.widthOfTextAtSize(text, size);
+  drawText(
+    page,
+    euro(report.totalRecettes),
+    xRecettes + 8,
+    y - 16,
+    8.5,
+    bold,
+    GREEN
+  );
 
-  page.drawText(text, {
-    x: align === 'center' ? x - textWidth / 2 : x,
-    y,
-    size,
-    font: bold,
-    color: MUTED,
-  });
-}
+  y -= rowHeight;
 
-function addFooter(
-  page: PDFPage,
-  regular: PDFFont,
-  dateLabel: string,
-  year: string
-) {
-  page.drawLine({
-    start: { x: MARGIN_X, y: 44 },
-    end: { x: PAGE_WIDTH - MARGIN_X, y: 44 },
-    thickness: 0.6,
-    color: CREAM_BORDER,
-  });
-
-  const leftText = `Document prepare le ${dateLabel}`;
-  const rightText = `GIPE Villemandeur - ${year}`;
-
-  page.drawText(leftText, {
-    x: MARGIN_X,
-    y: 28,
-    size: 7.5,
-    font: regular,
-    color: MUTED,
-  });
-
-  page.drawText(rightText, {
-    x: PAGE_WIDTH - MARGIN_X - regular.widthOfTextAtSize(rightText, 7.5),
-    y: 28,
-    size: 7.5,
-    font: regular,
-    color: MUTED,
-  });
+  return y;
 }
 
 export async function buildAnnualReportPdf(
-  data: AnnualReportData
+  report: AnnualReportData
 ): Promise<Uint8Array> {
   const pdf = await PDFDocument.create();
+
   const regular = await pdf.embedFont(StandardFonts.Helvetica);
   const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
-  const logo = await loadSiteLogo(pdf);
 
-  const dateLabel = data.closedAt
-    ? new Date(data.closedAt).toLocaleDateString('fr-FR')
-    : new Date().toLocaleDateString('fr-FR');
+  /*
+   * PAGE 1
+   * Bilan d'adhésion
+   */
+  let page = addReportPage(pdf, regular, bold, report);
 
-  let page = pdf.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
-  let y = PAGE_HEIGHT - 164;
+  let y = PAGE_HEIGHT - 125;
 
-  drawHeader(page, regular, bold, data.schoolYear, logo);
-
-  // Total des adhérents : contenu centré, sans texte explicatif.
-  const totalBoxHeight = 122;
-
-  page.drawRectangle({
-    x: MARGIN_X,
-    y: y - totalBoxHeight,
-    width: PAGE_WIDTH - 2 * MARGIN_X,
-    height: totalBoxHeight,
-    color: CREAM,
-    borderColor: CREAM_BORDER,
-    borderWidth: 1,
-  });
-
-  const totalLabel = 'TOTAL DES ADHERENTS';
-  drawSectionLabel(
+  y = drawSectionTitle(
     page,
-    bold,
-    totalLabel,
-    PAGE_WIDTH / 2,
-    y - 28,
-    'center'
+    "1. Bilan d'adhésion",
+    y,
+    bold
   );
 
-  const totalText = String(data.totalAdherents);
-  const totalSize = 34;
-
-  page.drawText(totalText, {
-    x: PAGE_WIDTH / 2 - bold.widthOfTextAtSize(totalText, totalSize) / 2,
-    y: y - 82,
-    size: totalSize,
-    font: bold,
-    color: BURGUNDY,
-  });
-
-  y -= totalBoxHeight + 30;
-
-  // Répartition
-  drawSectionLabel(
+  drawMetricBox(
     page,
+    MARGIN_LEFT,
+    y,
+    CONTENT_WIDTH,
+    "Nombre total d'adhérents",
+    String(report.totalAdherents),
+    regular,
+    bold
+  );
+
+  y -= 85;
+
+  drawText(
+    page,
+    'Répartition des adhérents par classe',
+    MARGIN_LEFT,
+    y,
+    11,
     bold,
-    'REPARTITION DES ADHERENTS PAR CLASSE',
-    MARGIN_X,
+    DARK
+  );
+
+  y -= 25;
+
+  const classes = Object.entries(report.adherentsByClass)
+    .sort(([a], [b]) =>
+      a.localeCompare(b, 'fr', {
+        numeric: true,
+        sensitivity: 'base',
+      })
+    );
+
+  for (const [className, count] of classes) {
+    page.drawRectangle({
+      x: MARGIN_LEFT,
+      y: y - 23,
+      width: CONTENT_WIDTH,
+      height: 23,
+      color: rgb(1, 1, 1),
+      borderColor: BORDER,
+      borderWidth: 0.5,
+    });
+
+    drawText(
+      page,
+      className,
+      MARGIN_LEFT + 8,
+      y - 15,
+      9,
+      regular,
+      DARK
+    );
+
+    drawText(
+      page,
+      String(count),
+      PAGE_WIDTH - MARGIN_RIGHT - 40,
+      y - 15,
+      9,
+      bold,
+      DARK
+    );
+
+    y -= 23;
+  }
+
+  drawFooter(page, regular);
+
+  /*
+   * PAGE 2
+   * Bilan financier
+   */
+  page = addReportPage(pdf, regular, bold, report);
+
+  y = PAGE_HEIGHT - 125;
+
+  y = drawSectionTitle(
+    page,
+    "2. Bilan financier",
+    y,
+    bold
+  );
+
+  drawText(
+    page,
+    'Synthèse financière de l’exercice',
+    MARGIN_LEFT,
+    y,
+    11,
+    bold,
+    DARK
+  );
+
+  y -= 20;
+
+  const boxGap = 10;
+  const boxWidth = (CONTENT_WIDTH - boxGap * 2) / 3;
+
+  drawMetricBox(
+    page,
+    MARGIN_LEFT,
+    y,
+    boxWidth,
+    'Solde initial',
+    euro(report.initialBalance),
+    regular,
+    bold,
+    DARK
+  );
+
+  drawMetricBox(
+    page,
+    MARGIN_LEFT + boxWidth + boxGap,
+    y,
+    boxWidth,
+    'Total recettes',
+    euro(report.totalRecettes),
+    regular,
+    bold,
+    GREEN
+  );
+
+  drawMetricBox(
+    page,
+    MARGIN_LEFT + (boxWidth + boxGap) * 2,
+    y,
+    boxWidth,
+    'Total dépenses',
+    euro(report.totalDepenses),
+    regular,
+    bold,
+    RED
+  );
+
+  y -= 85;
+
+  drawMetricBox(
+    page,
+    MARGIN_LEFT,
+    y,
+    CONTENT_WIDTH,
+    'Solde final de l’exercice',
+    euro(report.solde),
+    regular,
+    bold,
+    report.solde >= 0 ? GREEN : RED
+  );
+
+  y -= 90;
+
+  drawText(
+    page,
+    'Détail par catégorie',
+    MARGIN_LEFT,
+    y,
+    11,
+    bold,
+    DARK
+  );
+
+  y -= 20;
+
+  y = drawFinancialTable(
+    page,
+    report,
+    regular,
+    bold,
     y
+  );
+
+  drawFooter(page, regular);
+
+  /*
+   * PAGE 3
+   * Bilan moral
+   *
+   * Cette partie sera enrichie ensuite avec :
+   * - instances / conseils
+   * - actions menées
+   * - projets
+   * - événements
+   * - communication
+   * - etc.
+   */
+  page = addReportPage(pdf, regular, bold, report);
+
+  y = PAGE_HEIGHT - 125;
+
+  y = drawSectionTitle(
+    page,
+    "3. Bilan moral",
+    y,
+    bold
+  );
+
+  drawText(
+    page,
+    "Cette partie du rapport sera complétée avec le bilan des",
+    MARGIN_LEFT,
+    y,
+    10,
+    regular,
+    DARK
   );
 
   y -= 18;
 
-  const columns = 3;
-  const gap = 9;
-  const boxWidth =
-    (PAGE_WIDTH - 2 * MARGIN_X - gap * (columns - 1)) /
-    columns;
-  const boxHeight = 31;
-  const rowsPerPage = 8;
-
-  for (let i = 0; i < data.adherentsByClass.length; i += 1) {
-    if (i > 0 && i % (columns * rowsPerPage) === 0) {
-      addFooter(page, regular, dateLabel, data.schoolYear);
-      page = pdf.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
-      drawHeader(page, regular, bold, data.schoolYear, logo);
-      y = PAGE_HEIGHT - 164;
-
-      drawSectionLabel(
-        page,
-        bold,
-        'REPARTITION DES ADHERENTS PAR CLASSE (SUITE)',
-        MARGIN_X,
-        y
-      );
-
-      y -= 18;
-    }
-
-    const indexOnPage = i % (columns * rowsPerPage);
-    const col = indexOnPage % columns;
-    const row = Math.floor(indexOnPage / columns);
-    const x = MARGIN_X + col * (boxWidth + gap);
-    const rowTop = y - row * (boxHeight + gap);
-
-    page.drawRectangle({
-      x,
-      y: rowTop - boxHeight,
-      width: boxWidth,
-      height: boxHeight,
-      color: CREAM,
-      borderColor: CREAM_BORDER,
-      borderWidth: 1,
-    });
-
-    const className = data.adherentsByClass[i].className;
-    const classCount = String(data.adherentsByClass[i].count);
-    const classNameWidth = regular.widthOfTextAtSize(className, 9);
-    const countWidth = bold.widthOfTextAtSize(classCount, 9.5);
-
-    page.drawText(className, {
-      x: x + boxWidth / 2 - classNameWidth / 2,
-      y: rowTop - 20,
-      size: 9,
-      font: bold,
-      color: TEXT,
-    });
-
-    // La valeur reste visuellement associée à la classe,
-    // légèrement décalée pour conserver une lecture compacte.
-    page.drawText(classCount, {
-      x: x + boxWidth - countWidth - 10,
-      y: rowTop - 20,
-      size: 9.5,
-      font: bold,
-      color: BURGUNDY,
-    });
-  }
-
-  const countOnLastPage =
-    data.adherentsByClass.length === 0
-      ? 0
-      : ((data.adherentsByClass.length - 1) % (columns * rowsPerPage)) + 1;
-
-  const usedRows =
-    countOnLastPage === 0
-      ? 0
-      : Math.ceil(countOnLastPage / columns);
-
-  y -= usedRows * (boxHeight + gap) + 28;
-
-  // Bilan financier : uniquement les trois indicateurs.
-  if (y - 98 < 65) {
-    addFooter(page, regular, dateLabel, data.schoolYear);
-    page = pdf.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
-    drawHeader(page, regular, bold, data.schoolYear, logo);
-    y = PAGE_HEIGHT - 164;
-  }
-
-  page.drawRectangle({
-    x: MARGIN_X,
-    y: y - 98,
-    width: PAGE_WIDTH - 2 * MARGIN_X,
-    height: 98,
-    color: LIGHT,
-  });
-
-  const financialTitle = 'BILAN FINANCIER';
-  drawSectionLabel(
+  drawText(
     page,
-    bold,
-    financialTitle,
-    PAGE_WIDTH / 2,
-    y - 22,
-    'center'
+    "actions et des instances de l'association.",
+    MARGIN_LEFT,
+    y,
+    10,
+    regular,
+    DARK
   );
 
-  const financials = [
-    ['Recettes', currency(data.totalRecettes)],
-    ['Depenses', currency(data.totalDepenses)],
-    ['Solde', currency(data.solde)],
-  ];
+  y -= 45;
 
-  financials.forEach(([label, value], index) => {
-    const columnCenter = MARGIN_X + 83 + index * 166;
-    const labelWidth = regular.widthOfTextAtSize(label, 8.5);
-    const valueWidth = bold.widthOfTextAtSize(value, 12);
-
-    page.drawText(label, {
-      x: columnCenter - labelWidth / 2,
-      y: y - 50,
-      size: 8.5,
-      font: regular,
-      color: MUTED,
-    });
-
-    page.drawText(value, {
-      x: columnCenter - valueWidth / 2,
-      y: y - 72,
-      size: 12,
-      font: bold,
-      color: TEXT,
-    });
+  page.drawRectangle({
+    x: MARGIN_LEFT,
+    y: y - 180,
+    width: CONTENT_WIDTH,
+    height: 180,
+    color: LIGHT_GREY,
+    borderColor: BORDER,
+    borderWidth: 0.8,
   });
 
-  addFooter(page, regular, dateLabel, data.schoolYear);
+  drawText(
+    page,
+    'Contenu à compléter',
+    MARGIN_LEFT + 15,
+    y - 25,
+    10,
+    bold,
+    GREY
+  );
+
+  drawFooter(page, regular);
+
+  /*
+   * PAGE 4
+   * Perspectives
+   */
+  page = addReportPage(pdf, regular, bold, report);
+
+  y = PAGE_HEIGHT - 125;
+
+  y = drawSectionTitle(
+    page,
+    "4. Perspectives",
+    y,
+    bold
+  );
+
+  drawText(
+    page,
+    "Cette partie permettra de présenter les projets,",
+    MARGIN_LEFT,
+    y,
+    10,
+    regular,
+    DARK
+  );
+
+  y -= 18;
+
+  drawText(
+    page,
+    "objectifs et orientations pour le nouvel exercice.",
+    MARGIN_LEFT,
+    y,
+    10,
+    regular,
+    DARK
+  );
+
+  y -= 45;
+
+  page.drawRectangle({
+    x: MARGIN_LEFT,
+    y: y - 180,
+    width: CONTENT_WIDTH,
+    height: 180,
+    color: LIGHT_GREY,
+    borderColor: BORDER,
+    borderWidth: 0.8,
+  });
+
+  drawText(
+    page,
+    'Contenu à compléter',
+    MARGIN_LEFT + 15,
+    y - 25,
+    10,
+    bold,
+    GREY
+  );
+
+  drawFooter(page, regular);
+
+  /*
+   * Informations de clôture
+   */
+  page = addReportPage(pdf, regular, bold, report);
+
+  y = PAGE_HEIGHT - 125;
+
+  y = drawSectionTitle(
+    page,
+    "Clôture de l'exercice",
+    y,
+    bold
+  );
+
+  drawText(
+    page,
+    `Exercice clôturé : ${report.schoolYear}`,
+    MARGIN_LEFT,
+    y,
+    10,
+    regular,
+    DARK
+  );
+
+  y -= 22;
+
+  drawText(
+    page,
+    `Date de clôture : ${dateFr(report.closedAt)}`,
+    MARGIN_LEFT,
+    y,
+    10,
+    regular,
+    DARK
+  );
+
+  y -= 45;
+
+  drawMetricBox(
+    page,
+    MARGIN_LEFT,
+    y,
+    CONTENT_WIDTH,
+    'Solde transmis au nouvel exercice',
+    euro(report.solde),
+    regular,
+    bold,
+    report.solde >= 0 ? GREEN : RED
+  );
+
+  drawFooter(page, regular);
 
   return pdf.save();
 }
-
