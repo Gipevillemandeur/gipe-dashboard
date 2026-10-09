@@ -91,13 +91,17 @@ function paymentLabel(value: string | null) {
 
 export default function TresoreriePage() {
   const [schoolYear, setSchoolYear] = useState<string | null>(null);
+  const [initialBalance, setInitialBalance] = useState(0);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [savingInitialBalance, setSavingInitialBalance] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
   const [showForm, setShowForm] = useState(false);
+  const [showInitialBalanceForm, setShowInitialBalanceForm] = useState(false);
+  const [initialBalanceInput, setInitialBalanceInput] = useState('0');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm);
 
@@ -119,6 +123,10 @@ export default function TresoreriePage() {
       }
 
       setSchoolYear(data.schoolYear || null);
+      setInitialBalance(Number(data.initialBalance || 0));
+      setInitialBalanceInput(
+        String(Number(data.initialBalance || 0)).replace('.', ',')
+      );
       setTransactions(data.transactions || []);
     } catch (err) {
       setError(
@@ -144,12 +152,15 @@ export default function TresoreriePage() {
       .filter((item) => item.type === 'expense')
       .reduce((sum, item) => sum + item.amount, 0);
 
+    const currentBalance =
+      initialBalance + income - expense;
+
     return {
       income: Math.round(income * 100) / 100,
       expense: Math.round(expense * 100) / 100,
-      balance: Math.round((income - expense) * 100) / 100,
+      balance: Math.round(currentBalance * 100) / 100,
     };
-  }, [transactions]);
+  }, [transactions, initialBalance]);
 
   const categories =
     form.type === 'income'
@@ -196,11 +207,24 @@ export default function TresoreriePage() {
     setShowForm(true);
   }
 
+  function openInitialBalanceForm() {
+    setInitialBalanceInput(
+      String(initialBalance).replace('.', ',')
+    );
+    setError('');
+    setShowInitialBalanceForm(true);
+  }
+
   function closeForm() {
     if (saving) return;
     setShowForm(false);
     setEditingId(null);
     setForm({ ...emptyForm, date: today() });
+  }
+
+  function closeInitialBalanceForm() {
+    if (savingInitialBalance) return;
+    setShowInitialBalanceForm(false);
   }
 
   function setType(type: FormState['type']) {
@@ -209,6 +233,56 @@ export default function TresoreriePage() {
       type,
       category: '',
     }));
+  }
+
+  async function saveInitialBalance(event: FormEvent) {
+    event.preventDefault();
+
+    const numericBalance = Number(
+      String(initialBalanceInput).replace(',', '.')
+    );
+
+    if (!Number.isFinite(numericBalance)) {
+      setError('Le solde initial est invalide.');
+      return;
+    }
+
+    setSavingInitialBalance(true);
+    setError('');
+
+    try {
+      const response = await fetch('/api/tresorerie', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          initialBalance: numericBalance,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.error || 'Impossible d’enregistrer le solde initial.'
+        );
+      }
+
+      setInitialBalance(Number(data.initialBalance || 0));
+      setInitialBalanceInput(
+        String(Number(data.initialBalance || 0)).replace('.', ',')
+      );
+      setShowInitialBalanceForm(false);
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'Impossible d’enregistrer le solde initial.'
+      );
+    } finally {
+      setSavingInitialBalance(false);
+    }
   }
 
   async function deleteTransaction(item: Transaction) {
@@ -330,11 +404,37 @@ export default function TresoreriePage() {
         }}
       >
         <div className="tresorerie-summary-grid">
+          <div className="tresorerie-stat tresorerie-stat-initial">
+            <WalletCards size={18} />
+
+            <div className="stat-label tresorerie-stat-label">
+              SOLDE INITIAL
+            </div>
+
+            <div className="tresorerie-stat-value">
+              {formatMoney(initialBalance)}
+            </div>
+
+            <button
+              type="button"
+              className="btn"
+              onClick={openInitialBalanceForm}
+              style={{
+                marginTop: 10,
+              }}
+            >
+              <Pencil size={13} />
+              Modifier
+            </button>
+          </div>
+
           <div className="tresorerie-stat">
             <ArrowUpCircle size={18} />
+
             <div className="stat-label tresorerie-stat-label">
               RECETTES
             </div>
+
             <div className="tresorerie-stat-value">
               {formatMoney(totals.income)}
             </div>
@@ -342,9 +442,11 @@ export default function TresoreriePage() {
 
           <div className="tresorerie-stat">
             <ArrowDownCircle size={18} />
+
             <div className="stat-label tresorerie-stat-label">
               DÉPENSES
             </div>
+
             <div className="tresorerie-stat-value">
               {formatMoney(totals.expense)}
             </div>
@@ -352,9 +454,11 @@ export default function TresoreriePage() {
 
           <div className="tresorerie-stat tresorerie-stat-balance">
             <WalletCards size={18} />
+
             <div className="stat-label tresorerie-stat-label">
-              SOLDE
+              SOLDE ACTUEL
             </div>
+
             <div
               className="tresorerie-stat-value"
               style={{
@@ -374,6 +478,7 @@ export default function TresoreriePage() {
         <div className="section-head tresorerie-section-head">
           <div>
             <h2 className="section-title">Opérations</h2>
+
             <p className="section-sub">
               {filteredTransactions.length} opération
               {filteredTransactions.length > 1 ? 's' : ''} affichée
@@ -401,9 +506,11 @@ export default function TresoreriePage() {
               size={34}
               style={{ opacity: 0.35 }}
             />
+
             <h3 style={{ margin: '12px 0 4px' }}>
               Aucune opération
             </h3>
+
             <p className="section-sub">
               Ajoute la première recette ou dépense de l’année.
             </p>
@@ -527,12 +634,93 @@ export default function TresoreriePage() {
         )}
       </section>
 
+      {showInitialBalanceForm && (
+        <div className="tresorerie-modal-overlay">
+          <div className="card tresorerie-modal tresorerie-initial-modal">
+            <div className="tresorerie-modal-head">
+              <div>
+                <div className="eyebrow">Trésorerie</div>
+
+                <h2 className="section-title tresorerie-modal-title">
+                  Solde initial
+                </h2>
+
+                <p className="section-sub tresorerie-initial-help">
+                  Montant disponible sur le compte au début de l’année
+                  scolaire.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                className="btn tresorerie-close-button"
+                onClick={closeInitialBalanceForm}
+                disabled={savingInitialBalance}
+                title="Fermer"
+              >
+                <X size={15} />
+              </button>
+            </div>
+
+            <form onSubmit={saveInitialBalance}>
+              <div className="tresorerie-initial-balance-field">
+                <label
+                  className="form-label"
+                  htmlFor="initial-balance"
+                >
+                  Solde au début de l’année
+                </label>
+
+                <div className="tresorerie-initial-input-wrap">
+                  <input
+                    id="initial-balance"
+                    className="input tresorerie-initial-input"
+                    inputMode="decimal"
+                    placeholder="0,00"
+                    value={initialBalanceInput}
+                    onChange={(event) =>
+                      setInitialBalanceInput(event.target.value)
+                    }
+                    autoFocus
+                    required
+                  />
+
+                  <span>€</span>
+                </div>
+              </div>
+
+              <div className="tresorerie-modal-actions">
+                <button
+                  type="button"
+                  className="btn"
+                  onClick={closeInitialBalanceForm}
+                  disabled={savingInitialBalance}
+                >
+                  Annuler
+                </button>
+
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={savingInitialBalance}
+                >
+                  {savingInitialBalance
+                    ? 'Enregistrement…'
+                    : 'Enregistrer le solde'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {showForm && (
         <div className="tresorerie-modal-overlay">
           <div className="card tresorerie-modal">
             <div className="tresorerie-modal-head">
               <div>
                 <div className="eyebrow">Trésorerie</div>
+
                 <h2 className="section-title tresorerie-modal-title">
                   {editingId
                     ? 'Modifier l’opération'
@@ -774,7 +962,7 @@ export default function TresoreriePage() {
       <style jsx>{`
         .tresorerie-summary-grid {
           display: grid;
-          grid-template-columns: repeat(3, minmax(0, 1fr));
+          grid-template-columns: repeat(4, minmax(0, 1fr));
           gap: 14px;
           min-width: 0;
         }
@@ -787,6 +975,10 @@ export default function TresoreriePage() {
           background: #fffaf3;
           text-align: center;
           box-sizing: border-box;
+        }
+
+        .tresorerie-stat-initial {
+          background: #f8fafc;
         }
 
         .tresorerie-stat-balance {
@@ -860,6 +1052,10 @@ export default function TresoreriePage() {
           box-shadow: 0 20px 50px rgba(15, 23, 42, 0.20);
         }
 
+        .tresorerie-initial-modal {
+          max-width: 460px;
+        }
+
         .tresorerie-modal-head {
           display: flex;
           align-items: center;
@@ -873,6 +1069,35 @@ export default function TresoreriePage() {
 
         .tresorerie-close-button {
           flex: 0 0 auto;
+        }
+
+        .tresorerie-initial-help {
+          margin-top: 6px;
+          max-width: 360px;
+        }
+
+        .tresorerie-initial-balance-field {
+          margin-top: 22px;
+        }
+
+        .tresorerie-initial-input-wrap {
+          position: relative;
+          display: flex;
+          align-items: center;
+        }
+
+        .tresorerie-initial-input {
+          padding-right: 42px;
+          font-size: 20px;
+          font-weight: 700;
+        }
+
+        .tresorerie-initial-input-wrap > span {
+          position: absolute;
+          right: 14px;
+          font-weight: 700;
+          color: #756a67;
+          pointer-events: none;
         }
 
         .tresorerie-form-grid {
@@ -920,6 +1145,12 @@ export default function TresoreriePage() {
           justify-content: flex-end;
           gap: 10px;
           margin-top: 24px;
+        }
+
+        @media (max-width: 900px) {
+          .tresorerie-summary-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+          }
         }
 
         @media (max-width: 700px) {
