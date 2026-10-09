@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { requireOfficePermission } from '@/lib/office-auth'
 
@@ -678,9 +677,6 @@ export async function POST(
       return auth.error
     }
 
-    const supabase =
-      await createClient()
-
     const adminClient =
       createAdminClient()
 
@@ -860,7 +856,16 @@ export async function POST(
         error:
           resetError,
       } =
-        await supabase.auth.resetPasswordForEmail(
+        /*
+         * Envoi via le client « serveur » (clé secrète).
+         *
+         * Avant, l'envoi passait par la session du
+         * Président : Supabase rangeait alors une clé
+         * secrète dans le navigateur du Président, et
+         * le lien reçu par le destinataire ne pouvait
+         * fonctionner QUE sur le navigateur du Président.
+         */
+        await adminClient.auth.resetPasswordForEmail(
           email,
           {
             redirectTo,
