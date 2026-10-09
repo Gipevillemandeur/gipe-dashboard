@@ -2,6 +2,7 @@
 
 import {
   FormEvent,
+  useEffect,
   useState,
 } from 'react';
 import {
@@ -12,11 +13,123 @@ import {
   Loader2,
   ShieldCheck,
 } from 'lucide-react';
-import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 
+type LinkStatus =
+  | 'checking'
+  | 'ready'
+  | 'invalid';
+
 export default function SetPasswordPage() {
-  const router = useRouter();
+  /*
+   * Au chargement : on lit le lien reçu par e-mail.
+   *
+   * Supabase place la session après le # de l'adresse
+   * (#access_token=...&refresh_token=...), ou un
+   * message d'erreur si le lien est périmé.
+   */
+  const [linkStatus, setLinkStatus] =
+    useState<LinkStatus>('checking');
+
+  const [linkError, setLinkError] =
+    useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function readLink() {
+      const hash =
+        window.location.hash.startsWith('#')
+          ? window.location.hash.slice(1)
+          : '';
+
+      const params =
+        new URLSearchParams(hash);
+
+      const supabase =
+        createClient();
+
+      if (
+        params.get('error') ||
+        params.get('error_code')
+      ) {
+        window.history.replaceState(
+          null,
+          '',
+          window.location.pathname
+        );
+
+        if (!cancelled) {
+          setLinkError(
+            'Ce lien n’est plus valide : il a déjà été utilisé ou il a expiré. Demande un nouvel envoi de l’accès.'
+          );
+          setLinkStatus('invalid');
+        }
+        return;
+      }
+
+      const accessToken =
+        params.get('access_token');
+
+      const refreshToken =
+        params.get('refresh_token');
+
+      if (
+        accessToken &&
+        refreshToken
+      ) {
+        const { error: sessionError } =
+          await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken,
+          });
+
+        // On retire les jetons de la barre d'adresse.
+        window.history.replaceState(
+          null,
+          '',
+          window.location.pathname
+        );
+
+        if (sessionError) {
+          console.error(
+            'Erreur ouverture session invitation:',
+            sessionError
+          );
+
+          if (!cancelled) {
+            setLinkError(
+              'Ce lien n’est plus valide. Demande un nouvel envoi de l’accès.'
+            );
+            setLinkStatus('invalid');
+          }
+          return;
+        }
+      }
+
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (cancelled) return;
+
+      if (!user) {
+        setLinkError(
+          'Ce lien n’est plus valide ou a déjà été utilisé. Demande un nouvel envoi de l’accès.'
+        );
+        setLinkStatus('invalid');
+        return;
+      }
+
+      setLinkStatus('ready');
+    }
+
+    readLink();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const [password, setPassword] =
     useState('');
@@ -94,9 +207,10 @@ export default function SetPasswordPage() {
 
       setSuccess(true);
 
+      // Mot de passe créé : la personne est connectée,
+      // on l'envoie directement sur le tableau de bord.
       setTimeout(() => {
-        router.replace('/login');
-        router.refresh();
+        window.location.assign('/');
       }, 1200);
     } catch (err) {
       setError(
@@ -128,7 +242,19 @@ export default function SetPasswordPage() {
           Définissez le mot de passe de votre compte.
         </p>
 
-        {success ? (
+        {linkStatus === 'checking' ? (
+          <div className="password-info">
+            <Loader2
+              size={18}
+              className="password-spinner"
+            />
+            <div>Vérification du lien…</div>
+          </div>
+        ) : linkStatus === 'invalid' ? (
+          <div className="login-error password-invalid">
+            {linkError}
+          </div>
+        ) : success ? (
           <div className="password-success">
             <Check size={20} />
 
@@ -322,6 +448,24 @@ export default function SetPasswordPage() {
           font-size: 13px;
           line-height: 1.45;
           font-weight: 600;
+        }
+
+        .password-info {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          margin-top: 20px;
+          padding: 14px;
+          border-radius: 10px;
+          background: #f7f2eb;
+          color: #6f6663;
+          font-size: 13px;
+        }
+
+        .password-invalid {
+          margin-top: 20px;
+          font-size: 13px;
+          line-height: 1.45;
         }
 
         .password-spinner {
