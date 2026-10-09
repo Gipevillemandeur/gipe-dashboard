@@ -1,19 +1,13 @@
 import { NextResponse } from 'next/server';
 import { requireOfficePermission } from '@/lib/office-auth';
 import { createAdminClient } from '@/lib/supabase/admin';
-import {
-  buildAnnualReportPdf,
-  type AnnualReportData,
-} from '@/lib/annual-report-pdf';
-import { archiveInstanceMeeting } from '@/lib/instance-meeting-drive';
+import { buildAnnualReportPdf, type AnnualReportData } from '@/lib/annual-report-pdf';
 
 async function requireConfigurationAccess() {
   try {
     await requireOfficePermission('configuration');
 
-    return {
-      admin: createAdminClient(),
-    };
+    return {};
   } catch (error) {
     if (error instanceof Error) {
       if (error.message === 'AUTHENTICATION_REQUIRED') {
@@ -46,8 +40,7 @@ async function requireConfigurationAccess() {
     return {
       error: NextResponse.json(
         {
-          error:
-            'Erreur de contrôle des accès.',
+          error: 'Erreur de contrôle des accès.',
         },
         { status: 500 }
       ),
@@ -55,15 +48,12 @@ async function requireConfigurationAccess() {
   }
 }
 
-function sanitizeFileNamePart(value: string) {
-  return value
-    .replace(/[\\/:*?"<>|]/g, '-')
-    .trim();
-}
+async function buildCurrentAnnualReport(): Promise<AnnualReportData> {
+  const admin = createAdminClient();
 
-async function buildCurrentAnnualReport(
-  admin: ReturnType<typeof createAdminClient>
-) {
+  /*
+   * Année scolaire active
+   */
   const {
     data: year,
     error: yearError,
@@ -83,6 +73,9 @@ async function buildCurrentAnnualReport(
     );
   }
 
+  /*
+   * ADHÉSIONS
+   */
   const {
     data: memberships,
     error: membershipsError,
@@ -110,6 +103,9 @@ async function buildCurrentAnnualReport(
 
   const rows = memberships || [];
 
+  /*
+   * Répartition des adhérents par classe.
+   */
   const byClass =
     new Map<string, Set<string>>();
 
@@ -153,7 +149,11 @@ async function buildCurrentAnnualReport(
     }
   }
 
-  const adherentsByClass =
+  /*
+   * On conserve d'abord le format utilisé
+   * par la logique existante.
+   */
+  const adherentsByClassArray =
     Array.from(byClass.entries())
       .map(
         ([className, memberIds]) => ({
@@ -167,15 +167,32 @@ async function buildCurrentAnnualReport(
           'fr',
           {
             numeric: true,
+            sensitivity: 'base',
           }
         )
       );
 
   /*
-   * Bilan financier
+   * Le PDF attend :
    *
-   * Toutes les opérations de l'année active
-   * sont regroupées par catégorie.
+   * {
+   *   "6A": 12,
+   *   "6B": 9
+   * }
+   */
+  const adherentsByClass:
+    Record<string, number> =
+    Object.fromEntries(
+      adherentsByClassArray.map(
+        ({ className, count }) => [
+          className,
+          count,
+        ]
+      )
+    );
+
+  /*
+   * TRÉSORERIE
    */
   const {
     data: transactions,
@@ -183,7 +200,7 @@ async function buildCurrentAnnualReport(
   } = await admin
     .from('gipe_transactions')
     .select(
-      'transaction_type, category, amount'
+      'transaction_type,category,amount'
     )
     .eq(
       'school_year_id',
@@ -212,14 +229,15 @@ async function buildCurrentAnnualReport(
     const amount =
       Number(transaction.amount || 0);
 
-    const category =
-      String(
-        transaction.category || 'Autre'
-      ).trim() || 'Autre';
+    if (!Number.isFinite(amount)) {
+      continue;
+    }
 
-    if (
-      !financialByCategory.has(category)
-    ) {
+    const category =
+      transaction.category?.trim() ||
+      'Sans catégorie';
+
+    if (!financialByCategory.has(category)) {
       financialByCategory.set(
         category,
         {
@@ -229,28 +247,76 @@ async function buildCurrentAnnualReport(
       );
     }
 
-    const entry =
-      financialByCategory.get(
-        category
-      )!;
+    const financial =
+      financialByCategory.get(category)!;
 
-    if (
-      transaction.transaction_type ===
-      'income'
-    ) {
-      entry.recettes += amount;
+    const transactionType =
+      String(
+        transaction.transaction_type || ''
+      )
+        .trim()
+        .toLowerCase();
+
+    const isRecette =
+      [
+        'recette',
+        'recettes',
+        'income',
+        'entree',
+        'entrée',
+      ].includes(transactionType);
+
+    const isDepense =
+      [
+        'depense',
+        'depenses',
+        'dépense',
+        'dépenses',
+        'expense',
+        'sortie',
+      ].includes(transactionType);
+
+    if (isRecette) {
+      financial.recettes += amount;
       totalRecettes += amount;
-    }
-
-    if (
-      transaction.transaction_type ===
-      'expense'
-    ) {
-      entry.depenses += amount;
+    } else if (isDepense) {
+      financial.depenses += amount;
       totalDepenses += amount;
     }
   }
 
+  /*
+   * Arrondis financiers
+   */
+  totalRecettes =
+    Math.round(
+      totalRecettes * 100
+    ) / 100;
+
+  totalDepenses =
+    Math.round(
+      totalDepenses * 100
+    ) / 100;
+
+  const initialBalance =
+    Math.round(
+      Number(
+        year.initial_balance || 0
+      ) * 100
+    ) / 100;
+
+  const solde =
+    Math.round(
+      (
+        initialBalance +
+        totalRecettes -
+        totalDepenses
+      ) * 100
+    ) / 100;
+
+  /*
+   * Détail financier par catégorie.
+   */
   const financialByCategoryList =
     Array.from(
       financialByCategory.entries()
@@ -258,10 +324,12 @@ async function buildCurrentAnnualReport(
       .map(
         ([category, values]) => ({
           category,
+
           recettes:
             Math.round(
               values.recettes * 100
             ) / 100,
+
           depenses:
             Math.round(
               values.depenses * 100
@@ -273,54 +341,27 @@ async function buildCurrentAnnualReport(
           b.category,
           'fr',
           {
-            numeric: true,
+            sensitivity: 'base',
           }
         )
       );
 
-  const initialBalance =
-    Number(
-      year.initial_balance || 0
-    );
-
-  const roundedRecettes =
-    Math.round(
-      totalRecettes * 100
-    ) / 100;
-
-  const roundedDepenses =
-    Math.round(
-      totalDepenses * 100
-    ) / 100;
-
-  const solde =
-    Math.round(
-      (
-        initialBalance +
-        roundedRecettes -
-        roundedDepenses
-      ) * 100
-    ) / 100;
-
-  const report: AnnualReportData = {
-    schoolYear:
-      year.label,
+  /*
+   * Rapport annuel complet
+   */
+  return {
+    schoolYear: year.label,
 
     totalAdherents:
       rows.length,
 
     adherentsByClass,
 
-    initialBalance:
-      Math.round(
-        initialBalance * 100
-      ) / 100,
+    initialBalance,
 
-    totalRecettes:
-      roundedRecettes,
+    totalRecettes,
 
-    totalDepenses:
-      roundedDepenses,
+    totalDepenses,
 
     solde,
 
@@ -330,159 +371,6 @@ async function buildCurrentAnnualReport(
     closedAt:
       new Date().toISOString(),
   };
-
-  return {
-    year,
-    report,
-  };
-}
-
-async function archivePdfInDrive(
-  schoolYear: string,
-  pdf: Uint8Array
-) {
-  const scriptUrl =
-    process.env.GOOGLE_DRIVE_APPS_SCRIPT_URL?.trim();
-
-  const token =
-    process.env.GOOGLE_DRIVE_APPS_SCRIPT_TOKEN?.trim();
-
-  if (!scriptUrl || !token) {
-    throw new Error(
-      'La connexion Google Drive n’est pas configurée dans Vercel.'
-    );
-  }
-
-  const safeYear =
-    sanitizeFileNamePart(
-      schoolYear
-    );
-
-  const fileName =
-    `Bilan-annuel-GIPE-${safeYear}.pdf`;
-
-  const pdfBase64 =
-    Buffer.from(pdf).toString(
-      'base64'
-    );
-
-  const response =
-    await fetch(
-      scriptUrl,
-      {
-        method: 'POST',
-        redirect: 'follow',
-        headers: {
-          'Content-Type':
-            'application/json',
-        },
-        body: JSON.stringify({
-          action:
-            'upload_annual_report',
-          token,
-          schoolYear,
-          fileName,
-          pdfBase64,
-        }),
-        cache: 'no-store',
-      }
-    );
-
-  const responseText =
-    await response.text();
-
-  let result: any;
-
-  try {
-    result =
-      JSON.parse(
-        responseText
-      );
-  } catch {
-    throw new Error(
-      `Réponse Apps Script inattendue (HTTP ${response.status}).`
-    );
-  }
-
-  if (
-    !response.ok ||
-    !result?.ok
-  ) {
-    throw new Error(
-      result?.error ||
-        `Archivage Drive impossible (HTTP ${response.status}).`
-    );
-  }
-
-  return result;
-}
-
-async function archiveCurrentYearInstances(
-  admin: ReturnType<
-    typeof createAdminClient
-  >,
-  schoolYearId: string
-) {
-  const {
-    data: meetings,
-    error,
-  } = await admin
-    .from('instance_meetings')
-    .select(
-      'id, meeting_date, meeting_time, type, subject'
-    )
-    .eq(
-      'school_year_id',
-      schoolYearId
-    )
-    .order(
-      'meeting_date',
-      {
-        ascending: true,
-      }
-    )
-    .order(
-      'meeting_time',
-      {
-        ascending: true,
-      }
-    );
-
-  if (error) {
-    throw new Error(
-      `Impossible de récupérer les réunions à archiver : ${error.message}`
-    );
-  }
-
-  const rows =
-    meetings || [];
-
-  const archived = [];
-
-  for (const meeting of rows) {
-    try {
-      const result =
-        await archiveInstanceMeeting(
-          admin,
-          meeting.id
-        );
-
-      archived.push(
-        result
-      );
-    } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : 'Erreur inconnue lors de l’archivage.';
-
-      throw new Error(
-        `Échec de l’archivage de la réunion "${meeting.type} - ${meeting.subject}" : ${message}`
-      );
-    }
-  }
-
-  return archived;
 }
 
 export async function POST(
@@ -495,88 +383,36 @@ export async function POST(
     return auth.error;
   }
 
-  const { admin } =
-    auth;
-
-  const body =
-    (await request
-      .json()
-      .catch(
-        () => null
-      )) as {
-        newYearLabel?: string;
-      } | null;
-
-  const newYearLabel =
-    String(
-      body?.newYearLabel ||
-        ''
-    ).trim();
-
-  if (!newYearLabel) {
-    return NextResponse.json(
-      {
-        error:
-          'Le libellé de la nouvelle année scolaire est obligatoire.',
-      },
-      { status: 400 }
-    );
-  }
-
-  if (
-    newYearLabel.length >
-    30
-  ) {
-    return NextResponse.json(
-      {
-        error:
-          'Le libellé de l’année scolaire est trop long.',
-      },
-      { status: 400 }
-    );
-  }
-
-  if (
-    !/^\d{4}-\d{4}$/.test(
-      newYearLabel
-    )
-  ) {
-    return NextResponse.json(
-      {
-        error:
-          'Format invalide. Exemple : 2027-2028.',
-      },
-      { status: 400 }
-    );
-  }
-
   try {
-    /*
-     * 1. Lecture et préparation du bilan.
-     *
-     * Aucune modification de Supabase
-     * n'est encore effectuée.
-     */
-    const {
-      year,
-      report,
-    } =
-      await buildCurrentAnnualReport(
-        admin
+    const body =
+      await request.json();
+
+    const newYearLabel =
+      String(
+        body?.newYearLabel || ''
+      ).trim();
+
+    if (!newYearLabel) {
+      return NextResponse.json(
+        {
+          error:
+            "Le libellé de la nouvelle année scolaire est obligatoire.",
+        },
+        { status: 400 }
       );
+    }
+
+    const admin =
+      createAdminClient();
 
     /*
-     * 2. Archivage de toutes les réunions
-     * de l'année active.
+     * On construit le bilan AVANT la clôture.
      */
-    const archivedInstances =
-      await archiveCurrentYearInstances(
-        admin,
-        year.id
-      );
+    const report =
+      await buildCurrentAnnualReport();
 
     /*
-     * 3. Génération du bilan annuel.
+     * Génération du PDF.
      */
     const pdf =
       await buildAnnualReportPdf(
@@ -584,51 +420,65 @@ export async function POST(
       );
 
     /*
-     * 4. Archivage du bilan annuel dans Drive.
+     * Conversion Uint8Array -> ArrayBuffer
      */
-    const drive =
-      await archivePdfInDrive(
-        year.label,
-        pdf
+    const pdfBuffer =
+      new ArrayBuffer(
+        pdf.byteLength
       );
+
+    new Uint8Array(
+      pdfBuffer
+    ).set(pdf);
 
     /*
-     * 5. Seulement si toutes les archives
-     * sont réussies, on effectue la clôture SQL.
+     * Clôture réelle de l'année
+     *
+     * La fonction SQL :
+     * - enregistre le bilan
+     * - ferme l'ancienne année
+     * - crée la nouvelle année
+     * - transmet le solde
      */
     const {
-      data,
-      error,
-    } =
-      await admin.rpc(
-        'gipe_cloturer_annee',
-        {
-          p_new_year_label:
-            newYearLabel,
-        }
-      );
+      data: closure,
+      error: closureError,
+    } = await admin.rpc(
+      'gipe_cloturer_annee',
+      {
+        p_new_year_label:
+          newYearLabel,
+      }
+    );
 
-    if (error) {
-      return NextResponse.json(
-        {
-          error:
-            `Les archives ont bien été envoyées dans Google Drive, mais la clôture Supabase a échoué : ${error.message}`,
-          drive,
-          archivedInstances,
-        },
-        { status: 500 }
+    if (closureError) {
+      throw new Error(
+        closureError.message
       );
     }
 
-    return NextResponse.json({
-      ok: true,
-      result: data,
-      drive,
-      archivedInstances,
-    });
+    return new NextResponse(
+      pdfBuffer,
+      {
+        status: 200,
+        headers: {
+          'Content-Type':
+            'application/pdf',
+
+          'Content-Disposition':
+            `attachment; filename="Bilan-annuel-GIPE-${report.schoolYear}.pdf"`,
+
+          'X-Closure-Completed':
+            'true',
+
+          'Cache-Control':
+            'no-store',
+        },
+      }
+    );
   } catch (error) {
     console.error(
-      'Erreur clôture annuelle GIPE:',
+      'Erreur clôture année scolaire :',
       error
     );
 
