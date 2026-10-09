@@ -1,24 +1,104 @@
 import { NextResponse } from 'next/server'
 import { requireOfficePermission } from '@/lib/office-auth'
+import { getGoogleAccessToken } from '@/lib/google-drive'
 
-export async function GET(request: Request) {
+type GoogleDriveErrorResponse = {
+  error?: {
+    message?: string
+  }
+}
+
+export async function DELETE(request: Request) {
   try {
     await requireOfficePermission('drive')
+
+    const url =
+      new URL(request.url)
+
+    const fileId =
+      url.searchParams
+        .get('id')
+        ?.trim()
+
+    if (!fileId) {
+      return NextResponse.json(
+        {
+          error:
+            'L’identifiant du fichier ou du dossier est obligatoire.',
+        },
+        { status: 400 }
+      )
+    }
+
+    const accessToken =
+      await getGoogleAccessToken()
+
+    const driveResponse =
+      await fetch(
+        `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(
+          fileId
+        )}?supportsAllDrives=true`,
+        {
+          method: 'DELETE',
+          headers: {
+            Authorization:
+              `Bearer ${accessToken}`,
+          },
+          cache: 'no-store',
+        }
+      )
+
+    if (!driveResponse.ok) {
+      const driveData =
+        (await driveResponse.json()) as GoogleDriveErrorResponse
+
+      console.error(
+        'Erreur suppression Google Drive:',
+        driveData
+      )
+
+      return NextResponse.json(
+        {
+          error:
+            driveData?.error?.message ||
+            'Impossible de supprimer cet élément de Google Drive.',
+        },
+        {
+          status:
+            driveResponse.status || 500,
+        }
+      )
+    }
+
+    return NextResponse.json({
+      success: true,
+      id: fileId,
+    })
   } catch (error) {
     if (error instanceof Error) {
-      if (error.message === 'AUTHENTICATION_REQUIRED') {
-        return NextResponse.redirect(
-          new URL('/login', request.url)
+      if (
+        error.message ===
+        'AUTHENTICATION_REQUIRED'
+      ) {
+        return NextResponse.json(
+          {
+            error:
+              'Non authentifié.',
+          },
+          { status: 401 }
         )
       }
 
       if (
-        error.message === 'OFFICE_ACCESS_DENIED' ||
-        error.message === 'OFFICE_PERMISSION_DENIED'
+        error.message ===
+          'OFFICE_ACCESS_DENIED' ||
+        error.message ===
+          'OFFICE_PERMISSION_DENIED'
       ) {
         return NextResponse.json(
           {
-            error: 'Compte non autorisé.',
+            error:
+              'Compte non autorisé.',
           },
           { status: 403 }
         )
@@ -26,63 +106,16 @@ export async function GET(request: Request) {
     }
 
     console.error(
-      'Erreur contrôle accès Google Drive:',
+      'Erreur API suppression Google Drive:',
       error
     )
 
     return NextResponse.json(
       {
         error:
-          'Erreur de contrôle des accès.',
-      },
-      { status: 500 }
-    )
-  }
-
-  try {
-    const clientId =
-      process.env.GOOGLE_CLIENT_ID
-
-    if (!clientId) {
-      return NextResponse.json(
-        {
-          error:
-            'GOOGLE_CLIENT_ID est absent de la configuration.',
-        },
-        { status: 500 }
-      )
-    }
-
-    const redirectUri =
-      `${new URL(request.url).origin}` +
-      '/api/google/drive/callback'
-
-    const params = new URLSearchParams({
-      client_id: clientId,
-      redirect_uri: redirectUri,
-      response_type: 'code',
-      access_type: 'offline',
-      prompt: 'consent',
-      scope:
-        'https://www.googleapis.com/auth/drive',
-    })
-
-    const googleUrl =
-      `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`
-
-    return NextResponse.redirect(
-      googleUrl
-    )
-  } catch (error) {
-    console.error(
-      'Erreur connexion Google Drive:',
-      error
-    )
-
-    return NextResponse.json(
-      {
-        error:
-          'Impossible de démarrer la connexion Google Drive.',
+          error instanceof Error
+            ? error.message
+            : 'Impossible de supprimer cet élément.',
       },
       { status: 500 }
     )
