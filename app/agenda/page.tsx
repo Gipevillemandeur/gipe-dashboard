@@ -44,8 +44,16 @@ const INSTANCE_TYPES = [
   'Autre',
 ];
 
+const MAX_IMAGE_SIZE = 8 * 1024 * 1024;
+
+// Date du jour en heure locale (et non en heure UTC,
+// qui donnait la veille entre minuit et 2 h du matin).
 function today() {
-  return new Date().toISOString().slice(0, 10);
+  const now = new Date();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+
+  return `${now.getFullYear()}-${month}-${day}`;
 }
 
 function formatDate(value: string | null) {
@@ -88,6 +96,17 @@ export default function AgendaPage() {
     useState(false);
   const [eventToPublish, setEventToPublish] =
     useState<EventItem | null>(null);
+
+  const [eventToDelete, setEventToDelete] =
+    useState<EventItem | null>(null);
+
+  /*
+   * Créer une réunion dans les Instances demande
+   * aussi l'autorisation « Scolarité ». Sans elle,
+   * la case n'est pas proposée.
+   */
+  const [canCreateInstance, setCanCreateInstance] =
+    useState(false);
 
   const [title, setTitle] = useState('');
   const [description, setDescription] =
@@ -149,7 +168,51 @@ export default function AgendaPage() {
 
   useEffect(() => {
     void loadEvents();
+
+    fetch('/api/auth/access', { cache: 'no-store' })
+      .then((response) => response.json())
+      .then((data) => {
+        setCanCreateInstance(
+          Array.isArray(data?.permissions) &&
+            data.permissions.includes('schooling')
+        );
+      })
+      .catch(() => setCanCreateInstance(false));
   }, []);
+
+  /*
+   * Touche Échap : ferme la fenêtre ouverte.
+   */
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key !== 'Escape') return;
+
+      if (eventToDelete) {
+        closeDeleteConfirmation();
+      } else if (showPublishModal) {
+        closePublishConfirmation();
+      } else if (showForm) {
+        closeForm();
+      }
+    }
+
+    window.addEventListener('keydown', onKeyDown);
+
+    return () =>
+      window.removeEventListener('keydown', onKeyDown);
+  });
+
+  const categories = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          events
+            .map((item) => (item.category || '').trim())
+            .filter(Boolean)
+        )
+      ).sort((a, b) => a.localeCompare(b, 'fr')),
+    [events]
+  );
 
   const filteredEvents = useMemo(() => {
     const value =
@@ -247,6 +310,18 @@ export default function AgendaPage() {
     event.preventDefault();
 
     setError('');
+
+    if (imageFile) {
+      if (!imageFile.type.startsWith('image/')) {
+        setError('Le fichier choisi n’est pas une image.');
+        return;
+      }
+
+      if (imageFile.size > MAX_IMAGE_SIZE) {
+        setError('L’image dépasse 8 Mo.');
+        return;
+      }
+    }
 
     /*
      * La création dans Instances concerne uniquement
@@ -379,10 +454,21 @@ export default function AgendaPage() {
           await instanceResponse.json();
 
         if (!instanceResponse.ok) {
-          throw new Error(
-            instanceData?.error ||
-              "L'événement a été créé dans l'Agenda, mais impossible de créer la réunion dans les Instances."
+          /*
+           * L'événement EST déjà enregistré : on ferme
+           * la fenêtre (sinon un 2e clic sur
+           * « Enregistrer » créerait un doublon) et on
+           * explique ce qui manque.
+           */
+          await loadEvents();
+          setShowForm(false);
+          resetForm();
+          setError(
+            `L’événement a bien été créé dans l’Agenda, mais pas la réunion dans les Instances : ${
+              instanceData?.error || 'erreur inconnue'
+            }. Crée-la directement depuis la page Instances.`
           );
+          return;
         }
       }
 
@@ -401,7 +487,7 @@ export default function AgendaPage() {
     }
   }
 
-  async function deleteEvent(
+  function openDeleteConfirmation(
     item: EventItem
   ) {
     if (
@@ -411,14 +497,22 @@ export default function AgendaPage() {
       return;
     }
 
-    const confirmed =
-      window.confirm(
-        `Supprimer l’événement « ${
-          item.title || 'Sans titre'
-        } » ?\n\nCette action est irréversible.`
-      );
+    setError('');
+    setEventToDelete(item);
+  }
 
-    if (!confirmed) {
+  function closeDeleteConfirmation() {
+    if (deletingId !== null) {
+      return;
+    }
+
+    setEventToDelete(null);
+  }
+
+  async function deleteEvent() {
+    const item = eventToDelete;
+
+    if (!item || deletingId !== null) {
       return;
     }
 
@@ -451,6 +545,7 @@ export default function AgendaPage() {
         );
       }
 
+      setEventToDelete(null);
       await loadEvents();
     } catch (err) {
       setError(
@@ -570,7 +665,10 @@ export default function AgendaPage() {
         </div>
       </div>
 
-      {error && (
+      {error &&
+        !showForm &&
+        !showPublishModal &&
+        !eventToDelete && (
         <div className="notice notice-error agenda-error">
           {error}
         </div>
@@ -741,10 +839,10 @@ export default function AgendaPage() {
                         </button>
 
                         <button
-                          className="btn"
+                          className="btn agenda-delete-button"
                           type="button"
                           onClick={() =>
-                            void deleteEvent(
+                            openDeleteConfirmation(
                               item
                             )
                           }
@@ -915,36 +1013,12 @@ export default function AgendaPage() {
                   />
 
                   <datalist id="agenda-categories">
-                    {Array.from(
-                      new Set(
-                        events
-                          .map(
-                            (item) =>
-                              (
-                                item.category ||
-                                ''
-                              ).trim()
-                          )
-                          .filter(
-                            Boolean
-                          )
-                      )
-                    )
-                      .sort(
-                        (a, b) =>
-                          a.localeCompare(
-                            b,
-                            'fr'
-                          )
-                      )
-                      .map(
-                        (item) => (
-                          <option
-                            key={item}
-                            value={item}
-                          />
-                        )
-                      )}
+                    {categories.map((item) => (
+                      <option
+                        key={item}
+                        value={item}
+                      />
+                    ))}
                   </datalist>
 
                   <div className="agenda-help">
@@ -1024,7 +1098,7 @@ export default function AgendaPage() {
                 )}
               </div>
 
-              {editingId === null && (
+              {editingId === null && canCreateInstance && (
                 <div className="agenda-instance-section">
                   <label className="agenda-instance-checkbox">
                     <input
@@ -1048,9 +1122,7 @@ export default function AgendaPage() {
                     />
 
                     <span>
-                      <span>
-                       Créer également la réunion dans les Instances ?
-                      </span>
+                      Créer également la réunion dans les Instances ?
                     </span>
                   </label>
 
@@ -1213,6 +1285,12 @@ export default function AgendaPage() {
                 </span>
               </div>
 
+              {error && (
+                <div className="notice notice-error agenda-confirm-error">
+                  {error}
+                </div>
+              )}
+
               <div className="agenda-confirm-actions">
                 <button
                   className="btn"
@@ -1251,6 +1329,70 @@ export default function AgendaPage() {
           </div>
         )}
 
+      {eventToDelete && (
+        <div
+          className="agenda-modal-backdrop"
+          role="dialog"
+          aria-modal="true"
+        >
+          <div className="card agenda-confirm-card">
+            <div className="agenda-confirm-icon agenda-confirm-icon-danger">
+              <Trash2 size={24} />
+            </div>
+
+            <h2 className="section-title">
+              Supprimer l’événement ?
+            </h2>
+
+            <div className="agenda-confirm-event">
+              <strong>
+                {eventToDelete.title || 'Sans titre'}
+              </strong>
+
+              <span>
+                {formatDate(eventToDelete.event_date)}
+                {eventToDelete.start_time
+                  ? ` · ${eventToDelete.start_time}`
+                  : ''}
+              </span>
+            </div>
+
+            <p className="agenda-confirm-text">
+              Cette action est irréversible.
+            </p>
+
+            {error && (
+              <div className="notice notice-error agenda-confirm-error">
+                {error}
+              </div>
+            )}
+
+            <div className="agenda-confirm-actions">
+              <button
+                className="btn"
+                type="button"
+                onClick={closeDeleteConfirmation}
+                disabled={deletingId !== null}
+              >
+                Annuler
+              </button>
+
+              <button
+                className="btn btn-danger-solid"
+                type="button"
+                onClick={() => void deleteEvent()}
+                disabled={deletingId !== null}
+              >
+                <Trash2 size={14} />
+                {deletingId !== null
+                  ? 'Suppression…'
+                  : 'Supprimer'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <style jsx>{`
         .agenda-card {
           min-width: 0;
@@ -1265,7 +1407,7 @@ export default function AgendaPage() {
           position: relative;
         }
 
-        .agenda-search-wrap > svg {
+        .agenda-search-wrap > :global(svg) {
           position: absolute;
           left: 11px;
           top: 50%;
@@ -1368,7 +1510,7 @@ export default function AgendaPage() {
           line-height: 1 !important;
         }
 
-        .agenda-item-actions .btn:nth-child(2) {
+        .agenda-item-actions .agenda-delete-button {
           color: #8a2b22 !important;
           border-color: #efc8c4 !important;
         }
@@ -1503,6 +1645,8 @@ export default function AgendaPage() {
         }
 
         .agenda-instance-checkbox {
+          justify-self: end;
+          text-align: right;
           display: flex;
           align-items: flex-start;
           gap: 9px;
@@ -1565,6 +1709,25 @@ export default function AgendaPage() {
           margin-bottom: 16px;
         }
 
+        .agenda-confirm-icon-danger {
+          background: #fff0ee;
+          color: #8a2b22;
+        }
+
+        .agenda-confirm-error {
+          margin-top: 14px;
+        }
+
+        .btn-danger-solid {
+          background: #8a2b22 !important;
+          border-color: #8a2b22 !important;
+          color: #fff !important;
+        }
+
+        .btn-danger-solid:hover {
+          background: #6f1f18 !important;
+        }
+
         .agenda-confirm-text {
           margin: 10px 0 12px;
           color: var(--gipe-muted);
@@ -1612,6 +1775,14 @@ export default function AgendaPage() {
           justify-content: flex-end;
           gap: 10px;
           margin-top: 20px;
+        }
+
+        .agenda-confirm-actions .btn {
+          display: inline-flex;
+          flex-direction: row;
+          align-items: center;
+          justify-content: center;
+          gap: 7px;
         }
 
         @media (max-width: 900px) {

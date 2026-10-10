@@ -581,7 +581,7 @@ export async function PUT(
         'internal_agenda_events'
       )
       .select(
-        'id,image_url'
+        'id,image_url,published_on_site'
       )
       .eq(
         'id',
@@ -606,6 +606,20 @@ export async function PUT(
             'Événement introuvable.',
         },
         { status: 404 }
+      )
+    }
+
+    /*
+     * Un événement déjà envoyé sur le site se gère
+     * depuis Site internet → Agenda.
+     */
+    if (existing.published_on_site) {
+      return NextResponse.json(
+        {
+          error:
+            'Cet événement a déjà été envoyé sur le site : modifie-le ou supprime-le depuis Site internet → Agenda.',
+        },
+        { status: 409 }
       )
     }
 
@@ -745,7 +759,7 @@ export async function DELETE(
         'internal_agenda_events'
       )
       .select(
-        'id,image_url'
+        'id,image_url,published_on_site'
       )
       .eq(
         'id',
@@ -770,6 +784,20 @@ export async function DELETE(
             'Événement introuvable.',
         },
         { status: 404 }
+      )
+    }
+
+    /*
+     * Un événement déjà envoyé sur le site se gère
+     * depuis Site internet → Agenda.
+     */
+    if (existing.published_on_site) {
+      return NextResponse.json(
+        {
+          error:
+            'Cet événement a déjà été envoyé sur le site : modifie-le ou supprime-le depuis Site internet → Agenda.',
+        },
+        { status: 409 }
       )
     }
 

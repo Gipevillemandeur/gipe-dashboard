@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { requireOfficePermission } from '@/lib/office-auth'
+import { requireOfficeAccess } from '@/lib/office-auth'
 
 const MEETING_TYPES = [
   'Réunion GIPE',
@@ -39,8 +39,15 @@ function handlePermissionError(error: unknown) {
 
 export async function POST(request: Request) {
   try {
-    await requireOfficePermission('agenda')
-    await requireOfficePermission('schooling')
+    // Il faut à la fois « Agenda » et « Scolarité ».
+    const access = await requireOfficeAccess()
+
+    if (
+      !access.permissions.includes('agenda') ||
+      !access.permissions.includes('schooling')
+    ) {
+      throw new Error('OFFICE_PERMISSION_DENIED')
+    }
 
     const body = (await request.json()) as {
       eventId?: unknown
