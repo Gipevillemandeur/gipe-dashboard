@@ -77,6 +77,24 @@ export default function ConfigurationPage() {
   const [error, setError] =
     useState('');
 
+  /*
+   * Clôture de l'année : réservée au Président
+   * (et au SUPER ADMIN).
+   */
+  const [canCloseYear, setCanCloseYear] =
+    useState(false);
+
+  useEffect(() => {
+    fetch('/api/auth/access', { cache: 'no-store' })
+      .then((response) => response.json())
+      .then((data) => {
+        setCanCloseYear(
+          Boolean(data?.isPresident || data?.isSuperAdmin)
+        );
+      })
+      .catch(() => setCanCloseYear(false));
+  }, []);
+
   useEffect(() => {
     async function loadConfiguration() {
       try {
@@ -650,14 +668,26 @@ export default function ConfigurationPage() {
               </span>
             </div>
 
-            <button
-              type="button"
-              className="btn btn-primary"
-              onClick={openClosure}
-              disabled={!schoolYear}
-            >
-              Clôturer l’année
-            </button>
+            {canCloseYear ? (
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={openClosure}
+                disabled={!schoolYear}
+              >
+                Clôturer l’année
+              </button>
+            ) : (
+              <span
+                style={{
+                  fontSize: 12,
+                  color: '#64748b',
+                  fontStyle: 'italic',
+                }}
+              >
+                Clôture réservée au Président
+              </span>
+            )}
           </div>
         </div>
       </div>

@@ -8,7 +8,24 @@ import {
 
 async function requireConfigurationAccess() {
   try {
-    await requireOfficePermission('configuration');
+    const access =
+      await requireOfficePermission('configuration');
+
+    /*
+     * La clôture de l'année est réservée au
+     * Président (et au SUPER ADMIN).
+     */
+    if (!access.isPresident && !access.isSuperAdmin) {
+      return {
+        error: NextResponse.json(
+          {
+            error:
+              'Seul le Président peut clôturer l’année scolaire.',
+          },
+          { status: 403 }
+        ),
+      };
+    }
 
     return {};
   } catch (error) {
