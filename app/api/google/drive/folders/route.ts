@@ -1,6 +1,12 @@
 import { NextResponse } from 'next/server'
 import { requireOfficePermission } from '@/lib/office-auth'
-import { getGoogleAccessToken } from '@/lib/google-drive'
+import {
+  DRIVE_FOLDER_MIME,
+  driveErrorResponse,
+  getGoogleAccessToken,
+  isValidDriveId,
+  readGoogleError,
+} from '@/lib/google-drive'
 
 type GoogleDriveFolder = {
   id: string
@@ -11,109 +17,68 @@ type GoogleDriveFolder = {
   webViewLink?: string
 }
 
-type GoogleDriveResponse = {
-  files?: GoogleDriveFolder[]
-  nextPageToken?: string
-  error?: {
-    message?: string
-  }
-}
-
-type GoogleDriveCreateResponse = {
-  id?: string
-  name?: string
-  mimeType?: string
-  modifiedTime?: string
-  parents?: string[]
-  webViewLink?: string
-  error?: {
-    message?: string
-  }
-}
-
 /**
- * Récupération des dossiers.
+ * Récupération des sous-dossiers d'un dossier.
  */
 export async function GET(request: Request) {
   try {
     await requireOfficePermission('drive')
 
-    const accessToken =
-      await getGoogleAccessToken()
-
-    const requestUrl =
-      new URL(request.url)
-
     const parentId =
-      requestUrl.searchParams.get(
-        'parentId'
-      ) || 'root'
+      new URL(request.url).searchParams.get('parentId') || 'root'
 
-    const url =
-      new URL(
-        'https://www.googleapis.com/drive/v3/files'
-      )
-
-    url.searchParams.set(
-      'q',
-      `'${parentId}' in parents and mimeType = 'application/vnd.google-apps.folder' and trashed = false`
-    )
-
-    url.searchParams.set(
-      'pageSize',
-      '100'
-    )
-
-    url.searchParams.set(
-      'orderBy',
-      'name'
-    )
-
-    url.searchParams.set(
-      'fields',
-      'files(id,name,mimeType,modifiedTime,parents,webViewLink),nextPageToken'
-    )
-
-    const driveResponse =
-      await fetch(
-        url.toString(),
-        {
-          headers: {
-            Authorization:
-              `Bearer ${accessToken}`,
-          },
-          cache: 'no-store',
-        }
-      )
-
-    const driveData =
-      (await driveResponse.json()) as GoogleDriveResponse
-
-    if (!driveResponse.ok) {
-      console.error(
-        'Erreur Google Drive:',
-        driveData
-      )
-
+    if (!isValidDriveId(parentId)) {
       return NextResponse.json(
-        {
-          error:
-            driveData?.error?.message ||
-            'Impossible de récupérer les dossiers du Google Drive.',
-        },
-        {
-          status:
-            driveResponse.status || 500,
-        }
+        { error: 'Identifiant de dossier invalide.' },
+        { status: 400 }
       )
     }
 
+    const accessToken = await getGoogleAccessToken()
+
+    const url = new URL('https://www.googleapis.com/drive/v3/files')
+
+    url.searchParams.set(
+      'q',
+      `'${parentId}' in parents and mimeType = '${DRIVE_FOLDER_MIME}' and trashed = false`
+    )
+    url.searchParams.set('pageSize', '1000')
+    url.searchParams.set('orderBy', 'name')
+    url.searchParams.set(
+      'fields',
+      'files(id,name,mimeType,modifiedTime,parents,webViewLink)'
+    )
+    url.searchParams.set('supportsAllDrives', 'true')
+    url.searchParams.set('includeItemsFromAllDrives', 'true')
+
+    const driveResponse = await fetch(url.toString(), {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+      cache: 'no-store',
+    })
+
+    if (!driveResponse.ok) {
+      const message = await readGoogleError(
+        driveResponse,
+        'Impossible de récupérer les dossiers du Google Drive.'
+      )
+
+      return NextResponse.json(
+        { error: message },
+        { status: driveResponse.status || 500 }
+      )
+    }
+
+    const driveData = (await driveResponse.json()) as {
+      files?: GoogleDriveFolder[]
+    }
+
     return NextResponse.json({
-      folders:
-        driveData.files || [],
+      folders: driveData.files || [],
     })
   } catch (error) {
-    return handleDriveError(
+    return driveErrorResponse(
       error,
       'Impossible de récupérer les dossiers Google Drive.'
     )
@@ -123,153 +88,77 @@ export async function GET(request: Request) {
 /**
  * Création d'un dossier.
  */
-export async function POST(
-  request: Request
-) {
+export async function POST(request: Request) {
   try {
     await requireOfficePermission('drive')
 
-    const body =
-      (await request.json()) as {
-        name?: string
-        parentId?: string
-      }
+    const body = (await request.json().catch(() => ({}))) as {
+      name?: string
+      parentId?: string
+    }
 
-    const name =
-      body.name?.trim()
-
-    const parentId =
-      body.parentId?.trim() ||
-      'root'
+    const name = body.name?.trim()
+    const parentId = body.parentId?.trim() || 'root'
 
     if (!name) {
       return NextResponse.json(
-        {
-          error:
-            'Le nom du dossier est obligatoire.',
-        },
+        { error: 'Le nom du dossier est obligatoire.' },
         { status: 400 }
       )
     }
 
-    const accessToken =
-      await getGoogleAccessToken()
-
-    const driveResponse =
-      await fetch(
-        'https://www.googleapis.com/drive/v3/files?fields=id,name,mimeType,modifiedTime,parents,webViewLink',
-        {
-          method: 'POST',
-          headers: {
-            Authorization:
-              `Bearer ${accessToken}`,
-            'Content-Type':
-              'application/json',
-          },
-          body: JSON.stringify({
-            name,
-            mimeType:
-              'application/vnd.google-apps.folder',
-            parents: [parentId],
-          }),
-          cache: 'no-store',
-        }
+    if (name.length > 200) {
+      return NextResponse.json(
+        { error: 'Le nom du dossier est trop long.' },
+        { status: 400 }
       )
+    }
 
-    const driveData =
-      (await driveResponse.json()) as GoogleDriveCreateResponse
+    if (!isValidDriveId(parentId)) {
+      return NextResponse.json(
+        { error: 'Identifiant de dossier invalide.' },
+        { status: 400 }
+      )
+    }
+
+    const accessToken = await getGoogleAccessToken()
+
+    const driveResponse = await fetch(
+      'https://www.googleapis.com/drive/v3/files?supportsAllDrives=true&fields=id,name,mimeType,modifiedTime,parents,webViewLink',
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name,
+          mimeType: DRIVE_FOLDER_MIME,
+          parents: [parentId],
+        }),
+        cache: 'no-store',
+      }
+    )
 
     if (!driveResponse.ok) {
-      console.error(
-        'Erreur création dossier Google Drive:',
-        driveData
+      const message = await readGoogleError(
+        driveResponse,
+        'Impossible de créer le dossier dans Google Drive.'
       )
 
       return NextResponse.json(
-        {
-          error:
-            driveData?.error?.message ||
-            'Impossible de créer le dossier dans Google Drive.',
-        },
-        {
-          status:
-            driveResponse.status || 500,
-        }
+        { error: message },
+        { status: driveResponse.status || 500 }
       )
     }
+
+    const folder = (await driveResponse.json()) as GoogleDriveFolder
 
     return NextResponse.json({
       success: true,
-      folder: driveData,
+      folder,
     })
   } catch (error) {
-    return handleDriveError(
-      error,
-      'Impossible de créer le dossier Google Drive.'
-    )
+    return driveErrorResponse(error, 'Impossible de créer le dossier Google Drive.')
   }
-}
-
-/**
- * Gestion commune des erreurs.
- */
-function handleDriveError(
-  error: unknown,
-  fallbackMessage: string
-) {
-  if (error instanceof Error) {
-    if (
-      error.message ===
-      'AUTHENTICATION_REQUIRED'
-    ) {
-      return NextResponse.json(
-        {
-          error:
-            'Non authentifié.',
-        },
-        { status: 401 }
-      )
-    }
-
-    if (
-      error.message ===
-        'OFFICE_ACCESS_DENIED' ||
-      error.message ===
-        'OFFICE_PERMISSION_DENIED'
-    ) {
-      return NextResponse.json(
-        {
-          error:
-            'Compte non autorisé.',
-        },
-        { status: 403 }
-      )
-    }
-
-    console.error(
-      'Erreur API Google Drive:',
-      error
-    )
-
-    return NextResponse.json(
-      {
-        error:
-          error.message ||
-          fallbackMessage,
-      },
-      { status: 500 }
-    )
-  }
-
-  console.error(
-    'Erreur API Google Drive:',
-    error
-  )
-
-  return NextResponse.json(
-    {
-      error: fallbackMessage,
-    },
-    { status: 500 }
-  )
 }

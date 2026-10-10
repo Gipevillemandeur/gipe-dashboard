@@ -11,6 +11,7 @@ import {
   FileText,
   Folder,
   FolderOpen,
+  Link2,
   Loader2,
   Plus,
   RefreshCw,
@@ -76,6 +77,97 @@ function formatDate(date?: string) {
   }).format(parsed);
 }
 
+/*
+ * Fichiers Google qu'on sait convertir pour le téléchargement
+ * (Docs → Word, Sheets → Excel, Slides → PowerPoint, Dessin → PDF).
+ */
+const EXPORTABLE_GOOGLE_TYPES = new Set([
+  'application/vnd.google-apps.document',
+  'application/vnd.google-apps.spreadsheet',
+  'application/vnd.google-apps.presentation',
+  'application/vnd.google-apps.drawing',
+]);
+
+function isDownloadable(mimeType: string) {
+  return (
+    !mimeType.startsWith('application/vnd.google-apps.') ||
+    EXPORTABLE_GOOGLE_TYPES.has(mimeType)
+  );
+}
+
+// Lit la réponse JSON sans planter si le serveur renvoie autre chose.
+async function readJson(response: Response) {
+  try {
+    return await response.json();
+  } catch {
+    return {};
+  }
+}
+
+// Messages affichés au retour de la connexion Google.
+const GOOGLE_NOTICES: Record<string, { ok: boolean; text: string }> = {
+  connected: { ok: true, text: 'Google Drive est bien connecté.' },
+  cancelled: { ok: false, text: 'Connexion à Google annulée.' },
+  forbidden: { ok: false, text: 'Seul le Président peut connecter le Google Drive.' },
+  invalid_state: { ok: false, text: 'La connexion a expiré ou a été interrompue. Réessaie.' },
+  no_refresh_token: {
+    ok: false,
+    text: 'Google n’a pas donné d’accès durable. Réessaie la connexion.',
+  },
+  config_error: {
+    ok: false,
+    text: 'Configuration Google manquante sur Vercel (GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET).',
+  },
+  token_error: { ok: false, text: 'Google a refusé la connexion. Réessaie.' },
+  save_error: { ok: false, text: 'La connexion n’a pas pu être enregistrée. Réessaie.' },
+  error: { ok: false, text: 'Erreur pendant la connexion à Google. Réessaie.' },
+};
+
+type DriveConnection = {
+  connected: boolean;
+  email: string | null;
+  canManage: boolean;
+};
+
+/*
+ * Envoi direct du fichier du navigateur vers Google,
+ * avec suivi de la progression.
+ */
+function sendFileToGoogle(
+  uploadUrl: string,
+  file: File,
+  onProgress: (percent: number) => void
+): Promise<{ ok: boolean; networkError: boolean }> {
+  return new Promise((resolve) => {
+    const xhr = new XMLHttpRequest();
+
+    xhr.open('PUT', uploadUrl);
+    xhr.setRequestHeader(
+      'Content-Type',
+      file.type || 'application/octet-stream'
+    );
+
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable) {
+        onProgress(Math.round((event.loaded / event.total) * 100));
+      }
+    };
+
+    xhr.onload = () =>
+      resolve({
+        ok: xhr.status >= 200 && xhr.status < 300,
+        networkError: false,
+      });
+
+    xhr.onerror = () => resolve({ ok: false, networkError: true });
+
+    xhr.send(file);
+  });
+}
+
+// Envoi « de secours » par le serveur : petits fichiers seulement.
+const SERVER_UPLOAD_LIMIT = 4 * 1024 * 1024;
+
 export default function DocumentsPage() {
   const [files, setFiles] = useState<DriveFile[]>([]);
   const [loading, setLoading] = useState(true);
@@ -122,8 +214,37 @@ export default function DocumentsPage() {
   const [deleteError, setDeleteError] =
     useState('');
 
+  const [uploadProgress, setUploadProgress] =
+    useState<number | null>(null);
+
+  const [connection, setConnection] =
+    useState<DriveConnection | null>(null);
+
+  const [driveNotConnected, setDriveNotConnected] =
+    useState(false);
+
+  const [notice, setNotice] = useState<{
+    ok: boolean;
+    text: string;
+  } | null>(null);
+
   const fileInputRef =
     useRef<HTMLInputElement | null>(null);
+
+  async function loadConnection() {
+    try {
+      const response = await fetch(
+        '/api/google/drive/status',
+        { cache: 'no-store' }
+      );
+
+      if (response.ok) {
+        setConnection(await readJson(response));
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  }
 
   async function loadFiles(
     folderId = currentFolderId
@@ -141,15 +262,20 @@ export default function DocumentsPage() {
         }
       );
 
-      const data = await response.json();
+      const data = await readJson(response);
 
       if (!response.ok) {
+        setDriveNotConnected(
+          data?.code === 'DRIVE_NOT_CONNECTED'
+        );
+
         throw new Error(
           data?.error ||
             'Impossible de récupérer les fichiers.'
         );
       }
 
+      setDriveNotConnected(false);
       setFiles(data.files || []);
     } catch (err) {
       console.error(err);
@@ -166,6 +292,22 @@ export default function DocumentsPage() {
 
   useEffect(() => {
     loadFiles('root');
+    loadConnection();
+
+    /*
+     * Retour de Google après une connexion :
+     * on affiche le message puis on nettoie l'adresse.
+     */
+    const params = new URLSearchParams(window.location.search);
+    const google = params.get('google');
+
+    if (google) {
+      setNotice(
+        GOOGLE_NOTICES[google] || GOOGLE_NOTICES.error
+      );
+      window.history.replaceState(null, '', '/documents');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function openFolder(folder: DriveFile) {
@@ -205,6 +347,29 @@ export default function DocumentsPage() {
     setUploadSuccess('');
 
     loadFiles(previous.id);
+  }
+
+  function goToHistory(index: number) {
+    const target = folderHistory[index];
+
+    if (!target) return;
+
+    if (index === 0) {
+      goToRoot();
+      return;
+    }
+
+    setFolderHistory((history) =>
+      history.slice(0, index)
+    );
+
+    setCurrentFolderId(target.id);
+    setCurrentFolderName(target.name);
+    setSearch('');
+    setUploadError('');
+    setUploadSuccess('');
+
+    loadFiles(target.id);
   }
 
   function goToRoot() {
@@ -261,7 +426,7 @@ export default function DocumentsPage() {
         }
       );
 
-      const data = await response.json();
+      const data = await readJson(response);
 
       if (!response.ok) {
         throw new Error(
@@ -307,35 +472,95 @@ export default function DocumentsPage() {
       return;
     }
 
+    if (file.size === 0) {
+      setUploadError('Le fichier est vide.');
+      return;
+    }
+
     try {
       setUploadingFile(true);
+      setUploadProgress(0);
       setUploadError('');
       setUploadSuccess('');
 
-      const formData = new FormData();
-
-      formData.append('file', file);
-
-      formData.append(
-        'parentId',
-        currentFolderId
-      );
-
-      const response = await fetch(
+      /*
+       * 1) Le serveur ouvre une session d'envoi chez Google.
+       */
+      const prepareResponse = await fetch(
         '/api/google/drive/upload',
         {
           method: 'POST',
-          body: formData,
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            action: 'prepare',
+            name: file.name,
+            mimeType:
+              file.type ||
+              'application/octet-stream',
+            size: file.size,
+            parentId: currentFolderId,
+          }),
         }
       );
 
-      const data = await response.json();
+      const prepared = await readJson(prepareResponse);
 
-      if (!response.ok) {
+      if (!prepareResponse.ok || !prepared?.uploadUrl) {
+        if (prepared?.code === 'DRIVE_NOT_CONNECTED') {
+          setDriveNotConnected(true);
+        }
+
         throw new Error(
-          data?.error ||
-            'Impossible d’importer le fichier.'
+          prepared?.error ||
+            'Impossible de préparer l’envoi du fichier.'
         );
+      }
+
+      /*
+       * 2) Le navigateur envoie le fichier directement à Google.
+       */
+      const direct = await sendFileToGoogle(
+        prepared.uploadUrl,
+        file,
+        setUploadProgress
+      );
+
+      if (!direct.ok) {
+        /*
+         * Envoi direct bloqué (réseau, navigateur…) :
+         * pour un petit fichier, on repasse par le serveur.
+         */
+        if (
+          direct.networkError &&
+          file.size <= SERVER_UPLOAD_LIMIT
+        ) {
+          const formData = new FormData();
+          formData.append('file', file);
+          formData.append('parentId', currentFolderId);
+
+          const response = await fetch(
+            '/api/google/drive/upload',
+            {
+              method: 'POST',
+              body: formData,
+            }
+          );
+
+          const data = await readJson(response);
+
+          if (!response.ok) {
+            throw new Error(
+              data?.error ||
+                'Impossible d’importer le fichier.'
+            );
+          }
+        } else {
+          throw new Error(
+            'L’envoi du fichier vers Google Drive a échoué. Vérifie ta connexion internet et réessaie.'
+          );
+        }
       }
 
       setUploadSuccess(
@@ -353,6 +578,7 @@ export default function DocumentsPage() {
       );
     } finally {
       setUploadingFile(false);
+      setUploadProgress(null);
     }
   }
 
@@ -386,7 +612,7 @@ export default function DocumentsPage() {
         }
       );
 
-      const data = await response.json();
+      const data = await readJson(response);
 
       if (!response.ok) {
         throw new Error(
@@ -404,6 +630,11 @@ export default function DocumentsPage() {
           (file) =>
             file.id !== deletingItem.id
         )
+      );
+
+      setUploadError('');
+      setUploadSuccess(
+        `« ${deletingItem.name} » a été placé dans la corbeille de Google Drive (récupérable pendant 30 jours).`
       );
 
       setDeletingItem(null);
@@ -473,6 +704,29 @@ export default function DocumentsPage() {
                 Gestion des fichiers et dossiers
                 de l’association
               </p>
+
+              {connection && (
+                <div className="documents-connection">
+                  <Link2 size={14} />
+
+                  <span>
+                    {connection.connected
+                      ? `Relié au compte ${connection.email || 'Google'}`
+                      : 'Aucun compte Google relié'}
+                  </span>
+
+                  {connection.canManage && (
+                    <a
+                      href="/api/google/drive/connect"
+                      className="documents-connection-link"
+                    >
+                      {connection.connected
+                        ? 'Changer / reconnecter'
+                        : 'Connecter'}
+                    </a>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 
@@ -507,7 +761,9 @@ export default function DocumentsPage() {
 
               <span>
                 {uploadingFile
-                  ? 'Import en cours...'
+                  ? uploadProgress
+                    ? `Import… ${uploadProgress} %`
+                    : 'Import en cours...'
                   : 'Importer un fichier'}
               </span>
             </button>
@@ -522,6 +778,32 @@ export default function DocumentsPage() {
         </div>
 
         <div className="documents-content">
+          {notice && (
+            <div
+              className={`documents-message ${
+                notice.ok
+                  ? 'documents-message-success'
+                  : 'documents-message-error'
+              }`}
+            >
+              {notice.ok ? (
+                <Check size={18} />
+              ) : (
+                <AlertCircle size={18} />
+              )}
+
+              <span>{notice.text}</span>
+
+              <button
+                type="button"
+                onClick={() => setNotice(null)}
+                aria-label="Fermer"
+              >
+                <X size={16} />
+              </button>
+            </div>
+          )}
+
           {uploadSuccess && (
             <div className="documents-message documents-message-success">
               <Check size={18} />
@@ -583,17 +865,41 @@ export default function DocumentsPage() {
                 Mon Drive
               </button>
 
+              {folderHistory.slice(1).map(
+                (item, index) => (
+                  <span
+                    key={item.id}
+                    className="documents-breadcrumb-step"
+                  >
+                    <ChevronRight
+                      size={16}
+                      className="documents-breadcrumb-separator"
+                    />
+
+                    <button
+                      type="button"
+                      className="documents-breadcrumb-root"
+                      onClick={() =>
+                        goToHistory(index + 1)
+                      }
+                    >
+                      {item.name}
+                    </button>
+                  </span>
+                )
+              )}
+
               {currentFolderId !== 'root' && (
-                <>
+                <span className="documents-breadcrumb-step">
                   <ChevronRight
                     size={16}
                     className="documents-breadcrumb-separator"
                   />
 
-                  <span>
+                  <span className="documents-breadcrumb-current">
                     {currentFolderName}
                   </span>
-                </>
+                </span>
               )}
             </div>
 
@@ -649,16 +955,33 @@ export default function DocumentsPage() {
 
               <p>{error}</p>
 
-              <button
-                type="button"
-                onClick={() =>
-                  loadFiles(
-                    currentFolderId
-                  )
-                }
-              >
-                Réessayer
-              </button>
+              {driveNotConnected ? (
+                connection?.canManage ? (
+                  <a
+                    href="/api/google/drive/connect"
+                    className="documents-connect-button"
+                  >
+                    <Link2 size={17} />
+                    Connecter Google Drive
+                  </a>
+                ) : (
+                  <p className="documents-state-help">
+                    Préviens le Président : il peut
+                    reconnecter le Drive depuis cette page.
+                  </p>
+                )
+              ) : (
+                <button
+                  type="button"
+                  onClick={() =>
+                    loadFiles(
+                      currentFolderId
+                    )
+                  }
+                >
+                  Réessayer
+                </button>
+              )}
             </div>
           ) : filteredFiles.length === 0 ? (
             <div className="documents-empty">
@@ -816,18 +1139,28 @@ export default function DocumentsPage() {
                               </a>
                             )}
 
-                            <a
-                              href={getDownloadUrl(
-                                file
-                              )}
-                              className="documents-download-button"
-                              title="Télécharger"
-                              aria-label={`Télécharger ${file.name}`}
-                            >
-                              <Download
-                                size={16}
-                              />
-                            </a>
+                            {isDownloadable(
+                              file.mimeType
+                            ) && (
+                              <a
+                                href={getDownloadUrl(
+                                  file
+                                )}
+                                className="documents-download-button"
+                                title={
+                                  EXPORTABLE_GOOGLE_TYPES.has(
+                                    file.mimeType
+                                  )
+                                    ? 'Télécharger (converti en Word / Excel / PowerPoint / PDF)'
+                                    : 'Télécharger'
+                                }
+                                aria-label={`Télécharger ${file.name}`}
+                              >
+                                <Download
+                                  size={16}
+                                />
+                              </a>
+                            )}
 
                             <button
                               type="button"
@@ -1016,8 +1349,8 @@ export default function DocumentsPage() {
                 </h2>
 
                 <p>
-                  Cette action sera effectuée
-                  directement dans Google Drive.
+                  L’élément sera placé dans la
+                  corbeille de Google Drive.
                 </p>
               </div>
 
@@ -1044,17 +1377,19 @@ export default function DocumentsPage() {
                   {deletingItem.mimeType ===
                     'application/vnd.google-apps.folder' && (
                     <p>
-                      Attention : la suppression
-                      d’un dossier peut également
-                      supprimer son contenu.
+                      Le dossier et tout son contenu
+                      iront dans la corbeille de Google
+                      Drive. Ils restent récupérables
+                      pendant 30 jours depuis Google Drive.
                     </p>
                   )}
 
                   {deletingItem.mimeType !==
                     'application/vnd.google-apps.folder' && (
                     <p>
-                      Ce fichier sera supprimé
-                      de Google Drive.
+                      Le fichier ira dans la corbeille
+                      de Google Drive. Il reste
+                      récupérable pendant 30 jours.
                     </p>
                   )}
                 </div>
@@ -1299,6 +1634,70 @@ export default function DocumentsPage() {
           overflow: hidden;
           text-overflow: ellipsis;
           white-space: nowrap;
+        }
+
+        .documents-breadcrumb {
+          flex-wrap: wrap;
+        }
+
+        .documents-breadcrumb-step {
+          display: inline-flex;
+          align-items: center;
+          gap: 7px;
+          max-width: 100%;
+        }
+
+        .documents-breadcrumb-step .documents-breadcrumb-root,
+        .documents-breadcrumb-current {
+          max-width: 220px;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+
+        .documents-connection {
+          display: inline-flex;
+          flex-wrap: wrap;
+          align-items: center;
+          gap: 6px;
+          margin-top: 8px;
+          padding: 4px 10px;
+          border: 1px solid #eee4db;
+          border-radius: 999px;
+          background: #fff7ee;
+          color: #655b54;
+          font-size: 12px;
+          font-weight: 650;
+        }
+
+        .documents-connection-link {
+          color: #8f211c;
+          font-weight: 750;
+          text-decoration: underline;
+        }
+
+        .documents-connect-button {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          margin-top: 4px;
+          padding: 10px 16px;
+          border-radius: 10px;
+          background: #8f211c;
+          color: #ffffff;
+          font-size: 14px;
+          font-weight: 750;
+          text-decoration: none;
+        }
+
+        .documents-connect-button:hover {
+          background: #7a1c18;
+        }
+
+        .documents-state-help {
+          max-width: 420px;
+          color: #655b54;
+          font-size: 13px;
         }
 
         .documents-back-button {
@@ -1771,6 +2170,17 @@ export default function DocumentsPage() {
         }
 
         @media (max-width: 700px) {
+          .documents-connection {
+            display: flex;
+            border-radius: 10px;
+            padding: 7px 10px;
+            gap: 2px 8px;
+          }
+
+          .documents-connection :global(svg) {
+            display: none;
+          }
+
           .documents-drive-header {
             padding: 18px;
             gap: 16px;

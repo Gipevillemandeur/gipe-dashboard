@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
-import { requireOfficePermission } from '@/lib/office-auth';
+import { getOfficeAccess } from '@/lib/office-auth';
 import { createAdminClient } from '@/lib/supabase/admin';
 
 type GoogleTokenResponse = {
@@ -17,228 +16,149 @@ type GoogleUserInfo = {
   email?: string;
 };
 
-export async function GET(
-  request: Request
-) {
+const STATE_COOKIE = 'gipe_drive_oauth_state';
+
+/*
+ * Retour de Google après la connexion du Drive.
+ * Enregistre le jeton durable : il remplace l'ancienne
+ * connexion pour toute l'association.
+ */
+export async function GET(request: Request) {
+  const back = (status: string) => {
+    const response = NextResponse.redirect(
+      new URL(`/documents?google=${status}`, request.url)
+    );
+
+    response.cookies.set(STATE_COOKIE, '', {
+      path: '/api/google/drive',
+      maxAge: 0,
+    });
+
+    return response;
+  };
+
   try {
     const url = new URL(request.url);
+    const code = url.searchParams.get('code');
+    const state = url.searchParams.get('state');
+    const googleError = url.searchParams.get('error');
 
-    const code =
-      url.searchParams.get('code');
-
-    const error =
-      url.searchParams.get('error');
-
-    if (error) {
-      console.error(
-        'Google OAuth refusé:',
-        error
-      );
-
-      return NextResponse.redirect(
-        new URL(
-          '/documents?google=cancelled',
-          request.url
-        )
-      );
+    if (googleError) {
+      console.error('Google OAuth refusé:', googleError);
+      return back('cancelled');
     }
 
-    if (!code) {
-      return NextResponse.redirect(
-        new URL(
-          '/documents?google=missing_code',
-          request.url
-        )
-      );
+    const cookieHeader = request.headers.get('cookie') || '';
+    const expectedState = cookieHeader
+      .split(';')
+      .map((part) => part.trim())
+      .find((part) => part.startsWith(`${STATE_COOKIE}=`))
+      ?.slice(STATE_COOKIE.length + 1);
+
+    if (!code || !state || !expectedState || state !== expectedState) {
+      return back('invalid_state');
     }
 
-    const supabase =
-      await createClient();
+    const access = await getOfficeAccess();
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.redirect(
-        new URL('/login', request.url)
-      );
-    }
-    try {
-      await requireOfficePermission('drive')
-    } catch (error) {
-      if (error instanceof Error && error.message === 'AUTHENTICATION_REQUIRED') {
-        return NextResponse.redirect(new URL('/login', request.url))
-      }
-      if (error instanceof Error && (error.message === 'OFFICE_ACCESS_DENIED' || error.message === 'OFFICE_PERMISSION_DENIED')) {
-        return NextResponse.json({ error: 'Compte non autorisé.' }, { status: 403 })
-      }
-      throw error
+    if (!access.authenticated) {
+      return NextResponse.redirect(new URL('/login', request.url));
     }
 
-    const clientId =
-      process.env.GOOGLE_CLIENT_ID;
+    if (!access.authorized || !access.userId || !(access.isPresident || access.isSuperAdmin)) {
+      return back('forbidden');
+    }
 
-    const clientSecret =
-      process.env.GOOGLE_CLIENT_SECRET;
+    const clientId = process.env.GOOGLE_CLIENT_ID;
+    const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
 
-    if (
-      !clientId ||
-      !clientSecret
-    ) {
-      return NextResponse.json(
+    if (!clientId || !clientSecret) {
+      return back('config_error');
+    }
+
+    const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({
+        code,
+        client_id: clientId,
+        client_secret: clientSecret,
+        redirect_uri: `${url.origin}/api/google/drive/callback`,
+        grant_type: 'authorization_code',
+      }).toString(),
+      cache: 'no-store',
+    });
+
+    const tokenData = (await tokenResponse
+      .json()
+      .catch(() => ({}))) as GoogleTokenResponse;
+
+    if (!tokenResponse.ok) {
+      console.error('Erreur échange code Google:', tokenData);
+      return back('token_error');
+    }
+
+    if (!tokenData.refresh_token) {
+      console.error('Google n’a pas fourni de refresh token.');
+      return back('no_refresh_token');
+    }
+
+    let googleEmail: string | null = null;
+
+    if (tokenData.access_token) {
+      const userInfoResponse = await fetch(
+        'https://www.googleapis.com/oauth2/v2/userinfo',
         {
-          error:
-            'La configuration Google OAuth est incomplète.',
-        },
-        { status: 500 }
-      );
-    }
-
-    const redirectUri =
-      `${url.origin}` +
-      '/api/google/drive/callback';
-
-    const tokenResponse =
-      await fetch(
-        'https://oauth2.googleapis.com/token',
-        {
-          method: 'POST',
           headers: {
-            'Content-Type':
-              'application/x-www-form-urlencoded',
+            Authorization: `Bearer ${tokenData.access_token}`,
           },
-          body:
-            new URLSearchParams({
-              code,
-              client_id: clientId,
-              client_secret:
-                clientSecret,
-              redirect_uri:
-                redirectUri,
-              grant_type:
-                'authorization_code',
-            }).toString(),
           cache: 'no-store',
         }
       );
 
-    const tokenData =
-      (await tokenResponse.json()) as GoogleTokenResponse;
-
-    if (
-      !tokenResponse.ok
-    ) {
-      console.error(
-        'Erreur échange code Google:',
-        tokenData
-      );
-
-      return NextResponse.redirect(
-        new URL(
-          '/documents?google=token_error',
-          request.url
-        )
-      );
-    }
-
-    if (
-      !tokenData.refresh_token
-    ) {
-      console.error(
-        'Google n’a pas fourni de refresh token.'
-      );
-
-      return NextResponse.redirect(
-        new URL(
-          '/documents?google=no_refresh_token',
-          request.url
-        )
-      );
-    }
-
-    let googleEmail: string | null =
-      null;
-
-    if (tokenData.access_token) {
-      const userInfoResponse =
-        await fetch(
-          'https://www.googleapis.com/oauth2/v2/userinfo',
-          {
-            headers: {
-              Authorization:
-                `Bearer ${tokenData.access_token}`,
-            },
-            cache: 'no-store',
-          }
-        );
-
-      if (
-        userInfoResponse.ok
-      ) {
-        const userInfo =
-          (await userInfoResponse.json()) as GoogleUserInfo;
-
-        googleEmail =
-          userInfo.email || null;
+      if (userInfoResponse.ok) {
+        const userInfo = (await userInfoResponse.json()) as GoogleUserInfo;
+        googleEmail = userInfo.email || null;
       }
     }
 
-    const adminClient =
-      createAdminClient();
+    const adminClient = createAdminClient();
 
-    const { error: saveError } =
-      await adminClient
-        .from(
-          'google_drive_connections'
-        )
-        .upsert(
-          {
-            user_id: user.id,
-            google_email:
-              googleEmail,
-            refresh_token:
-              tokenData.refresh_token,
-            updated_at:
-              new Date().toISOString(),
-          },
-          {
-            onConflict:
-              'user_id',
-          }
-        );
+    const { error: saveError } = await adminClient
+      .from('google_drive_connections')
+      .upsert(
+        {
+          user_id: access.userId,
+          google_email: googleEmail,
+          refresh_token: tokenData.refresh_token,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'user_id' }
+      );
 
     if (saveError) {
-      console.error(
-        'Erreur sauvegarde connexion Google Drive:',
-        saveError
-      );
-
-      return NextResponse.redirect(
-        new URL(
-          '/documents?google=save_error',
-          request.url
-        )
-      );
+      console.error('Erreur sauvegarde connexion Google Drive:', saveError);
+      return back('save_error');
     }
 
-    return NextResponse.redirect(
-      new URL(
-        '/documents?google=connected',
-        request.url
-      )
-    );
-  } catch (error) {
-    console.error(
-      'Erreur callback Google Drive:',
-      error
-    );
+    /*
+     * Une seule connexion pour l'association :
+     * les anciennes sont effacées.
+     */
+    const { error: cleanError } = await adminClient
+      .from('google_drive_connections')
+      .delete()
+      .neq('user_id', access.userId);
 
-    return NextResponse.redirect(
-      new URL(
-        '/documents?google=error',
-        request.url
-      )
-    );
+    if (cleanError) {
+      console.error('Nettoyage anciennes connexions Drive:', cleanError);
+    }
+
+    return back('connected');
+  } catch (error) {
+    console.error('Erreur callback Google Drive:', error);
+    return back('error');
   }
 }

@@ -1,123 +1,62 @@
+import { randomBytes } from 'crypto'
 import { NextResponse } from 'next/server'
-import { requireOfficePermission } from '@/lib/office-auth'
-import { getGoogleAccessToken } from '@/lib/google-drive'
+import { getOfficeAccess } from '@/lib/office-auth'
+import { GOOGLE_DRIVE_SCOPES } from '@/lib/google-drive'
 
-type GoogleDriveErrorResponse = {
-  error?: {
-    message?: string
+/*
+ * Lance la connexion (ou reconnexion) du Google Drive
+ * de l'association. Réservé au Président.
+ *
+ * L'utilisateur est envoyé chez Google, qui le renvoie
+ * ensuite vers /api/google/drive/callback.
+ */
+export async function GET(request: Request) {
+  const url = new URL(request.url)
+  const access = await getOfficeAccess()
+
+  if (!access.authenticated) {
+    return NextResponse.redirect(new URL('/login', request.url))
   }
-}
 
-export async function DELETE(request: Request) {
-  try {
-    await requireOfficePermission('drive')
-
-    const url =
-      new URL(request.url)
-
-    const fileId =
-      url.searchParams
-        .get('id')
-        ?.trim()
-
-    if (!fileId) {
-      return NextResponse.json(
-        {
-          error:
-            'L’identifiant du fichier ou du dossier est obligatoire.',
-        },
-        { status: 400 }
-      )
-    }
-
-    const accessToken =
-      await getGoogleAccessToken()
-
-    const driveResponse =
-      await fetch(
-        `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(
-          fileId
-        )}?supportsAllDrives=true`,
-        {
-          method: 'DELETE',
-          headers: {
-            Authorization:
-              `Bearer ${accessToken}`,
-          },
-          cache: 'no-store',
-        }
-      )
-
-    if (!driveResponse.ok) {
-      const driveData =
-        (await driveResponse.json()) as GoogleDriveErrorResponse
-
-      console.error(
-        'Erreur suppression Google Drive:',
-        driveData
-      )
-
-      return NextResponse.json(
-        {
-          error:
-            driveData?.error?.message ||
-            'Impossible de supprimer cet élément de Google Drive.',
-        },
-        {
-          status:
-            driveResponse.status || 500,
-        }
-      )
-    }
-
-    return NextResponse.json({
-      success: true,
-      id: fileId,
-    })
-  } catch (error) {
-    if (error instanceof Error) {
-      if (
-        error.message ===
-        'AUTHENTICATION_REQUIRED'
-      ) {
-        return NextResponse.json(
-          {
-            error:
-              'Non authentifié.',
-          },
-          { status: 401 }
-        )
-      }
-
-      if (
-        error.message ===
-          'OFFICE_ACCESS_DENIED' ||
-        error.message ===
-          'OFFICE_PERMISSION_DENIED'
-      ) {
-        return NextResponse.json(
-          {
-            error:
-              'Compte non autorisé.',
-          },
-          { status: 403 }
-        )
-      }
-    }
-
-    console.error(
-      'Erreur API suppression Google Drive:',
-      error
-    )
-
-    return NextResponse.json(
-      {
-        error:
-          error instanceof Error
-            ? error.message
-            : 'Impossible de supprimer cet élément.',
-      },
-      { status: 500 }
+  if (!access.authorized || !(access.isPresident || access.isSuperAdmin)) {
+    return NextResponse.redirect(
+      new URL('/documents?google=forbidden', request.url)
     )
   }
+
+  const clientId = process.env.GOOGLE_CLIENT_ID
+
+  if (!clientId || !process.env.GOOGLE_CLIENT_SECRET) {
+    return NextResponse.redirect(
+      new URL('/documents?google=config_error', request.url)
+    )
+  }
+
+  /*
+   * Jeton anti-usurpation : Google nous le renverra
+   * et on vérifiera qu'il correspond.
+   */
+  const state = randomBytes(24).toString('hex')
+
+  const googleUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth')
+  googleUrl.searchParams.set('client_id', clientId)
+  googleUrl.searchParams.set('redirect_uri', `${url.origin}/api/google/drive/callback`)
+  googleUrl.searchParams.set('response_type', 'code')
+  googleUrl.searchParams.set('scope', GOOGLE_DRIVE_SCOPES.join(' '))
+  googleUrl.searchParams.set('access_type', 'offline')
+  // Force Google à redonner un jeton durable à chaque connexion.
+  googleUrl.searchParams.set('prompt', 'consent select_account')
+  googleUrl.searchParams.set('state', state)
+
+  const response = NextResponse.redirect(googleUrl.toString())
+
+  response.cookies.set('gipe_drive_oauth_state', state, {
+    httpOnly: true,
+    secure: url.protocol === 'https:',
+    sameSite: 'lax',
+    path: '/api/google/drive',
+    maxAge: 10 * 60,
+  })
+
+  return response
 }

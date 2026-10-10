@@ -1,6 +1,11 @@
 import { NextResponse } from 'next/server'
 import { requireOfficePermission } from '@/lib/office-auth'
-import { getGoogleAccessToken } from '@/lib/google-drive'
+import {
+  driveErrorResponse,
+  getGoogleAccessToken,
+  isValidDriveId,
+  readGoogleError,
+} from '@/lib/google-drive'
 
 type GoogleDriveFile = {
   id: string
@@ -15,135 +20,82 @@ type GoogleDriveFile = {
 type GoogleDriveResponse = {
   files?: GoogleDriveFile[]
   nextPageToken?: string
-  error?: {
-    message?: string
-  }
 }
 
-export async function GET(
-  request: Request
-) {
+// Garde-fou : au-delà, le dossier est vraiment énorme.
+const MAX_PAGES = 20
+
+/*
+ * Contenu d'un dossier (dossiers + fichiers), en entier :
+ * on enchaîne les pages de 1000 éléments renvoyées par Google.
+ */
+export async function GET(request: Request) {
   try {
     await requireOfficePermission('drive')
 
-    const accessToken =
-      await getGoogleAccessToken()
-
-    const requestUrl =
-      new URL(request.url)
-
     const folderId =
-      requestUrl.searchParams.get(
-        'folderId'
-      ) || 'root'
+      new URL(request.url).searchParams.get('folderId') || 'root'
 
-    const url =
-      new URL(
-        'https://www.googleapis.com/drive/v3/files'
-      )
-
-    url.searchParams.set(
-      'q',
-      `'${folderId}' in parents and trashed = false`
-    )
-
-    url.searchParams.set(
-      'pageSize',
-      '100'
-    )
-
-    url.searchParams.set(
-      'orderBy',
-      'folder,name'
-    )
-
-    url.searchParams.set(
-      'fields',
-      'files(id,name,mimeType,size,modifiedTime,webViewLink,parents),nextPageToken'
-    )
-
-    const driveResponse =
-      await fetch(
-        url.toString(),
-        {
-          headers: {
-            Authorization:
-              `Bearer ${accessToken}`,
-          },
-          cache: 'no-store',
-        }
-      )
-
-    const driveData =
-      (await driveResponse.json()) as GoogleDriveResponse
-
-    if (!driveResponse.ok) {
-      console.error(
-        'Erreur Google Drive:',
-        driveData
-      )
-
+    if (!isValidDriveId(folderId)) {
       return NextResponse.json(
-        {
-          error:
-            driveData?.error?.message ||
-            'Impossible de récupérer les fichiers du Google Drive.',
-        },
-        {
-          status:
-            driveResponse.status || 500,
-        }
+        { error: 'Identifiant de dossier invalide.' },
+        { status: 400 }
       )
     }
 
-    return NextResponse.json({
-      files:
-        driveData.files || [],
-    })
-  } catch (error) {
-    if (error instanceof Error) {
-      if (
-        error.message ===
-        'AUTHENTICATION_REQUIRED'
-      ) {
+    const accessToken = await getGoogleAccessToken()
+
+    const files: GoogleDriveFile[] = []
+    let pageToken: string | undefined
+
+    for (let page = 0; page < MAX_PAGES; page += 1) {
+      const url = new URL('https://www.googleapis.com/drive/v3/files')
+
+      url.searchParams.set('q', `'${folderId}' in parents and trashed = false`)
+      url.searchParams.set('pageSize', '1000')
+      url.searchParams.set('orderBy', 'folder,name')
+      url.searchParams.set(
+        'fields',
+        'files(id,name,mimeType,size,modifiedTime,webViewLink,parents),nextPageToken'
+      )
+      url.searchParams.set('supportsAllDrives', 'true')
+      url.searchParams.set('includeItemsFromAllDrives', 'true')
+
+      if (pageToken) {
+        url.searchParams.set('pageToken', pageToken)
+      }
+
+      const driveResponse = await fetch(url.toString(), {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+        cache: 'no-store',
+      })
+
+      if (!driveResponse.ok) {
+        const message = await readGoogleError(
+          driveResponse,
+          'Impossible de récupérer les fichiers du Google Drive.'
+        )
+
+        console.error('Erreur Google Drive:', message)
+
         return NextResponse.json(
-          {
-            error:
-              'Non authentifié.',
-          },
-          { status: 401 }
+          { error: message },
+          { status: driveResponse.status || 500 }
         )
       }
 
-      if (
-        error.message ===
-          'OFFICE_ACCESS_DENIED' ||
-        error.message ===
-          'OFFICE_PERMISSION_DENIED'
-      ) {
-        return NextResponse.json(
-          {
-            error:
-              'Compte non autorisé.',
-          },
-          { status: 403 }
-        )
-      }
+      const driveData = (await driveResponse.json()) as GoogleDriveResponse
+
+      files.push(...(driveData.files || []))
+      pageToken = driveData.nextPageToken
+
+      if (!pageToken) break
     }
 
-    console.error(
-      'Erreur API Google Drive:',
-      error
-    )
-
-    return NextResponse.json(
-      {
-        error:
-          error instanceof Error
-            ? error.message
-            : 'Impossible de récupérer le Google Drive.',
-      },
-      { status: 500 }
-    )
+    return NextResponse.json({ files })
+  } catch (error) {
+    return driveErrorResponse(error, 'Impossible de récupérer le Google Drive.')
   }
 }
