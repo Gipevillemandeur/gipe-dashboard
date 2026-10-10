@@ -482,8 +482,10 @@ export function parseCollegeWorkbook(data: ArrayBuffer): CollegeImport {
   }
 
   if (!codes) {
-    warnings.push(
-      'Aucun onglet de codes de classe : les codes de déverrouillage existants seront conservés.'
+    // Situation normale : les codes sont saisis par le GIPE
+    // dans Configuration → Gérer les classes.
+    notes.push(
+      'Pas d’onglet de codes : les codes déjà saisis sont conservés (à gérer dans Configuration → Gérer les classes).'
     );
   }
 

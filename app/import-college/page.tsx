@@ -752,7 +752,7 @@ export default function ImportCollegePage() {
                       <td>
                         {c.accessCode
                           ? 'Détecté'
-                          : 'Absent'}
+                          : 'Aucun code'}
                       </td>
 
                     </tr>

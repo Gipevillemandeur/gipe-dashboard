@@ -7,6 +7,7 @@ import {
   KeyRound,
   Pencil,
   Plus,
+  RefreshCw,
   Save,
   ShieldCheck,
   Trash2,
@@ -39,6 +40,25 @@ type Teacher = {
   isPP: boolean;
 };
 
+/* La classe TEST (démonstration) garde toujours son code. */
+function isDemoClass(item: ClassItem) {
+  return item.kind === 'demo' || item.name.trim().toUpperCase() === 'TEST';
+}
+
+/* Code aléatoire de 6 chiffres, différent des codes déjà utilisés. */
+function randomCode(used: Set<string>) {
+  for (;;) {
+    const values = new Uint32Array(1);
+    crypto.getRandomValues(values);
+    const code = String(100000 + (values[0] % 900000));
+
+    if (!used.has(code)) {
+      used.add(code);
+      return code;
+    }
+  }
+}
+
 type ModalMode =
   | 'class'
   | 'student'
@@ -52,6 +72,10 @@ export default function ConfigurationClassesPage() {
   const [classes, setClasses] = useState<ClassItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [savingCodes, setSavingCodes] = useState(false);
+  const [confirmCodes, setConfirmCodes] =
+    useState<'generate' | 'clear' | null>(null);
+  const [regeneratingId, setRegeneratingId] =
+    useState<string | null>(null);
 
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
@@ -149,6 +173,96 @@ export default function ConfigurationClassesPage() {
           : item
       )
     );
+  }
+
+  /*
+   * Enregistre directement les codes donnés
+   * (utilisé par Générer / Effacer / Régénérer).
+   */
+  async function persistCodes(
+    updates: { id: string; accessCode: string | null }[],
+    successMessage: string
+  ) {
+    setError('');
+    setMessage('');
+
+    const response = await fetch('/api/configuration', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ classes: updates }),
+    });
+
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      throw new Error(data.error || 'Impossible d’enregistrer les codes.');
+    }
+
+    const byId = new Map(updates.map((u) => [u.id, u.accessCode]));
+
+    setClasses((current) =>
+      current.map((item) =>
+        byId.has(item.id)
+          ? { ...item, access_code: byId.get(item.id) ?? null }
+          : item
+      )
+    );
+
+    setMessage(successMessage);
+  }
+
+  async function runBulkCodes(action: 'generate' | 'clear') {
+    setSavingCodes(true);
+
+    try {
+      const targets = classes.filter((item) => !isDemoClass(item));
+      const used = new Set(
+        classes
+          .filter(isDemoClass)
+          .map((item) => item.access_code || '')
+      );
+
+      await persistCodes(
+        targets.map((item) => ({
+          id: item.id,
+          accessCode: action === 'generate' ? randomCode(used) : null,
+        })),
+        action === 'generate'
+          ? `Nouveaux codes générés et enregistrés pour ${targets.length} classe(s).`
+          : `Les codes de ${targets.length} classe(s) ont été effacés. La classe TEST garde son code.`
+      );
+    } catch (e) {
+      setError(
+        e instanceof Error ? e.message : 'Impossible d’enregistrer les codes.'
+      );
+    } finally {
+      setConfirmCodes(null);
+      setSavingCodes(false);
+    }
+  }
+
+  async function regenerateCode(item: ClassItem) {
+    setRegeneratingId(item.id);
+
+    try {
+      const used = new Set(
+        classes
+          .filter((other) => other.id !== item.id)
+          .map((other) => other.access_code || '')
+      );
+      const code = randomCode(used);
+
+      await persistCodes(
+        [{ id: item.id, accessCode: code }],
+        `Nouveau code enregistré pour la classe ${item.name} : ${code}.`
+      );
+    } catch (e) {
+      setError(
+        e instanceof Error ? e.message : 'Impossible de régénérer le code.'
+      );
+    } finally {
+      setRegeneratingId(null);
+    }
   }
 
   async function saveCodes() {
@@ -700,25 +814,48 @@ export default function ConfigurationClassesPage() {
 
             <p className="section-sub">
               Tu peux changer ces codes à chaque
-              conseil. Un import du collège ne les
-              efface pas.
+              période de conseils. Un import du collège
+              ne les efface pas. La classe TEST garde
+              toujours son code.
             </p>
           </div>
 
-          <button
-            className="btn btn-primary"
-            onClick={saveCodes}
-            disabled={
-              savingCodes ||
-              loading
-            }
-          >
-            <Save size={14} />
+          <div className="codes-actions">
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => setConfirmCodes('generate')}
+              disabled={savingCodes || loading || classes.length === 0}
+            >
+              <RefreshCw size={14} />
+              Générer les codes
+            </button>
 
-            {savingCodes
-              ? 'Enregistrement…'
-              : 'Enregistrer les codes'}
-          </button>
+            <button
+              type="button"
+              className="btn btn-secondary codes-clear-button"
+              onClick={() => setConfirmCodes('clear')}
+              disabled={savingCodes || loading || classes.length === 0}
+            >
+              <Trash2 size={14} />
+              Effacer tous les codes
+            </button>
+
+            <button
+              className="btn btn-primary"
+              onClick={saveCodes}
+              disabled={
+                savingCodes ||
+                loading
+              }
+            >
+              <Save size={14} />
+
+              {savingCodes
+                ? 'Enregistrement…'
+                : 'Enregistrer les codes'}
+            </button>
+          </div>
         </div>
 
         {loading ? (
@@ -776,28 +913,48 @@ export default function ConfigurationClassesPage() {
                         </td>
 
                         <td>
-                          <input
-                            className="input"
-                            style={{
-                              maxWidth:
-                                220,
-                            }}
-                            value={
-                              item.access_code ||
-                              ''
-                            }
-                            onChange={(
-                              e
-                            ) =>
-                              updateCode(
-                                item.id,
-                                e.target
-                                  .value
-                              )
-                            }
-                            placeholder="Code"
-                            inputMode="numeric"
-                          />
+                          <div className="code-cell">
+                            <input
+                              className="input"
+                              style={{
+                                maxWidth:
+                                  220,
+                              }}
+                              value={
+                                item.access_code ||
+                                ''
+                              }
+                              onChange={(
+                                e
+                              ) =>
+                                updateCode(
+                                  item.id,
+                                  e.target
+                                    .value
+                                )
+                              }
+                              placeholder="Aucun code"
+                              inputMode="numeric"
+                            />
+
+                            {isDemoClass(item) ? (
+                              <span className="code-demo">Démo</span>
+                            ) : (
+                              <button
+                                type="button"
+                                className="btn btn-secondary code-regenerate"
+                                onClick={() => void regenerateCode(item)}
+                                disabled={regeneratingId !== null || savingCodes}
+                                title="Générer un nouveau code pour cette classe"
+                              >
+                                <RefreshCw
+                                  size={14}
+                                  className={regeneratingId === item.id ? 'code-spin' : ''}
+                                />
+                                Régénérer
+                              </button>
+                            )}
+                          </div>
                         </td>
 
                         <td>
@@ -865,10 +1022,22 @@ export default function ConfigurationClassesPage() {
                               .value
                           )
                         }
-                        placeholder="Code"
+                        placeholder="Aucun code"
                         inputMode="numeric"
                       />
                     </label>
+
+                    {!isDemoClass(item) && (
+                      <button
+                        type="button"
+                        className="btn btn-secondary"
+                        onClick={() => void regenerateCode(item)}
+                        disabled={regeneratingId !== null || savingCodes}
+                      >
+                        <RefreshCw size={14} />
+                        Régénérer le code
+                      </button>
+                    )}
 
                     <button
                       type="button"
@@ -893,6 +1062,60 @@ export default function ConfigurationClassesPage() {
           </>
         )}
       </section>
+
+      {confirmCodes && (
+        <div
+          className="modal-overlay"
+          role="dialog"
+          aria-modal="true"
+        >
+          <div className="codes-confirm">
+            <h2>
+              {confirmCodes === 'generate'
+                ? 'Générer de nouveaux codes ?'
+                : 'Effacer tous les codes ?'}
+            </h2>
+
+            <p>
+              {confirmCodes === 'generate'
+                ? `Chaque classe (${classes.filter((c) => !isDemoClass(c)).length}) reçoit un nouveau code à 6 chiffres. Les anciens codes ne fonctionneront plus.`
+                : `Plus aucune classe ne sera accessible dans l’application des conseils. Pratique à la fin de la période des conseils.`}
+            </p>
+
+            <p className="codes-confirm-note">
+              La classe TEST garde son code.
+            </p>
+
+            <div className="codes-confirm-actions">
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => setConfirmCodes(null)}
+                disabled={savingCodes}
+              >
+                Annuler
+              </button>
+
+              <button
+                type="button"
+                className={
+                  confirmCodes === 'clear'
+                    ? 'btn codes-danger'
+                    : 'btn btn-primary'
+                }
+                onClick={() => void runBulkCodes(confirmCodes)}
+                disabled={savingCodes}
+              >
+                {savingCodes
+                  ? 'Enregistrement…'
+                  : confirmCodes === 'generate'
+                    ? 'Générer et enregistrer'
+                    : 'Effacer les codes'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {selectedClass && (
         <div
@@ -1557,6 +1780,96 @@ export default function ConfigurationClassesPage() {
 
         .mobile-list {
           display: none;
+        }
+
+        .codes-actions {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 8px;
+          justify-content: flex-end;
+        }
+
+        .codes-actions .btn,
+        .code-regenerate,
+        .codes-confirm-actions .btn {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          white-space: nowrap;
+        }
+
+        .codes-clear-button {
+          color: #8a2b22 !important;
+          border-color: #efc8c4 !important;
+        }
+
+        .code-cell {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .code-regenerate {
+          padding: 6px 10px !important;
+          font-size: 12px !important;
+        }
+
+        .code-demo {
+          font-size: 11px;
+          font-weight: 700;
+          color: #756a67;
+          padding: 4px 8px;
+          border: 1px solid #eadfd5;
+          border-radius: 999px;
+          white-space: nowrap;
+        }
+
+        :global(.code-spin) {
+          animation: code-spin 0.8s linear infinite;
+        }
+
+        @keyframes -global-code-spin {
+          to {
+            transform: rotate(360deg);
+          }
+        }
+
+        .codes-confirm {
+          width: min(460px, calc(100vw - 32px));
+          padding: 22px;
+          border-radius: 14px;
+          background: #fff;
+          box-shadow: 0 20px 50px rgba(15, 23, 42, 0.2);
+        }
+
+        .codes-confirm h2 {
+          margin: 0 0 10px;
+          font-size: 19px;
+        }
+
+        .codes-confirm p {
+          margin: 0 0 8px;
+          font-size: 14px;
+          line-height: 1.5;
+          color: #4b4543;
+        }
+
+        .codes-confirm-note {
+          font-size: 12px !important;
+          color: #756a67 !important;
+        }
+
+        .codes-confirm-actions {
+          display: flex;
+          justify-content: flex-end;
+          gap: 10px;
+          margin-top: 16px;
+        }
+
+        .codes-danger {
+          background: #8a2b22 !important;
+          border-color: #8a2b22 !important;
+          color: #fff !important;
         }
 
         .modal-overlay {
