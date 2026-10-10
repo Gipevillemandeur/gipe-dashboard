@@ -178,14 +178,14 @@ export async function GET() {
 
   const { data, error } =
     await admin
-      .from('public_agenda_events')
+      .from('events')
       .select(
-        'id,title,description,event_date,start_time,end_time,location,category,image_url'
+        'id,title,description,date,time,location,category,image_url'
       )
-      .order('event_date', {
+      .order('date', {
         ascending: true,
       })
-      .order('start_time', {
+      .order('time', {
         ascending: true,
       })
       .order('id', {
@@ -243,11 +243,6 @@ export async function POST(
         formData.get('time')
       )
 
-    const endTime =
-      cleanString(
-        formData.get('endTime')
-      )
-
     const location =
       cleanString(
         formData.get('location')
@@ -291,16 +286,6 @@ export async function POST(
       )
     }
 
-    if (!validTime(endTime)) {
-      return NextResponse.json(
-        {
-          error:
-            'L’heure de fin est invalide.',
-        },
-        { status: 400 }
-      )
-    }
-
     let imageUrl: string | null =
       null
 
@@ -317,16 +302,14 @@ export async function POST(
 
     const { data, error } =
       await admin
-        .from('public_agenda_events')
+        .from('events')
         .insert({
           title,
           description:
             description || null,
-          event_date: date,
-          start_time:
+          date,
+          time:
             time || null,
-          end_time:
-            endTime || null,
           location:
             location || null,
           category:
@@ -335,7 +318,7 @@ export async function POST(
             imageUrl,
         })
         .select(
-          'id,title,description,event_date,start_time,end_time,location,category,image_url'
+          'id,title,description,date,time,location,category,image_url'
         )
         .single()
 
@@ -417,11 +400,6 @@ export async function PUT(
         formData.get('time')
       )
 
-    const endTime =
-      cleanString(
-        formData.get('endTime')
-      )
-
     const location =
       cleanString(
         formData.get('location')
@@ -479,22 +457,12 @@ export async function PUT(
       )
     }
 
-    if (!validTime(endTime)) {
-      return NextResponse.json(
-        {
-          error:
-            'L’heure de fin est invalide.',
-        },
-        { status: 400 }
-      )
-    }
-
     const {
       data: existing,
       error: existingError,
     } =
       await admin
-        .from('public_agenda_events')
+        .from('events')
         .select(
           'id,image_url'
         )
@@ -543,16 +511,14 @@ export async function PUT(
       error,
     } =
       await admin
-        .from('public_agenda_events')
+        .from('events')
         .update({
           title,
           description:
             description || null,
-          event_date: date,
-          start_time:
+          date,
+          time:
             time || null,
-          end_time:
-            endTime || null,
           location:
             location || null,
           category:
@@ -562,7 +528,7 @@ export async function PUT(
         })
         .eq('id', id)
         .select(
-          'id,title,description,event_date,start_time,end_time,location,category,image_url'
+          'id,title,description,date,time,location,category,image_url'
         )
         .single()
 
@@ -653,7 +619,7 @@ export async function DELETE(
       error: existingError,
     } =
       await admin
-        .from('public_agenda_events')
+        .from('events')
         .select(
           'id,image_url'
         )
@@ -682,7 +648,7 @@ export async function DELETE(
 
     const { error } =
       await admin
-        .from('public_agenda_events')
+        .from('events')
         .delete()
         .eq('id', id)
 
