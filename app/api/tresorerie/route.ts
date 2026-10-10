@@ -53,6 +53,79 @@ async function requireTreasuryAccess() {
   }
 }
 
+const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/
+
+/*
+ * Montant en euros : nombre positif, arrondi au centime.
+ * Renvoie null si invalide.
+ */
+function parsePositiveAmount(value: unknown) {
+  const amount = Number(
+    String(value ?? '').replace(/\s/g, '').replace(',', '.')
+  )
+
+  if (!Number.isFinite(amount) || amount <= 0) {
+    return null
+  }
+
+  return Math.round(amount * 100) / 100
+}
+
+/*
+ * Une opération ne peut être modifiée ou supprimée que si
+ * elle appartient à l'année scolaire EN COURS : les années
+ * clôturées restent figées (sinon leur bilan deviendrait faux).
+ */
+async function checkTransactionIsEditable(
+  admin: ReturnType<typeof createAdminClient>,
+  id: string
+) {
+  const { data, error } = await admin
+    .from('gipe_transactions')
+    .select('id, school_year_id')
+    .eq('id', id)
+    .maybeSingle()
+
+  if (error) {
+    return NextResponse.json(
+      { error: `Impossible de vérifier l'opération : ${error.message}` },
+      { status: 500 }
+    )
+  }
+
+  if (!data) {
+    return NextResponse.json(
+      { error: 'Opération introuvable.' },
+      { status: 404 }
+    )
+  }
+
+  const { data: year, error: yearError } = await admin
+    .from('school_years')
+    .select('is_active')
+    .eq('id', data.school_year_id)
+    .maybeSingle()
+
+  if (yearError) {
+    return NextResponse.json(
+      { error: `Impossible de vérifier l'année : ${yearError.message}` },
+      { status: 500 }
+    )
+  }
+
+  if (!year?.is_active) {
+    return NextResponse.json(
+      {
+        error:
+          'Cette opération appartient à une année clôturée : elle ne peut plus être modifiée.',
+      },
+      { status: 409 }
+    )
+  }
+
+  return null
+}
+
 export async function GET() {
   const auth = await requireTreasuryAccess()
 
@@ -179,7 +252,7 @@ export async function POST(
       note,
     } = body
 
-    if (!date) {
+    if (!date || !DATE_PATTERN.test(String(date))) {
       return NextResponse.json(
         {
           error: 'La date est obligatoire.',
@@ -215,30 +288,12 @@ export async function POST(
       )
     }
 
-    if (
-      amount === undefined ||
-      amount === null ||
-      amount === ''
-    ) {
+    const numericAmount = parsePositiveAmount(amount)
+
+    if (numericAmount === null) {
       return NextResponse.json(
         {
-          error: 'Le montant est obligatoire.',
-        },
-        { status: 400 }
-      )
-    }
-
-    const numericAmount = Number(
-      String(amount).replace(',', '.')
-    )
-
-    if (
-      !Number.isFinite(numericAmount) ||
-      numericAmount < 0
-    ) {
-      return NextResponse.json(
-        {
-          error: 'Le montant est invalide.',
+          error: 'Le montant doit être supérieur à 0.',
         },
         { status: 400 }
       )
@@ -421,7 +476,8 @@ export async function PUT(
       } = await admin
         .from('school_years')
         .update({
-          initial_balance: numericInitialBalance,
+          initial_balance:
+            Math.round(numericInitialBalance * 100) / 100,
         })
         .eq('id', schoolYear.id)
         .select('id,label,initial_balance')
@@ -463,12 +519,26 @@ export async function PUT(
       )
     }
 
+    const notEditable =
+      await checkTransactionIsEditable(admin, id)
+
+    if (notEditable) {
+      return notEditable
+    }
+
     const updateData: Record<
       string,
       unknown
     > = {}
 
     if (body.date !== undefined) {
+      if (!DATE_PATTERN.test(String(body.date))) {
+        return NextResponse.json(
+          { error: 'La date est invalide.' },
+          { status: 400 }
+        )
+      }
+
       updateData.transaction_date =
         body.date
     }
@@ -508,17 +578,13 @@ export async function PUT(
     }
 
     if (body.amount !== undefined) {
-      const numericAmount = Number(
-        String(body.amount).replace(',', '.')
-      )
+      const numericAmount =
+        parsePositiveAmount(body.amount)
 
-      if (
-        !Number.isFinite(numericAmount) ||
-        numericAmount < 0
-      ) {
+      if (numericAmount === null) {
         return NextResponse.json(
           {
-            error: 'Le montant est invalide.',
+            error: 'Le montant doit être supérieur à 0.',
           },
           { status: 400 }
         )
@@ -659,6 +725,13 @@ export async function DELETE(
         },
         { status: 400 }
       )
+    }
+
+    const notEditable =
+      await checkTransactionIsEditable(admin, id)
+
+    if (notEditable) {
+      return notEditable
     }
 
     const {

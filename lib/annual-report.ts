@@ -26,6 +26,16 @@ export type CategoryTotal = {
   depenses: number;
 };
 
+/*
+ * Détail d'une catégorie : opérations regroupées par libellé
+ * (ex. « Vente » → « Vente pain au chocolat », « Vente gâteaux »…).
+ */
+export type CategoryDetail = {
+  category: string;
+  total: number;
+  items: { label: string; count: number; amount: number }[];
+};
+
 export type MeetingSummary = {
   id: string;
   date: string;
@@ -57,6 +67,8 @@ export type AnnualReport = {
   totalDepenses: number;
   solde: number;
   financialByCategory: CategoryTotal[];
+  incomeDetails: CategoryDetail[];
+  expenseDetails: CategoryDetail[];
 
   meetings: MeetingSummary[];
 
@@ -184,7 +196,7 @@ export async function buildAnnualReport(
 
     admin
       .from('gipe_transactions')
-      .select('transaction_type,category,amount')
+      .select('transaction_type,category,label,amount')
       .eq('school_year_id', year.id),
 
     admin
@@ -245,6 +257,30 @@ export async function buildAnnualReport(
    * TRÉSORERIE
    */
   const categories = new Map<string, CategoryTotal>();
+
+  // catégorie → (libellé normalisé → ligne)
+  type DetailMap = Map<string, Map<string, { label: string; count: number; amount: number }>>;
+  const incomeMap: DetailMap = new Map();
+  const expenseMap: DetailMap = new Map();
+
+  const addDetail = (
+    map: DetailMap,
+    category: string,
+    rawLabel: string,
+    amount: number
+  ) => {
+    const label = rawLabel.trim().replace(/\s+/g, ' ') || 'Sans libellé';
+    const key = label.toLowerCase();
+
+    if (!map.has(category)) map.set(category, new Map());
+
+    const items = map.get(category)!;
+    const item = items.get(key) || { label, count: 0, amount: 0 };
+
+    item.count += 1;
+    item.amount += amount;
+    items.set(key, item);
+  };
   let totalRecettes = 0;
   let totalDepenses = 0;
 
@@ -267,12 +303,16 @@ export async function buildAnnualReport(
 
     const row = categories.get(category)!;
 
+    const label = String((transaction as any).label || '');
+
     if (isIncome(transaction.transaction_type)) {
       row.recettes += amount;
       totalRecettes += amount;
+      addDetail(incomeMap, category, label, amount);
     } else if (isExpense(transaction.transaction_type)) {
       row.depenses += amount;
       totalDepenses += amount;
+      addDetail(expenseMap, category, label, amount);
     }
   }
 
@@ -287,6 +327,24 @@ export async function buildAnnualReport(
       depenses: round2(row.depenses),
     }))
     .sort((a, b) => sortFr(a.category, b.category));
+
+  const toDetails = (map: DetailMap): CategoryDetail[] =>
+    [...map.entries()]
+      .map(([category, items]) => {
+        const list = [...items.values()]
+          .map((i) => ({ ...i, amount: round2(i.amount) }))
+          .sort((a, b) => b.amount - a.amount || sortFr(a.label, b.label));
+
+        return {
+          category,
+          total: round2(list.reduce((sum, i) => sum + i.amount, 0)),
+          items: list,
+        };
+      })
+      .sort((a, b) => sortFr(a.category, b.category));
+
+  const incomeDetails = toDetails(incomeMap);
+  const expenseDetails = toDetails(expenseMap);
 
   /*
    * CLÔTURE DE CETTE ANNÉE (si déjà clôturée)
@@ -357,6 +415,8 @@ export async function buildAnnualReport(
     totalDepenses,
     solde: round2(initialBalance + totalRecettes - totalDepenses),
     financialByCategory,
+    incomeDetails,
+    expenseDetails,
 
     meetings,
 

@@ -9,9 +9,11 @@
  *   de pdf-lib sur les emojis, flèches, etc.).
  */
 
+import { GIPE_LOGO_PNG_BASE64 } from '@/lib/pdf-logo';
 import {
   PDFDocument,
   PDFFont,
+  PDFImage,
   PDFPage,
   StandardFonts,
   rgb,
@@ -32,7 +34,8 @@ export const COLORS = {
 const PAGE_WIDTH = 595.28;
 const PAGE_HEIGHT = 841.89;
 const MARGIN_X = 45;
-const TOP = PAGE_HEIGHT - 95;
+const HEADER_HEIGHT = 74;
+const TOP = PAGE_HEIGHT - HEADER_HEIGHT - 30;
 const BOTTOM = 60;
 
 export type TableColumn = {
@@ -45,6 +48,7 @@ export class PdfBuilder {
   pdf!: PDFDocument;
   regular!: PDFFont;
   bold!: PDFFont;
+  logo: PDFImage | null = null;
   page!: PDFPage;
   y = TOP;
   private charset = new Set<number>();
@@ -67,6 +71,15 @@ export class PdfBuilder {
     builder.regular = await builder.pdf.embedFont(StandardFonts.Helvetica);
     builder.bold = await builder.pdf.embedFont(StandardFonts.HelveticaBold);
     builder.charset = new Set(builder.regular.getCharacterSet());
+
+    try {
+      builder.logo = await builder.pdf.embedPng(
+        Buffer.from(GIPE_LOGO_PNG_BASE64, 'base64')
+      );
+    } catch {
+      builder.logo = null; // le PDF reste valable sans logo
+    }
+
     builder.newPage();
 
     return builder;
@@ -101,28 +114,47 @@ export class PdfBuilder {
     this.page = this.pdf.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
     this.pages.push(this.page);
 
-    this.page.drawRectangle({
-      x: 0,
-      y: PAGE_HEIGHT - 62,
-      width: PAGE_WIDTH,
-      height: 62,
+    /*
+     * En-tête : logo + nom de l'association + titre du document,
+     * souligné d'un filet bordeaux.
+     */
+    let textX = MARGIN_X;
+
+    if (this.logo) {
+      const size = 50;
+      const ratio = this.logo.width / this.logo.height;
+
+      this.page.drawImage(this.logo, {
+        x: MARGIN_X,
+        y: PAGE_HEIGHT - 12 - size,
+        width: size * ratio,
+        height: size,
+      });
+
+      textX = MARGIN_X + size * ratio + 12;
+    }
+
+    this.page.drawText(this.clean('GIPE Villemandeur'), {
+      x: textX,
+      y: PAGE_HEIGHT - 34,
+      size: 14,
+      font: this.bold,
       color: COLORS.burgundy,
     });
 
-    this.page.drawText(this.clean('GIPE Villemandeur'), {
-      x: MARGIN_X,
-      y: PAGE_HEIGHT - 30,
-      size: 13,
-      font: this.bold,
-      color: COLORS.white,
-    });
-
     this.page.drawText(this.clean(`${this.title} — ${this.subtitle}`), {
-      x: MARGIN_X,
-      y: PAGE_HEIGHT - 48,
+      x: textX,
+      y: PAGE_HEIGHT - 51,
       size: 9.5,
       font: this.regular,
-      color: COLORS.white,
+      color: COLORS.grey,
+    });
+
+    this.page.drawLine({
+      start: { x: MARGIN_X, y: PAGE_HEIGHT - HEADER_HEIGHT },
+      end: { x: PAGE_WIDTH - MARGIN_X, y: PAGE_HEIGHT - HEADER_HEIGHT },
+      thickness: 1.5,
+      color: COLORS.burgundy,
     });
 
     this.y = TOP;
@@ -282,7 +314,12 @@ export class PdfBuilder {
   table(
     columns: TableColumn[],
     rows: string[][],
-    options: { size?: number; boldLastRow?: boolean } = {}
+    options: {
+      size?: number;
+      boldLastRow?: boolean;
+      // lignes « sous-total » mises en valeur (index des lignes)
+      highlightRows?: number[];
+    } = {}
   ) {
     const size = options.size ?? 9;
     const padding = 5;
@@ -320,7 +357,8 @@ export class PdfBuilder {
 
     rows.forEach((row, rowIndex) => {
       const isLast = rowIndex === rows.length - 1;
-      const bold = Boolean(options.boldLastRow && isLast);
+      const highlighted = Boolean(options.highlightRows?.includes(rowIndex));
+      const bold = Boolean(options.boldLastRow && isLast) || highlighted;
 
       const wrapped = row.map((value, i) =>
         this.wrap(value ?? '', size, widths[i] - padding * 2, bold)
@@ -339,7 +377,11 @@ export class PdfBuilder {
           y: this.y - height,
           width: this.width,
           height,
-          color: bold ? rgb(0.93, 0.89, 0.86) : COLORS.light,
+          color: highlighted
+            ? rgb(0.97, 0.94, 0.91)
+            : bold
+              ? rgb(0.93, 0.89, 0.86)
+              : COLORS.light,
         });
       }
 

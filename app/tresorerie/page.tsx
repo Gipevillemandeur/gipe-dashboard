@@ -25,7 +25,8 @@ type Transaction = {
 
 type FormState = {
   date: string;
-  type: 'income' | 'expense';
+  // '' = pas encore choisi : oblige à choisir Recette ou Dépense
+  type: '' | 'income' | 'expense';
   category: string;
   label: string;
   amount: string;
@@ -58,13 +59,23 @@ const paymentMethods = [
   { value: 'other', label: 'Autre' },
 ];
 
+// Date du jour en heure locale (et non en heure UTC,
+// qui donnait la veille entre minuit et 2 h du matin).
 function today() {
-  return new Date().toISOString().slice(0, 10);
+  const now = new Date();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+
+  return `${now.getFullYear()}-${month}-${day}`;
+}
+
+function parseAmount(value: string) {
+  return Number(String(value).replace(/\s/g, '').replace(',', '.'));
 }
 
 const emptyForm: FormState = {
   date: today(),
-  type: 'income',
+  type: '',
   category: '',
   label: '',
   amount: '',
@@ -104,6 +115,9 @@ export default function TresoreriePage() {
   const [initialBalanceInput, setInitialBalanceInput] = useState('0');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm);
+  const [formError, setFormError] = useState('');
+  const [transactionToDelete, setTransactionToDelete] =
+    useState<Transaction | null>(null);
 
   async function load() {
     setLoading(true);
@@ -162,10 +176,46 @@ export default function TresoreriePage() {
     };
   }, [transactions, initialBalance]);
 
-  const categories =
-    form.type === 'income'
-      ? incomeCategories
-      : expenseCategories;
+  /*
+   * Catégories proposées selon le type choisi.
+   * En modification, une ancienne catégorie qui ne fait
+   * plus partie de la liste reste proposée (sinon elle
+   * serait effacée sans qu'on s'en rende compte).
+   */
+  const categories = useMemo(() => {
+    const base =
+      form.type === 'income'
+        ? incomeCategories
+        : form.type === 'expense'
+          ? expenseCategories
+          : [];
+
+    return form.category && !base.includes(form.category)
+      ? [form.category, ...base]
+      : base;
+  }, [form.type, form.category]);
+
+  /*
+   * Touche Échap : ferme la fenêtre ouverte.
+   */
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key !== 'Escape') return;
+
+      if (transactionToDelete) {
+        if (!deletingId) setTransactionToDelete(null);
+      } else if (showInitialBalanceForm) {
+        closeInitialBalanceForm();
+      } else if (showForm) {
+        closeForm();
+      }
+    }
+
+    window.addEventListener('keydown', onKeyDown);
+
+    return () =>
+      window.removeEventListener('keydown', onKeyDown);
+  });
 
   const filteredTransactions = useMemo(() => {
     const value = search.trim().toLowerCase();
@@ -188,7 +238,7 @@ export default function TresoreriePage() {
   function openNew() {
     setEditingId(null);
     setForm({ ...emptyForm, date: today() });
-    setError('');
+    setFormError('');
     setShowForm(true);
   }
 
@@ -203,7 +253,7 @@ export default function TresoreriePage() {
       paymentMethod: item.paymentMethod || '',
       note: item.note || '',
     });
-    setError('');
+    setFormError('');
     setShowForm(true);
   }
 
@@ -211,7 +261,7 @@ export default function TresoreriePage() {
     setInitialBalanceInput(
       String(initialBalance).replace('.', ',')
     );
-    setError('');
+    setFormError('');
     setShowInitialBalanceForm(true);
   }
 
@@ -227,28 +277,28 @@ export default function TresoreriePage() {
     setShowInitialBalanceForm(false);
   }
 
-  function setType(type: FormState['type']) {
+  function setType(type: 'income' | 'expense') {
+    setFormError('');
     setForm((current) => ({
       ...current,
       type,
-      category: '',
+      // On ne vide la catégorie que si le type change vraiment
+      category: current.type === type ? current.category : '',
     }));
   }
 
   async function saveInitialBalance(event: FormEvent) {
     event.preventDefault();
 
-    const numericBalance = Number(
-      String(initialBalanceInput).replace(',', '.')
-    );
+    const numericBalance = parseAmount(initialBalanceInput);
 
     if (!Number.isFinite(numericBalance)) {
-      setError('Le solde initial est invalide.');
+      setFormError('Le solde initial est invalide.');
       return;
     }
 
     setSavingInitialBalance(true);
-    setError('');
+    setFormError('');
 
     try {
       const response = await fetch('/api/tresorerie', {
@@ -275,7 +325,7 @@ export default function TresoreriePage() {
       );
       setShowInitialBalanceForm(false);
     } catch (err) {
-      setError(
+      setFormError(
         err instanceof Error
           ? err.message
           : 'Impossible d’enregistrer le solde initial.'
@@ -285,17 +335,13 @@ export default function TresoreriePage() {
     }
   }
 
-  async function deleteTransaction(item: Transaction) {
-    if (deletingId) return;
+  async function deleteTransaction() {
+    const item = transactionToDelete;
 
-    const confirmed = window.confirm(
-      `Supprimer l’opération « ${item.label} » de ${formatMoney(item.amount)} ?\n\nCette opération sera définitivement supprimée.`
-    );
-
-    if (!confirmed) return;
+    if (!item || deletingId) return;
 
     setDeletingId(item.id);
-    setError('');
+    setFormError('');
 
     try {
       const response = await fetch('/api/tresorerie', {
@@ -314,9 +360,10 @@ export default function TresoreriePage() {
         );
       }
 
+      setTransactionToDelete(null);
       await load();
     } catch (err) {
-      setError(
+      setFormError(
         err instanceof Error
           ? err.message
           : 'Impossible de supprimer l’opération.'
@@ -328,8 +375,21 @@ export default function TresoreriePage() {
 
   async function save(event: FormEvent) {
     event.preventDefault();
+    setFormError('');
+
+    if (!form.type) {
+      setFormError('Choisis d’abord s’il s’agit d’une recette ou d’une dépense.');
+      return;
+    }
+
+    const amount = parseAmount(form.amount);
+
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setFormError('Le montant doit être un nombre supérieur à 0.');
+      return;
+    }
+
     setSaving(true);
-    setError('');
 
     try {
       const response = await fetch('/api/tresorerie', {
@@ -351,10 +411,11 @@ export default function TresoreriePage() {
         );
       }
 
+      setSaving(false);
       closeForm();
       await load();
     } catch (err) {
-      setError(
+      setFormError(
         err instanceof Error
           ? err.message
           : 'Impossible d’enregistrer l’opération.'
@@ -614,7 +675,10 @@ export default function TresoreriePage() {
                         <button
                           type="button"
                           className="btn"
-                          onClick={() => void deleteTransaction(item)}
+                          onClick={() => {
+                            setFormError('');
+                            setTransactionToDelete(item);
+                          }}
                           disabled={deletingId === item.id}
                           title="Supprimer"
                           aria-label={`Supprimer ${item.label}`}
@@ -688,6 +752,12 @@ export default function TresoreriePage() {
                   <span>€</span>
                 </div>
               </div>
+
+              {formError && (
+                <div className="notice notice-error tresorerie-form-error">
+                  {formError}
+                </div>
+              )}
 
               <div className="tresorerie-modal-actions">
                 <button
@@ -766,7 +836,7 @@ export default function TresoreriePage() {
 
                 <div className="tresorerie-form-field">
                   <label className="form-label">
-                    Type
+                    Type <span className="tresorerie-required">*</span>
                   </label>
 
                   <div className="tresorerie-type-buttons">
@@ -778,6 +848,7 @@ export default function TresoreriePage() {
                           : 'btn'
                       }
                       onClick={() => setType('income')}
+                      aria-pressed={form.type === 'income'}
                     >
                       Recette
                     </button>
@@ -790,6 +861,7 @@ export default function TresoreriePage() {
                           : 'btn'
                       }
                       onClick={() => setType('expense')}
+                      aria-pressed={form.type === 'expense'}
                     >
                       Dépense
                     </button>
@@ -808,6 +880,7 @@ export default function TresoreriePage() {
                     id="transaction-category"
                     className="input"
                     value={form.category}
+                    disabled={!form.type}
                     onChange={(event) =>
                       setForm((current) => ({
                         ...current,
@@ -817,7 +890,9 @@ export default function TresoreriePage() {
                     required
                   >
                     <option value="">
-                      Sélectionner une catégorie
+                      {form.type
+                        ? 'Sélectionner une catégorie'
+                        : 'Choisis d’abord le type'}
                     </option>
 
                     {categories.map((category) => (
@@ -932,6 +1007,12 @@ export default function TresoreriePage() {
                 </div>
               </div>
 
+              {formError && (
+                <div className="notice notice-error tresorerie-form-error">
+                  {formError}
+                </div>
+              )}
+
               <div className="tresorerie-modal-actions">
                 <button
                   type="button"
@@ -959,7 +1040,93 @@ export default function TresoreriePage() {
         </div>
       )}
 
+      {transactionToDelete && (
+        <div className="tresorerie-modal-overlay">
+          <div className="card tresorerie-modal tresorerie-initial-modal">
+            <div className="eyebrow">Trésorerie</div>
+
+            <h2 className="section-title tresorerie-modal-title">
+              Supprimer l’opération ?
+            </h2>
+
+            <div className="tresorerie-delete-summary">
+              <strong>{transactionToDelete.label}</strong>
+              <span>
+                {formatDate(transactionToDelete.date)} ·{' '}
+                {transactionToDelete.type === 'income'
+                  ? 'Recette'
+                  : 'Dépense'}{' '}
+                · {formatMoney(transactionToDelete.amount)}
+              </span>
+            </div>
+
+            <p className="section-sub">
+              Cette opération sera définitivement supprimée.
+            </p>
+
+            {formError && (
+              <div className="notice notice-error tresorerie-form-error">
+                {formError}
+              </div>
+            )}
+
+            <div className="tresorerie-modal-actions">
+              <button
+                type="button"
+                className="btn"
+                onClick={() => setTransactionToDelete(null)}
+                disabled={!!deletingId}
+              >
+                Annuler
+              </button>
+
+              <button
+                type="button"
+                className="btn tresorerie-danger-button"
+                onClick={() => void deleteTransaction()}
+                disabled={!!deletingId}
+              >
+                <Trash2 size={14} />
+                {deletingId ? 'Suppression…' : 'Supprimer'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <style jsx>{`
+        .tresorerie-required {
+          color: #b91c1c;
+        }
+
+        .tresorerie-form-error {
+          margin-top: 16px;
+        }
+
+        .tresorerie-delete-summary {
+          display: grid;
+          gap: 5px;
+          margin: 16px 0 12px;
+          padding: 13px 14px;
+          border: 1px solid #eadfd5;
+          border-radius: 10px;
+          background: #fafafa;
+        }
+
+        .tresorerie-delete-summary span {
+          color: #756a67;
+          font-size: 13px;
+        }
+
+        .tresorerie-danger-button {
+          background: #8a2b22 !important;
+          border-color: #8a2b22 !important;
+          color: #fff !important;
+          display: inline-flex;
+          align-items: center;
+          gap: 7px;
+        }
+
         .tresorerie-summary-grid {
           display: grid;
           grid-template-columns: repeat(4, minmax(0, 1fr));

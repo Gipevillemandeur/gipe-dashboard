@@ -44,6 +44,46 @@ function freeText(builder: PdfBuilder, text: string, emptyLines: number) {
   }
 }
 
+/*
+ * Tableau détaillé : chaque catégorie (ligne de sous-total),
+ * puis ses libellés regroupés avec le nombre d'opérations.
+ */
+function detailTable(
+  builder: PdfBuilder,
+  title: string,
+  details: AnnualReport['incomeDetails'],
+  total: number,
+  totalLabel: string
+) {
+  if (details.length === 0) return;
+
+  const rows: string[][] = [];
+  const highlightRows: number[] = [];
+
+  for (const category of details) {
+    highlightRows.push(rows.length);
+    rows.push([category.category, '', '', euro(category.total)]);
+
+    for (const item of category.items) {
+      rows.push(['', item.label, String(item.count), euro(item.amount)]);
+    }
+  }
+
+  rows.push([totalLabel, '', '', euro(total)]);
+
+  builder.subTitle(title, 90);
+  builder.table(
+    [
+      { header: 'Catégorie', width: 1.6 },
+      { header: 'Détail', width: 3.4 },
+      { header: 'Nb', width: 0.6, align: 'center' },
+      { header: 'Montant', width: 1.4, align: 'right' },
+    ],
+    rows,
+    { highlightRows, boldLastRow: true }
+  );
+}
+
 export async function buildAnnualReportPdf(report: AnnualReport) {
   const builder = await PdfBuilder.create(
     'Bilan annuel',
@@ -187,6 +227,9 @@ export async function buildAnnualReportPdf(report: AnnualReport) {
       { boldLastRow: true }
     );
   }
+
+  detailTable(builder, 'Détail des recettes', report.incomeDetails, report.totalRecettes, 'Total recettes');
+  detailTable(builder, 'Détail des dépenses', report.expenseDetails, report.totalDepenses, 'Total dépenses');
 
   /*
    * 3. BILAN MORAL
