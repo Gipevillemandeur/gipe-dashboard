@@ -23,6 +23,7 @@ export default function ConfigurationDirectionPage() {
   const [savingDirection, setSavingDirection] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [dirty, setDirty] = useState(false);
 
   async function load() {
     setLoading(true);
@@ -42,6 +43,7 @@ export default function ConfigurationDirectionPage() {
       }
 
       setDirection(data.direction || []);
+      setDirty(false);
     } catch (e) {
       setError(
         e instanceof Error
@@ -57,11 +59,29 @@ export default function ConfigurationDirectionPage() {
     void load();
   }, []);
 
+  /*
+   * Prévient avant de quitter la page avec
+   * des modifications non enregistrées.
+   */
+  useEffect(() => {
+    if (!dirty) return;
+
+    const warn = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = '';
+    };
+
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [dirty]);
+
   function updateDirection(
     index: number,
     field: 'display_name' | 'role',
     value: string
   ) {
+    setDirty(true);
+    setMessage('');
     setDirection((current) =>
       current.map((item, i) =>
         i === index
@@ -75,6 +95,8 @@ export default function ConfigurationDirectionPage() {
   }
 
   function addDirection() {
+    setDirty(true);
+    setMessage('');
     setDirection((current) => [
       ...current,
       {
@@ -86,6 +108,8 @@ export default function ConfigurationDirectionPage() {
   }
 
   function removeDirection(index: number) {
+    setDirty(true);
+    setMessage('');
     setDirection((current) =>
       current.filter((_, i) => i !== index)
     );
@@ -150,9 +174,8 @@ export default function ConfigurationDirectionPage() {
           </h1>
 
           <div className="kicker">
-            Cette liste est indépendante du fichier des élèves
-            et reste en place lorsqu’un import ne contient pas
-            de direction.
+            Cette liste se gère uniquement ici : l’import du
+            fichier du collège n’y touche jamais.
           </div>
         </div>
 
@@ -194,7 +217,15 @@ export default function ConfigurationDirectionPage() {
             <p className="section-sub">
               Ajoute, modifie ou supprime les personnes
               qui doivent apparaître dans les comptes rendus.
+              Elles sont classées automatiquement : principal(e),
+              adjoint(e), CPE, puis les autres.
             </p>
+
+            {dirty && (
+              <span className="badge badge-warn direction-dirty">
+                Modifications non enregistrées
+              </span>
+            )}
           </div>
 
           <div className="btn-row direction-actions">
@@ -420,8 +451,9 @@ export default function ConfigurationDirectionPage() {
 
             Le fichier du collège met à jour
             les élèves, les classes et les équipes.
-            Les codes et la direction sont gérés
-            ici dans le dashboard.
+            Les codes (Configuration → Gérer les classes)
+            et la direction (ici) se gèrent uniquement
+            dans le dashboard.
           </div>
         </div>
 
@@ -430,6 +462,28 @@ export default function ConfigurationDirectionPage() {
       <style jsx>{`
         .direction-mobile-list {
           display: none;
+        }
+
+        /* Icône et texte des boutons sur une seule ligne. */
+        .btn,
+        .topbar-right :global(.btn) {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 7px;
+          white-space: nowrap;
+        }
+
+        .direction-actions {
+          display: flex;
+          gap: 10px;
+          align-items: center;
+          flex-shrink: 0;
+        }
+
+        .direction-dirty {
+          display: inline-flex;
+          margin-top: 10px;
         }
 
         .direction-mobile-item {

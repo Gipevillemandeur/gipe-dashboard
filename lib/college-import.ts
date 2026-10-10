@@ -350,16 +350,6 @@ function parseAccessCodes(sheetName: string, rows: Rows, warnings: string[]) {
   return codes;
 }
 
-function parseDirection(rows: Rows): string[] {
-  const values = rows.map((row) => clean(row[0])).filter(Boolean);
-
-  if (values.length > 0 && simplify(values[0]).includes('direction')) {
-    values.shift();
-  }
-
-  return values;
-}
-
 function uniqueStudents(rows: ImportedStudent[]) {
   const seen = new Set<string>();
 
@@ -401,7 +391,6 @@ export function parseCollegeWorkbook(data: ArrayBuffer): CollegeImport {
   let studentsByClass: Map<string, ImportedStudent[]> | null = null;
   let studentsSheet: string | null = null;
   let codes: Map<string, string> | null = null;
-  let direction: string[] | null = null;
 
   /* 1. Onglets reconnus par leur nom */
   for (const sheetName of workbook.SheetNames) {
@@ -447,9 +436,11 @@ export function parseCollegeWorkbook(data: ArrayBuffer): CollegeImport {
       continue;
     }
 
-    if (!direction && simple === 'direction') {
-      direction = parseDirection(rows);
-      notes.push(`Direction lue dans l’onglet « ${sheetName} » (${direction.length} personne(s)).`);
+    if (simple === 'direction') {
+      // La direction se gère uniquement dans le dashboard.
+      notes.push(
+        `Onglet « ${sheetName} » ignoré : la direction se gère dans Configuration → Direction.`
+      );
       continue;
     }
 
@@ -489,11 +480,6 @@ export function parseCollegeWorkbook(data: ArrayBuffer): CollegeImport {
     );
   }
 
-  if (!direction) {
-    warnings.push(
-      'Aucun onglet « direction » : les informations de direction existantes seront conservées.'
-    );
-  }
 
   /* 3. Assemblage : toutes les classes vues, que ce soit
    *    dans la liste d'élèves ou dans un onglet d'équipe. */
@@ -541,7 +527,8 @@ export function parseCollegeWorkbook(data: ArrayBuffer): CollegeImport {
 
   return {
     classes,
-    direction: direction ?? [],
+    // Jamais importée : gérée dans Configuration → Direction.
+    direction: [],
     ignoredSheets,
     warnings,
     notes,

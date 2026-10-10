@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { sortDirection } from '@/lib/direction';
 import { createHash } from 'crypto';
 import { createAdminClient } from '@/lib/supabase/admin';
 
@@ -169,7 +170,7 @@ export async function GET(request: Request) {
         NextResponse.json({
           schoolYear: year.label,
           classes: safeClasses,
-          direction: direction ?? [],
+          direction: sortDirection(direction ?? []),
         })
       );
     }
@@ -432,7 +433,7 @@ export async function GET(request: Request) {
 
         teachers,
 
-        direction: direction ?? [],
+        direction: sortDirection(direction ?? []),
       })
     );
   } catch (error) {

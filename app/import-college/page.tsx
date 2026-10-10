@@ -517,7 +517,7 @@ export default function ImportCollegePage() {
               className="page-grid cards-4"
               style={{
                 gridTemplateColumns:
-                  'repeat(4,minmax(0,1fr))',
+                  'repeat(3,minmax(0,1fr))',
               }}
             >
 
@@ -560,17 +560,6 @@ export default function ImportCollegePage() {
               </div>
 
 
-              <div className="card stat">
-
-                <div className="stat-label">
-                  Direction
-                </div>
-
-                <div className="stat-value">
-                  {summary?.direction}
-                </div>
-
-              </div>
 
             </div>
 
@@ -701,8 +690,8 @@ export default function ImportCollegePage() {
                 </h2>
 
                 <p className="section-sub">
-                  Les onglets « code classe » et
-                  « direction » sont utilisés séparément.
+                  Les codes et la direction ne sont pas
+                  importés : ils se gèrent dans Configuration.
                 </p>
 
               </div>

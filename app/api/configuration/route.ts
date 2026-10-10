@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getOfficeAccess } from '@/lib/office-auth';
+import { sortDirection } from '@/lib/direction';
 
 async function requireConfigurationAccess() {
   /*
@@ -76,10 +77,31 @@ export async function GET() {
   }
 
   if (!year) {
+    /*
+     * La direction ne dépend pas de l'année :
+     * elle est renvoyée même sans année active
+     * (sinon la page l'afficherait vide et un
+     * enregistrement l'effacerait).
+     */
+    const {
+      data: direction,
+      error: directionError,
+    } = await admin
+      .from('school_management')
+      .select('id,display_name,role,active')
+      .eq('active', true);
+
+    if (directionError) {
+      return NextResponse.json(
+        { error: directionError.message },
+        { status: 500 }
+      );
+    }
+
     return NextResponse.json({
       schoolYear: null,
       classes: [],
-      direction: [],
+      direction: sortDirection(direction ?? []),
       lastImport: null,
     });
   }
@@ -183,7 +205,7 @@ export async function GET() {
       classes ?? [],
 
     direction:
-      direction ?? [],
+      sortDirection(direction ?? []),
 
     lastImport:
       lastImport ?? null,
@@ -389,67 +411,94 @@ export async function PUT(
           member.display_name
       );
 
-  /*
-   * On conserve le fonctionnement
-   * existant de la gestion de direction.
-   */
-
-  const {
-    error: deleteError,
-  } = await admin
-    .from(
-      'school_management'
-    )
-    .delete()
-    .eq(
-      'active',
-      true
-    );
-
-  if (deleteError) {
+  if (clean.some((member) => member.display_name.length > 120)) {
     return NextResponse.json(
-      {
-        error:
-          deleteError.message,
-      },
-      {
-        status: 500,
-      }
+      { error: 'Un nom est trop long (120 caractères maximum).' },
+      { status: 400 }
     );
   }
 
-  if (
-    clean.length > 0
-  ) {
-    const {
-      error: insertError,
-    } = await admin
-      .from(
-        'school_management'
-      )
-      .insert(
-        clean.map(
-          ({
-            display_name,
-            role,
-            active,
-          }) => ({
-            display_name,
-            role,
-            active,
-          })
-        )
-      );
+  /*
+   * Enregistrement « en douceur » : on ne touche qu'à ce qui
+   * a changé. Ajouts et modifications d'abord, suppressions
+   * en dernier : si quelque chose échoue en route, la
+   * direction n'est jamais effacée.
+   */
+  const {
+    data: existingRows,
+    error: readError,
+  } = await admin
+    .from('school_management')
+    .select('id')
+    .eq('active', true);
 
-    if (insertError) {
+  if (readError) {
+    return NextResponse.json(
+      { error: readError.message },
+      { status: 500 }
+    );
+  }
+
+  const existingIds = new Set(
+    (existingRows ?? []).map((row) => row.id as string)
+  );
+
+  const keptIds = new Set<string>();
+
+  for (const member of clean) {
+    if (member.id && existingIds.has(member.id)) {
+      keptIds.add(member.id);
+
+      const { error } = await admin
+        .from('school_management')
+        .update({
+          display_name: member.display_name,
+          role: member.role,
+        })
+        .eq('id', member.id);
+
+      if (error) {
+        return NextResponse.json(
+          { error: `Modification impossible : ${error.message}` },
+          { status: 500 }
+        );
+      }
+    }
+  }
+
+  const toInsert = clean
+    .filter((member) => !(member.id && existingIds.has(member.id)))
+    .map(({ display_name, role }) => ({
+      display_name,
+      role,
+      active: true,
+    }));
+
+  if (toInsert.length > 0) {
+    const { error } = await admin
+      .from('school_management')
+      .insert(toInsert);
+
+    if (error) {
       return NextResponse.json(
-        {
-          error:
-            insertError.message,
-        },
-        {
-          status: 500,
-        }
+        { error: `Ajout impossible : ${error.message}` },
+        { status: 500 }
+      );
+    }
+  }
+
+  const toDelete = [...existingIds].filter((id) => !keptIds.has(id));
+
+  if (toDelete.length > 0) {
+    const { error } = await admin
+      .from('school_management')
+      .delete()
+      .in('id', toDelete);
+
+    if (error) {
+      return NextResponse.json(
+        { error: `Suppression impossible : ${error.message}` },
+        { status: 500 }
       );
     }
   }

@@ -305,8 +305,9 @@ export async function POST(
         p_classes:
           parsed.classes,
 
-        p_direction:
-          parsed.direction,
+        // Liste vide = la direction actuelle n'est jamais modifiée
+        // par l'import (elle se gère dans Configuration → Direction).
+        p_direction: [],
       }
     );
 
