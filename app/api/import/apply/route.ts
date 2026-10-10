@@ -170,43 +170,40 @@ export async function POST(
         .digest('hex');
 
     /*
-     * Vérification de l'année scolaire.
+     * L'import se fait TOUJOURS dans l'année en cours.
+     *
+     * (Importer dans une autre année réactiverait cette
+     * année-là — par exemple une année déjà clôturée.)
      */
     const {
       data: schoolYear,
       error: yearError,
     } = await admin
       .from('school_years')
-      .select(
-        'id,label'
-      )
-      .eq(
-        'label',
-        schoolYearLabel
-      )
+      .select('id,label')
+      .eq('is_active', true)
       .maybeSingle();
 
     if (yearError) {
       return NextResponse.json(
-        {
-          error:
-            "Impossible de vérifier l'année scolaire.",
-        },
-        {
-          status: 500,
-        }
+        { error: "Impossible de vérifier l'année scolaire." },
+        { status: 500 }
       );
     }
 
     if (!schoolYear) {
       return NextResponse.json(
+        { error: "Aucune année scolaire active n'est définie." },
+        { status: 409 }
+      );
+    }
+
+    if (schoolYear.label !== schoolYearLabel) {
+      return NextResponse.json(
         {
-          error:
-            `L'année scolaire ${schoolYearLabel} n'existe pas.`,
+          error: `L'import se fait dans l'année en cours (${schoolYear.label}), pas dans ${schoolYearLabel}. Recharge la page.`,
         },
-        {
-          status: 409,
-        }
+        { status: 409 }
       );
     }
 

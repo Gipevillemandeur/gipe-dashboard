@@ -1,6 +1,6 @@
 'use client';
 
-import { ChangeEvent, useMemo, useState } from 'react';
+import { ChangeEvent, useEffect, useMemo, useState } from 'react';
 import {
   ArrowLeft,
   CheckCircle2,
@@ -38,10 +38,6 @@ type ApplyResult = {
   previousImport?: PreviousImport;
 };
 
-const defaultSchoolYear =
-  process.env.NEXT_PUBLIC_DEFAULT_SCHOOL_YEAR ||
-  '2026-2027';
-
 export default function ImportCollegePage() {
   const [file, setFile] =
     useState<File | null>(null);
@@ -49,8 +45,19 @@ export default function ImportCollegePage() {
   const [parsed, setParsed] =
     useState<CollegeImport | null>(null);
 
+  /*
+   * Année de l'import : toujours l'année en cours,
+   * lue sur le serveur (non modifiable).
+   */
   const [schoolYear, setSchoolYear] =
-    useState(defaultSchoolYear);
+    useState('');
+
+  useEffect(() => {
+    fetch('/api/configuration', { cache: 'no-store' })
+      .then((response) => response.json())
+      .then((data) => setSchoolYear(data?.schoolYear || ''))
+      .catch(() => setSchoolYear(''));
+  }, []);
 
   const [error, setError] =
     useState('');
@@ -106,6 +113,11 @@ export default function ImportCollegePage() {
     force = false
   ) {
     if (!file || !parsed) {
+      return;
+    }
+
+    if (!schoolYear) {
+      setError('Année scolaire en cours introuvable. Recharge la page.');
       return;
     }
 
@@ -614,16 +626,12 @@ export default function ImportCollegePage() {
                 <input
                   className="input"
                   value={
-                    schoolYear
+                    schoolYear ||
+                    'Chargement…'
                   }
-                  onChange={(
-                    e
-                  ) =>
-                    setSchoolYear(
-                      e.target.value
-                    )
-                  }
-                  placeholder="2026-2027"
+                  readOnly
+                  disabled
+                  title="L’import se fait toujours dans l’année scolaire en cours."
                 />
 
               </label>
@@ -760,6 +768,24 @@ export default function ImportCollegePage() {
 
 
           {/* ================================================= */}
+          {/* CE QUI A ÉTÉ RECONNU */}
+          {/* ================================================= */}
+
+          {parsed.notes?.length > 0 && (
+            <div className="card section-card">
+              <div className="notice">
+                <ShieldCheck size={17} />
+                <div>
+                  <strong>Ce que l’import a reconnu dans le fichier</strong>
+                  {parsed.notes.map((note) => (
+                    <div key={note}>{note}</div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ================================================= */}
           {/* AVERTISSEMENTS */}
           {/* ================================================= */}
 
@@ -794,7 +820,7 @@ export default function ImportCollegePage() {
                         marginTop: 6,
                       }}
                     >
-                      Onglets réservés :{' '}
+                      Onglets non utilisés :{' '}
                       {parsed.ignoredSheets.join(
                         ', '
                       )}
