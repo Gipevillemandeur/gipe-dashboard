@@ -357,7 +357,14 @@ export default function Sidebar() {
           </Link>
           )}
 
-          <Link href="#">
+          <Link
+            className={
+              pathname === '/guide'
+                ? 'active'
+                : ''
+            }
+            href="/guide"
+          >
             <BookOpen size={18} />
             Guide de passation
           </Link>
