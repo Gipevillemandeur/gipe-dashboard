@@ -1,4 +1,6 @@
+import Link from 'next/link';
 import {
+  AlertTriangle,
   GraduationCap,
   Users,
   HeartHandshake,
@@ -30,7 +32,9 @@ export default async function DashboardPage() {
 
           <div className="eyebrow">
             Année scolaire{' '}
-            {snapshot.schoolYear.replace('-', '–')}
+            {snapshot.schoolYear
+              ? snapshot.schoolYear.replace('-', '–')
+              : '—'}
           </div>
 
           <h1>
@@ -54,6 +58,28 @@ export default async function DashboardPage() {
 
       </div>
 
+
+      {snapshot.error && (
+        <div
+          className="notice notice-error"
+          style={{
+            display: 'flex',
+            gap: 10,
+            alignItems: 'flex-start',
+            marginBottom: 18,
+          }}
+        >
+          <AlertTriangle size={18} />
+          <div>
+            <strong>Les données n’ont pas pu être chargées.</strong>
+            <div>{snapshot.error}</div>
+            <div style={{ fontSize: 12, marginTop: 4 }}>
+              Recharge la page dans quelques instants. Aucun chiffre n’est
+              affiché tant que les vraies données ne sont pas disponibles.
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="page-grid cards-3">
 
@@ -158,8 +184,8 @@ export default async function DashboardPage() {
             </h2>
 
             <p className="section-sub">
-              Les prochains éléments à
-              vérifier ou à préparer.
+              Les prochaines réunions et ce qui
+              reste à préparer.
             </p>
 
           </div>
@@ -168,82 +194,68 @@ export default async function DashboardPage() {
 
 
         <div className="list">
-
-          <div className="list-item">
-
-            <div className="item-main">
-
-              <strong>
-                Mettre à jour les listes du collège
-              </strong>
-
-              <span>
-                Après réception du prochain fichier.
-              </span>
-
+          {!snapshot.error && realClasses.length === 0 && (
+            <div className="list-item">
+              <div className="item-main">
+                <strong>Importer le listing du collège</strong>
+                <span>
+                  Aucune classe pour l’année en cours.
+                </span>
+              </div>
+              <Link
+                href="/import-college"
+                className="badge badge-warn"
+                style={{ textDecoration: 'none' }}
+              >
+                À faire
+              </Link>
             </div>
+          )}
 
-            <span className="badge badge-warn">
-              À faire
-            </span>
-
-          </div>
-
-
-          <div className="list-item">
-
-            <div className="item-main">
-
-              <strong>
-                Conseil de classe 3A
-              </strong>
-
-              <span>
-                Date à confirmer dans le module
-                Conseils.
+          {snapshot.upcomingMeetings.map((meeting) => (
+            <Link
+              key={meeting.id}
+              href={`/instances/${meeting.id}`}
+              className="list-item"
+              style={{ textDecoration: 'none', color: 'inherit' }}
+            >
+              <div className="item-main">
+                <strong>
+                  {meeting.type} – {meeting.subject}
+                </strong>
+                <span>
+                  {meeting.date.split('-').reverse().join('/')}
+                  {meeting.time ? ` à ${meeting.time.slice(0, 5)}` : ''}
+                </span>
+              </div>
+              <span className="badge badge-info">
+                À préparer
               </span>
+            </Link>
+          ))}
 
-            </div>
-
-            <span className="badge badge-info">
-              À préparer
-            </span>
-
-          </div>
-
-
-          <div className="list-item">
-
-            <div className="item-main">
-
-              <strong>
-                Classe TEST
-              </strong>
-
-              <span>
-                Disponible pour les démonstrations.
-              </span>
-
-            </div>
-
-            <span className="badge badge-ok">
-              OK
-            </span>
-
-          </div>
-
+          {!snapshot.error &&
+            realClasses.length > 0 &&
+            snapshot.upcomingMeetings.length === 0 && (
+              <div className="list-item">
+                <div className="item-main">
+                  <strong>Aucune réunion à venir</strong>
+                  <span>
+                    Les prochaines instances apparaîtront ici.
+                  </span>
+                </div>
+              </div>
+            )}
         </div>
 
       </section>
 
 
-      <div className="footer-note">
-
-        {snapshot.connected
-          ? 'Données chargées depuis Supabase.'
-          : "Mode démonstration : Supabase n'est pas encore connecté ou aucune année active n'est configurée."}
-
-      </div>
+      {snapshot.connected && (
+        <div className="footer-note">
+          Données chargées depuis Supabase.
+        </div>
+      )}
 
     </>
   );

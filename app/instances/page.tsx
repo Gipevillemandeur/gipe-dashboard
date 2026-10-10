@@ -47,6 +47,8 @@ export default function InstancesPage() {
   const [loading,setLoading] = useState(true)
   const [saving,setSaving] = useState(false)
   const [deleting,setDeleting] = useState(false)
+  // Réunion dont la suppression attend confirmation
+  const [toDelete,setToDelete] = useState<Meeting|null>(null)
   const [error,setError] = useState('')
   const [modalMode,setModalMode] = useState<'edit'|null>(null)
   const [selected,setSelected] = useState<Meeting|null>(null)
@@ -175,14 +177,6 @@ export default function InstancesPage() {
   }
 
   async function del(meeting:Meeting) {
-    if (
-      !window.confirm(
-        `Supprimer la réunion « ${meeting.subject} » ?\n\nCette action est définitive.`
-      )
-    ) {
-      return
-    }
-
     try {
       setDeleting(true)
 
@@ -221,6 +215,7 @@ export default function InstancesPage() {
       )
     } finally {
       setDeleting(false)
+      setToDelete(null)
     }
   }
 
@@ -235,7 +230,7 @@ export default function InstancesPage() {
   )
 
   return (
-    <main className="page">
+    <main className="page scol">
 
       <section className="hero">
         <div>
@@ -305,7 +300,7 @@ export default function InstancesPage() {
                     meeting={m}
                     past={false}
                     onEdit={() => edit(m)}
-                    onDelete={() => del(m)}
+                    onDelete={() => setToDelete(m)}
                   />
                 ))}
               </div>
@@ -328,7 +323,7 @@ export default function InstancesPage() {
                     meeting={m}
                     past
                     onEdit={() => edit(m)}
-                    onDelete={() => del(m)}
+                    onDelete={() => setToDelete(m)}
                   />
                 ))}
               </div>
@@ -337,6 +332,38 @@ export default function InstancesPage() {
           )}
 
         </section>
+      )}
+
+      {toDelete && (
+        <div className="modal-backdrop" role="dialog" aria-modal="true">
+          <div className="modal confirm-modal">
+            <h2>Supprimer la réunion ?</h2>
+            <p>
+              <strong>{toDelete.type} – {toDelete.subject}</strong>
+              <br />
+              {toDelete.meeting_date.split('-').reverse().join('/')}
+            </p>
+            <p className="confirm-note">Cette action est définitive.</p>
+            <div className="confirm-actions">
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={() => setToDelete(null)}
+                disabled={deleting}
+              >
+                Annuler
+              </button>
+              <button
+                type="button"
+                className="danger-solid"
+                onClick={() => void del(toDelete)}
+                disabled={deleting}
+              >
+                {deleting ? 'Suppression…' : 'Supprimer'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {modalMode && (
@@ -476,57 +503,59 @@ export default function InstancesPage() {
 
       <style>{`
 
-        .page{
+        .scol.page{
           display:grid;
           gap:24px;
           padding:28px
         }
 
-        .hero{
+        .scol .hero{
           display:flex;
           justify-content:space-between;
           gap:24px
         }
 
-        .eyebrow{
+        .scol .eyebrow{
           display:inline-flex;
           gap:8px;
           align-items:center;
           margin-bottom:8px;
-          color:#64748b;
+          color:#756a67;
           font-size:14px;
           font-weight:700
         }
 
-        h1{
+        .scol h1{
           margin:0;
-          color:#0f172a;
+          color:#241c1b;
           font-size:clamp(28px,4vw,38px)
         }
 
-        .hero p{
+        .scol .hero p{
           max-width:760px;
           margin:10px 0 0;
-          color:#64748b;
+          color:#756a67;
           line-height:1.6
         }
 
-        .back-link{
+        .scol .back-link{
           display:inline-flex;
           align-items:center;
           gap:7px;
           min-height:44px;
           padding:0 14px;
-          border:1px solid #e2e8f0;
+          border:1px solid #eadfd4;
           border-radius:12px;
           background:#fff;
-          color:#475569;
+          color:#5f514b;
           font-weight:700;
-          text-decoration:none
+          text-decoration:none;
+          align-self:flex-start;
+          white-space:nowrap
         }
 
-        .page-error,
-        .form-error{
+        .scol .page-error,
+        .scol .form-error{
           padding:12px 14px;
           border:1px solid #e8c7c4;
           border-radius:10px;
@@ -534,20 +563,20 @@ export default function InstancesPage() {
           color:#8f211c
         }
 
-        .empty-card{
+        .scol .empty-card{
           display:flex;
           flex-direction:column;
           align-items:center;
           justify-content:center;
           min-height:330px;
           padding:40px 24px;
-          border:1px dashed #cbd5e1;
+          border:1px dashed #d8cbc0;
           border-radius:18px;
           background:#fff;
           text-align:center
         }
 
-        .empty-icon{
+        .scol .empty-icon{
           display:grid;
           place-items:center;
           width:64px;
@@ -557,37 +586,37 @@ export default function InstancesPage() {
           color:#302b27
         }
 
-        .empty-card h2{
+        .scol .empty-card h2{
           margin:18px 0 0
         }
 
-        .empty-card p{
-          color:#64748b
+        .scol .empty-card p{
+          color:#756a67
         }
 
-        .meeting-sections{
+        .scol .meeting-sections{
           display:grid;
           gap:24px
         }
 
-        .meeting-group{
+        .scol .meeting-group{
           display:grid;
           gap:12px
         }
 
-        .group-title{
+        .scol .group-title{
           display:flex;
           align-items:center;
           gap:9px
         }
 
-        .group-title h2{
+        .scol .group-title h2{
           margin:0;
-          color:#0f172a;
+          color:#241c1b;
           font-size:19px
         }
 
-        .group-title span{
+        .scol .group-title span{
           display:inline-flex;
           align-items:center;
           justify-content:center;
@@ -600,39 +629,39 @@ export default function InstancesPage() {
           font-weight:700
         }
 
-        .meeting-list{
+        .scol .meeting-list{
           display:grid;
           gap:10px
         }
 
-        .meeting-card{
+        .scol .meeting-card{
           display:grid;
           grid-template-columns:minmax(220px,1fr) auto;
           align-items:center;
           gap:20px;
           padding:18px 20px;
-          border:1px solid #e2e8f0;
+          border:1px solid #eadfd4;
           border-radius:15px;
           background:#fff;
-          box-shadow:0 4px 16px rgba(15,23,42,.04);
+          box-shadow:0 4px 16px rgba(36, 28, 27,.04);
           text-decoration:none;
           color:inherit
         }
 
-        .meeting-card.clickable{
+        .scol .meeting-card.clickable{
           cursor:pointer
         }
 
-        .meeting-card.clickable:hover{
+        .scol .meeting-card.clickable:hover{
           border-color:#d8b8b4;
-          box-shadow:0 8px 22px rgba(15,23,42,.07)
+          box-shadow:0 8px 22px rgba(36, 28, 27,.07)
         }
 
-        .meeting-main{
+        .scol .meeting-main{
           min-width:0
         }
 
-        .meeting-type{
+        .scol .meeting-type{
           display:inline-flex;
           padding:4px 9px;
           border-radius:999px;
@@ -642,28 +671,28 @@ export default function InstancesPage() {
           font-weight:700
         }
 
-        .meeting-main h3{
+        .scol .meeting-main h3{
           margin:8px 0 0;
-          color:#0f172a;
+          color:#241c1b;
           font-size:17px
         }
 
-        .meeting-meta{
+        .scol .meeting-meta{
           display:flex;
           flex-wrap:wrap;
           gap:12px 18px;
           margin-top:8px;
-          color:#64748b;
+          color:#756a67;
           font-size:13px
         }
 
-        .meeting-meta span{
+        .scol .meeting-meta span{
           display:inline-flex;
           align-items:center;
           gap:5px
         }
 
-        .meeting-actions{
+        .scol .meeting-actions{
           display:flex;
           align-items:center;
           justify-content:flex-end;
@@ -671,9 +700,9 @@ export default function InstancesPage() {
           flex-wrap:wrap
         }
 
-        .open-hint,
-        .edit-hint,
-        .delete-hint{
+        .scol .open-hint,
+        .scol .edit-hint,
+        .scol .delete-hint{
           display:inline-flex;
           align-items:center;
           justify-content:center;
@@ -690,11 +719,11 @@ export default function InstancesPage() {
           text-decoration:none
         }
 
-        .delete-hint:hover{
+        .scol .delete-hint:hover{
           background:#fff5f4
         }
 
-        .modal-backdrop{
+        .scol .modal-backdrop{
           position:fixed;
           inset:0;
           z-index:1000;
@@ -702,80 +731,123 @@ export default function InstancesPage() {
           align-items:center;
           justify-content:center;
           padding:20px;
-          background:rgba(15,23,42,.45)
+          background:rgba(36, 28, 27,.45)
         }
 
-        .modal{
+        .scol .confirm-modal{
+          width:min(440px,100%);
+          padding:22px
+        }
+
+        .scol .confirm-modal h2{
+          margin:0 0 10px;
+          font-size:19px
+        }
+
+        .scol .confirm-modal p{
+          margin:0 0 8px;
+          font-size:14px;
+          line-height:1.5
+        }
+
+        .scol .confirm-note{
+          color:#756a67;
+          font-size:13px !important
+        }
+
+        .scol .confirm-actions{
+          display:flex;
+          justify-content:flex-end;
+          gap:10px;
+          margin-top:16px
+        }
+
+        .scol .danger-solid{
+          min-height:42px;
+          padding:0 16px;
+          border:0;
+          border-radius:12px;
+          background:#8a2b22;
+          color:#fff;
+          font-weight:700;
+          cursor:pointer
+        }
+
+        .scol .danger-solid:disabled{
+          opacity:.6
+        }
+
+        .scol .modal{
           width:min(620px,100%);
           max-height:calc(100vh - 40px);
           overflow-y:auto;
           border-radius:18px;
           background:#fff;
-          box-shadow:0 20px 60px rgba(15,23,42,.2)
+          box-shadow:0 20px 60px rgba(36, 28, 27,.2)
         }
 
-        .modal-head{
+        .scol .modal-head{
           display:flex;
           justify-content:space-between;
           gap:16px;
           padding:22px 24px;
-          border-bottom:1px solid #e2e8f0
+          border-bottom:1px solid #eadfd4
         }
 
-        .modal-head span{
-          color:#64748b;
+        .scol .modal-head span{
+          color:#756a67;
           font-size:11px;
           font-weight:800;
           letter-spacing:.08em
         }
 
-        .modal-head h2{
+        .scol .modal-head h2{
           margin:5px 0 0;
           font-size:21px
         }
 
-        .close-button{
+        .scol .close-button{
           display:grid;
           place-items:center;
           width:38px;
           height:38px;
-          border:1px solid #e2e8f0;
+          border:1px solid #eadfd4;
           border-radius:10px;
           background:#fff;
-          color:#475569;
+          color:#5f514b;
           cursor:pointer
         }
 
-        .modal form{
+        .scol .modal form{
           padding:24px;
           min-width:0
         }
 
-        .form-grid{
+        .scol .form-grid{
           display:grid;
           grid-template-columns:repeat(2,minmax(0,1fr));
           gap:16px;
           min-width:0
         }
 
-        .form-grid>label{
+        .scol .form-grid>label{
           display:grid;
           gap:7px;
           min-width:0
         }
 
-        .form-grid>label.full{
+        .scol .form-grid>label.full{
           grid-column:1/-1
         }
 
-        .form-grid label>span{
-          color:#334155;
+        .scol .form-grid label>span{
+          color:#302b27;
           font-size:13px;
           font-weight:700
         }
 
-        .form-grid input,
-        .form-grid select{
+        .scol .form-grid input,
+        .scol .form-grid select{
           width:100%;
           min-width:0;
           max-width:100%;
@@ -785,11 +857,11 @@ export default function InstancesPage() {
           border:1px solid #e2d7d1;
           border-radius:10px;
           background:#fff;
-          color:#0f172a;
+          color:#241c1b;
           font:inherit
         }
 
-        .documents-field{
+        .scol .documents-field{
           display:grid;
           gap:7px;
           font-size:12px;
@@ -797,7 +869,7 @@ export default function InstancesPage() {
           min-width:0
         }
 
-        .documents-two-columns{
+        .scol .documents-two-columns{
           display:grid;
           grid-template-columns:minmax(0,1fr) minmax(0,1fr);
           gap:16px;
@@ -805,7 +877,7 @@ export default function InstancesPage() {
           grid-column:1/-1
         }
 
-        .documents-date-input{
+        .scol .documents-date-input{
           width:100%!important;
           min-width:0!important;
           max-width:100%!important;
@@ -820,7 +892,7 @@ export default function InstancesPage() {
           justify-content:center!important
         }
 
-        .documents-date-input::-webkit-datetime-edit{
+        .scol .documents-date-input::-webkit-datetime-edit{
           display:flex!important;
           align-items:center!important;
           justify-content:center!important;
@@ -830,7 +902,7 @@ export default function InstancesPage() {
           margin:0!important
         }
 
-        .documents-date-input::-webkit-datetime-edit-fields-wrapper{
+        .scol .documents-date-input::-webkit-datetime-edit-fields-wrapper{
           display:flex!important;
           align-items:center!important;
           justify-content:center!important;
@@ -840,27 +912,27 @@ export default function InstancesPage() {
           margin:0!important
         }
 
-        .documents-date-input::-webkit-date-and-time-value{
+        .scol .documents-date-input::-webkit-date-and-time-value{
           text-align:center!important;
           line-height:normal!important
         }
 
-        .modal-actions{
+        .scol .modal-actions{
           display:flex;
           justify-content:flex-end;
           gap:10px;
           margin-top:24px;
           padding-top:18px;
-          border-top:1px solid #eef2f7
+          border-top:1px solid #f6efe8
         }
 
-        .modal-actions-right{
+        .scol .modal-actions-right{
           display:flex;
           gap:10px
         }
 
-        .secondary-button,
-        .primary-button{
+        .scol .secondary-button,
+        .scol .primary-button{
           display:inline-flex;
           align-items:center;
           justify-content:center;
@@ -872,88 +944,91 @@ export default function InstancesPage() {
           cursor:pointer
         }
 
-        .secondary-button{
+        .scol .secondary-button{
           border:1px solid #e2d7d1;
           background:#fff;
-          color:#475569
+          color:#5f514b
         }
 
-        .primary-button{
+        .scol .primary-button{
           border:0;
           background:#8f211c;
           color:#fff
         }
 
-        .primary-button:hover{
+        .scol .primary-button:hover{
           background:#7a1c18
         }
 
         @media(max-width:760px){
 
-          .page{
+          .scol.page{
             gap:18px;
             padding:18px 14px
           }
 
-          .hero{
+          .scol .hero{
             flex-direction:column
           }
 
-          .back-link{
+          .scol .back-link{
             width:auto;
             align-self:flex-start;
             justify-content:center
           }
 
-          .meeting-card{
+          .scol .meeting-card{
             grid-template-columns:1fr;
             gap:14px
           }
 
-          .meeting-actions{
+          .scol .meeting-actions{
             width:100%;
             justify-content:stretch
           }
 
-          .open-hint,
-          .edit-hint,
-          .delete-hint{
+          .scol .open-hint,
+          .scol .edit-hint,
+          .scol .delete-hint{
             flex:1;
-            width:auto
+            width:auto;
+            white-space:nowrap;
+            padding-left:8px;
+            padding-right:8px
           }
 
-          .modal-backdrop{
+          .scol .modal-backdrop{
             align-items:flex-end;
             padding:0
           }
 
-          .modal{
+          .scol .modal{
             width:100%;
             max-height:92vh;
             border-radius:18px 18px 0 0
           }
 
-          .modal-head,
-          .modal form{
+          .scol .modal-head,
+          .scol .modal form{
             padding-left:18px;
             padding-right:18px
           }
 
-          .form-grid{
+          .scol .form-grid{
             grid-template-columns:minmax(0,1fr)
           }
 
-          .form-grid>label.full{
+          .scol .form-grid>label.full{
             grid-column:auto
           }
 
-          .documents-two-columns{
+          .scol .documents-two-columns{
             grid-template-columns:minmax(0,1fr);
             gap:16px;
             grid-column:auto
           }
 
-          .documents-date-input{
+          .scol .documents-date-input{
             width:100%!important;
             min-width:0!important;
             max-width:100%!important;
@@ -970,7 +1045,7 @@ export default function InstancesPage() {
             line-height:normal!important
           }
 
-          .documents-date-input::-webkit-datetime-edit{
+          .scol .documents-date-input::-webkit-datetime-edit{
             display:flex!important;
             align-items:center!important;
             justify-content:center!important;
@@ -980,7 +1055,7 @@ export default function InstancesPage() {
             margin:0!important
           }
 
-          .documents-date-input::-webkit-datetime-edit-fields-wrapper{
+          .scol .documents-date-input::-webkit-datetime-edit-fields-wrapper{
             display:flex!important;
             align-items:center!important;
             justify-content:center!important;
@@ -990,17 +1065,17 @@ export default function InstancesPage() {
             margin:0!important
           }
 
-          .documents-date-input::-webkit-date-and-time-value{
+          .scol .documents-date-input::-webkit-date-and-time-value{
             text-align:center!important;
             line-height:normal!important
           }
 
-          .modal-actions{
+          .scol .modal-actions{
             align-items:stretch;
             flex-direction:column
           }
 
-          .modal-actions-right{
+          .scol .modal-actions-right{
             display:grid;
             grid-template-columns:1fr 1fr
           }

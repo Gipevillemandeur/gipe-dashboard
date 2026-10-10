@@ -13,6 +13,7 @@ import {
   Trash2,
   ExternalLink,
 } from 'lucide-react'
+import { createClient } from '@/lib/supabase/client'
 
 type Meeting = {
   id: string
@@ -84,6 +85,10 @@ export default function InstanceDetailPage({
   const [uploading, setUploading] = useState(false)
   const [deletingDocumentId, setDeletingDocumentId] =
     useState<string | null>(null)
+
+  // Document dont la suppression attend confirmation
+  const [documentToDelete, setDocumentToDelete] =
+    useState<MeetingDocument | null>(null)
 
   const [error, setError] = useState('')
   const [saved, setSaved] = useState(false)
@@ -232,14 +237,56 @@ export default function InstanceDetailPage({
       setUploading(true)
       setError('')
 
-      const formData = new FormData()
-      formData.append('file', file)
+      // 1. Autorisation d'envoi temporaire
+      const prepareResponse = await fetch(
+        `/api/instances/${meeting.id}/documents`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'prepare',
+            fileName: file.name,
+            fileSize: file.size,
+            fileType: file.type,
+          }),
+        }
+      )
 
+      const prepared = await prepareResponse.json()
+
+      if (!prepareResponse.ok) {
+        throw new Error(
+          prepared.error || 'Impossible de préparer l’envoi.'
+        )
+      }
+
+      // 2. Envoi DIRECT au stockage (sans passer par Vercel,
+      //    qui limite les envois à ~4,5 Mo).
+      const { error: uploadError } = await createClient()
+        .storage.from('instance-documents')
+        .uploadToSignedUrl(prepared.path, prepared.token, file, {
+          contentType: file.type || 'application/octet-stream',
+        })
+
+      if (uploadError) {
+        throw new Error(
+          `Envoi du fichier impossible : ${uploadError.message}`
+        )
+      }
+
+      // 3. Enregistrement du document
       const response = await fetch(
         `/api/instances/${meeting.id}/documents`,
         {
           method: 'POST',
-          body: formData,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'confirm',
+            path: prepared.path,
+            fileName: file.name,
+            fileSize: file.size,
+            fileType: file.type,
+          }),
         }
       )
 
@@ -271,12 +318,6 @@ export default function InstanceDetailPage({
     document: MeetingDocument
   ) {
     if (!meeting) return
-
-    const confirmed = window.confirm(
-      `Supprimer le document « ${document.file_name} » ?`
-    )
-
-    if (!confirmed) return
 
     try {
       setDeletingDocumentId(document.id)
@@ -317,12 +358,13 @@ export default function InstanceDetailPage({
       )
     } finally {
       setDeletingDocumentId(null)
+      setDocumentToDelete(null)
     }
   }
 
   if (loading) {
     return (
-      <main className="page">
+      <main className="page scol">
         <section className="state-card">
           Chargement de la réunion…
         </section>
@@ -332,7 +374,7 @@ export default function InstanceDetailPage({
 
   if (!meeting) {
     return (
-      <main className="page">
+      <main className="page scol">
         <section className="state-card">
           <h1>Réunion introuvable</h1>
 
@@ -351,7 +393,7 @@ export default function InstanceDetailPage({
   }
 
   return (
-    <main className="page">
+    <main className="page scol">
       <div className="topbar">
         <Link
           href="/instances"
@@ -595,7 +637,7 @@ export default function InstanceDetailPage({
                     type="button"
                     className="document-delete"
                     onClick={() =>
-                      deleteDocument(
+                      setDocumentToDelete(
                         document
                       )
                     }
@@ -619,8 +661,50 @@ export default function InstanceDetailPage({
         )}
       </section>
 
+      {documentToDelete && (
+        <div className="confirm-backdrop" role="dialog" aria-modal="true">
+          <div className="confirm-box">
+            <h2>Supprimer le document ?</h2>
+            <p>
+              <strong>{documentToDelete.file_name}</strong>
+            </p>
+            <p className="confirm-note">
+              Le fichier sera définitivement supprimé.
+            </p>
+            <div className="confirm-actions">
+              <button
+                type="button"
+                className="confirm-cancel"
+                onClick={() => setDocumentToDelete(null)}
+                disabled={deletingDocumentId !== null}
+              >
+                Annuler
+              </button>
+              <button
+                type="button"
+                className="confirm-danger"
+                onClick={() => void deleteDocument(documentToDelete)}
+                disabled={deletingDocumentId !== null}
+              >
+                {deletingDocumentId !== null ? 'Suppression…' : 'Supprimer'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <style>{`
-        .page {
+        .scol .confirm-backdrop{position:fixed;inset:0;z-index:1000;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(36, 28, 27,.45)}
+        .scol .confirm-box{width:min(440px,100%);padding:22px;border-radius:18px;background:#fff;box-shadow:0 20px 60px rgba(36, 28, 27,.2)}
+        .scol .confirm-box h2{margin:0 0 10px;font-size:19px}
+        .scol .confirm-box p{margin:0 0 8px;font-size:14px;line-height:1.5;overflow-wrap:anywhere}
+        .scol .confirm-note{color:#756a67;font-size:13px !important}
+        .scol .confirm-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:16px}
+        .scol .confirm-cancel,.scol .confirm-danger{min-height:42px;padding:0 16px;border-radius:12px;font-weight:700;cursor:pointer}
+        .scol .confirm-cancel{border:1px solid #eadfd4;background:#fff;color:#302b27}
+        .scol .confirm-danger{border:0;background:#8a2b22;color:#fff}
+
+        .scol.page {
           display: grid;
           gap: 22px;
           padding: 28px;
@@ -628,14 +712,14 @@ export default function InstanceDetailPage({
           margin: 0 auto;
         }
 
-        .topbar {
+        .scol .topbar {
           display: flex;
           align-items: center;
           justify-content: space-between;
           gap: 16px;
         }
 
-        .back-link {
+        .scol .back-link {
           display: inline-flex;
           align-items: center;
           gap: 7px;
@@ -650,11 +734,11 @@ export default function InstanceDetailPage({
           text-decoration: none;
         }
 
-        .back-link:hover {
+        .scol .back-link:hover {
           background: #fff8f7;
         }
 
-        .status {
+        .scol .status {
           display: inline-flex;
           align-items: center;
           min-height: 32px;
@@ -666,11 +750,11 @@ export default function InstanceDetailPage({
           font-weight: 800;
         }
 
-        .hero {
+        .scol .hero {
           padding: 4px 0;
         }
 
-        .eyebrow {
+        .scol .eyebrow {
           display: inline-flex;
           align-items: center;
           min-height: 28px;
@@ -682,30 +766,30 @@ export default function InstanceDetailPage({
           font-weight: 800;
         }
 
-        h1 {
+        .scol h1 {
           margin: 10px 0 0;
-          color: #0f172a;
+          color: #241c1b;
           font-size: clamp(28px, 4vw, 38px);
           line-height: 1.12;
           letter-spacing: -0.03em;
         }
 
-        .meta {
+        .scol .meta {
           display: flex;
           flex-wrap: wrap;
           gap: 10px 18px;
           margin-top: 12px;
-          color: #64748b;
+          color: #756a67;
           font-size: 14px;
         }
 
-        .meta span {
+        .scol .meta span {
           display: inline-flex;
           align-items: center;
           gap: 6px;
         }
 
-        .error {
+        .scol .error {
           padding: 12px 14px;
           border: 1px solid #e8c7c4;
           border-radius: 10px;
@@ -714,18 +798,18 @@ export default function InstanceDetailPage({
           font-size: 14px;
         }
 
-        .info-card,
-        .content-card {
+        .scol .info-card,
+        .scol .content-card {
           padding: 22px;
-          border: 1px solid #e2e8f0;
+          border: 1px solid #eadfd4;
           border-radius: 16px;
           background: #fff;
-          box-shadow: 0 4px 16px rgba(15, 23, 42, 0.04);
+          box-shadow: 0 4px 16px rgba(36, 28, 27, 0.04);
           min-width: 0;
           box-sizing: border-box;
         }
 
-        .section-title {
+        .scol .section-title {
           display: flex;
           align-items: flex-start;
           gap: 12px;
@@ -733,32 +817,32 @@ export default function InstanceDetailPage({
           min-width: 0;
         }
 
-        .section-title > svg {
+        .scol .section-title > svg {
           flex: 0 0 auto;
           margin-top: 2px;
         }
 
-        .section-title h2 {
+        .scol .section-title h2 {
           margin: 0;
-          color: #0f172a;
+          color: #241c1b;
           font-size: 19px;
         }
 
-        .section-title p {
+        .scol .section-title p {
           margin: 5px 0 0;
-          color: #64748b;
+          color: #756a67;
           font-size: 14px;
           line-height: 1.5;
         }
 
-        .info-grid {
+        .scol .info-grid {
           display: grid;
           grid-template-columns: repeat(2, minmax(0, 1fr));
           gap: 16px;
           margin-top: 20px;
         }
 
-        .info-grid > div {
+        .scol .info-grid > div {
           display: grid;
           gap: 6px;
           min-width: 0;
@@ -769,27 +853,27 @@ export default function InstanceDetailPage({
           box-sizing: border-box;
         }
 
-        .info-grid .full {
+        .scol .info-grid .full {
           grid-column: 1 / -1;
         }
 
-        .info-grid span {
-          color: #64748b;
+        .scol .info-grid span {
+          color: #756a67;
           font-size: 12px;
           font-weight: 700;
         }
 
-        .info-grid strong {
-          color: #0f172a;
+        .scol .info-grid strong {
+          color: #241c1b;
           font-size: 14px;
           overflow-wrap: anywhere;
         }
 
-        form {
+        .scol form {
           margin-top: 20px;
         }
 
-        textarea {
+        .scol textarea {
           display: block;
           width: 100%;
           min-height: 260px;
@@ -799,18 +883,18 @@ export default function InstanceDetailPage({
           border: 1px solid #e2d7d1;
           border-radius: 10px;
           background: #fff;
-          color: #0f172a;
+          color: #241c1b;
           font: inherit;
           line-height: 1.6;
           outline: none;
         }
 
-        textarea:focus {
+        .scol textarea:focus {
           border-color: #8f211c;
           box-shadow: 0 0 0 3px rgba(143, 33, 28, 0.08);
         }
 
-        .actions {
+        .scol .actions {
           display: flex;
           align-items: center;
           justify-content: flex-end;
@@ -818,14 +902,14 @@ export default function InstanceDetailPage({
           margin-top: 14px;
         }
 
-        .saved {
+        .scol .saved {
           margin-right: auto;
           color: #2f6b45;
           font-size: 13px;
           font-weight: 700;
         }
 
-        .primary-button {
+        .scol .primary-button {
           display: inline-flex;
           align-items: center;
           justify-content: center;
@@ -841,16 +925,16 @@ export default function InstanceDetailPage({
           cursor: pointer;
         }
 
-        .primary-button:hover {
+        .scol .primary-button:hover {
           background: #7a1c18;
         }
 
-        .primary-button:disabled {
+        .scol .primary-button:disabled {
           opacity: 0.55;
           cursor: not-allowed;
         }
 
-        .documents-header {
+        .scol .documents-header {
           display: flex;
           align-items: flex-start;
           justify-content: space-between;
@@ -858,12 +942,12 @@ export default function InstanceDetailPage({
           min-width: 0;
         }
 
-        .documents-header > .section-title {
+        .scol .documents-header > .section-title {
           min-width: 0;
           flex: 1 1 auto;
         }
 
-        .upload-button {
+        .scol .upload-button {
           display: inline-flex;
           align-items: center;
           justify-content: center;
@@ -880,33 +964,33 @@ export default function InstanceDetailPage({
           flex: 0 0 auto;
         }
 
-        .upload-button:hover {
+        .scol .upload-button:hover {
           background: #7a1c18;
         }
 
-        .upload-button input {
+        .scol .upload-button input {
           display: none;
         }
 
-        .documents-empty {
+        .scol .documents-empty {
           margin-top: 18px;
           padding: 22px;
           border: 1px dashed #d8c5bd;
           border-radius: 12px;
           background: #fffaf4;
-          color: #64748b;
+          color: #756a67;
           font-size: 14px;
           text-align: center;
         }
 
-        .documents-list {
+        .scol .documents-list {
           display: grid;
           gap: 10px;
           margin-top: 18px;
           min-width: 0;
         }
 
-        .document-row {
+        .scol .document-row {
           display: flex;
           align-items: center;
           gap: 12px;
@@ -918,7 +1002,7 @@ export default function InstanceDetailPage({
           box-sizing: border-box;
         }
 
-        .document-icon {
+        .scol .document-icon {
           display: inline-flex;
           align-items: center;
           justify-content: center;
@@ -930,26 +1014,26 @@ export default function InstanceDetailPage({
           color: #8f211c;
         }
 
-        .document-info {
+        .scol .document-info {
           display: grid;
           gap: 4px;
           min-width: 0;
           flex: 1 1 auto;
         }
 
-        .document-info strong {
-          color: #0f172a;
+        .scol .document-info strong {
+          color: #241c1b;
           font-size: 14px;
           overflow-wrap: anywhere;
           word-break: break-word;
         }
 
-        .document-info span {
-          color: #64748b;
+        .scol .document-info span {
+          color: #756a67;
           font-size: 12px;
         }
 
-        .document-actions {
+        .scol .document-actions {
           display: flex;
           align-items: center;
           gap: 8px;
@@ -957,8 +1041,8 @@ export default function InstanceDetailPage({
           min-width: 0;
         }
 
-        .document-action,
-        .document-delete {
+        .scol .document-action,
+        .scol .document-delete {
           display: inline-flex;
           align-items: center;
           justify-content: center;
@@ -974,116 +1058,116 @@ export default function InstanceDetailPage({
           min-width: 0;
         }
 
-        .document-action {
+        .scol .document-action {
           border: 1px solid #e4c8c5;
           background: #fff;
           color: #8f211c;
         }
 
-        .document-action:hover {
+        .scol .document-action:hover {
           background: #fff8f7;
         }
 
-        .document-delete {
+        .scol .document-delete {
           border: 1px solid #e4c8c5;
           background: #fff;
           color: #8f211c;
         }
 
-        .document-delete:hover {
+        .scol .document-delete:hover {
           background: #fff0ef;
         }
 
-        .document-delete:disabled {
+        .scol .document-delete:disabled {
           opacity: 0.55;
           cursor: not-allowed;
         }
 
-        .state-card {
+        .scol .state-card {
           display: grid;
           gap: 12px;
           padding: 32px;
-          border: 1px solid #e2e8f0;
+          border: 1px solid #eadfd4;
           border-radius: 16px;
           background: #fff;
         }
 
-        .state-card h1 {
+        .scol .state-card h1 {
           font-size: 24px;
         }
 
-        .state-card p {
+        .scol .state-card p {
           margin: 0;
-          color: #64748b;
+          color: #756a67;
         }
 
         @media (max-width: 700px) {
-          .page {
+          .scol.page {
             gap: 16px;
             padding: 18px 14px;
             min-width: 0;
           }
 
-          .topbar {
+          .scol .topbar {
             align-items: stretch;
             flex-direction: column;
           }
 
-          .back-link {
+          .scol .back-link {
             width: 100%;
             justify-content: center;
             box-sizing: border-box;
           }
 
-          .status {
+          .scol .status {
             align-self: flex-start;
           }
 
-          .info-card,
-          .content-card {
+          .scol .info-card,
+          .scol .content-card {
             padding: 18px;
             width: 100%;
             min-width: 0;
           }
 
-          .info-grid {
+          .scol .info-grid {
             grid-template-columns: minmax(0, 1fr);
             gap: 12px;
           }
 
-          .info-grid .full {
+          .scol .info-grid .full {
             grid-column: auto;
           }
 
-          .actions {
+          .scol .actions {
             align-items: stretch;
             flex-direction: column;
           }
 
-          .saved {
+          .scol .saved {
             margin: 0;
           }
 
-          .primary-button {
+          .scol .primary-button {
             width: 100%;
             box-sizing: border-box;
           }
 
-          .meta {
+          .scol .meta {
             gap: 9px 14px;
           }
 
-          .documents-header {
+          .scol .documents-header {
             align-items: stretch;
             flex-direction: column;
           }
 
-          .upload-button {
+          .scol .upload-button {
             width: 100%;
             box-sizing: border-box;
           }
 
-          .document-row {
+          .scol .document-row {
             display: grid;
             grid-template-columns: 38px minmax(0, 1fr);
             align-items: start;
@@ -1092,19 +1176,19 @@ export default function InstanceDetailPage({
             box-sizing: border-box;
           }
 
-          .document-icon {
+          .scol .document-icon {
             grid-column: 1;
             grid-row: 1;
           }
 
-          .document-info {
+          .scol .document-info {
             grid-column: 2;
             grid-row: 1;
             width: 100%;
             min-width: 0;
           }
 
-          .document-actions {
+          .scol .document-actions {
             grid-column: 1 / -1;
             grid-row: 2;
             display: grid;
@@ -1115,8 +1199,8 @@ export default function InstanceDetailPage({
             margin: 0;
           }
 
-          .document-action,
-          .document-delete {
+          .scol .document-action,
+          .scol .document-delete {
             width: 100%;
             min-width: 0;
             max-width: 100%;

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { requireOfficePermission } from '@/lib/office-auth'
+import { requireEditableMeeting } from '@/lib/instance-guard'
 
 const BUCKET = 'instance-documents'
 const MAX_FILE_SIZE = 50 * 1024 * 1024
@@ -185,190 +186,133 @@ export async function GET(
   })
 }
 
+/*
+ * AJOUT D'UN DOCUMENT — en deux temps, pour que le fichier
+ * aille DIRECTEMENT du navigateur au stockage (sans passer
+ * par Vercel, limité à ~4,5 Mo par envoi) :
+ *
+ * 1. { action: 'prepare', fileName, fileSize, fileType }
+ *    → autorisation d'envoi temporaire (path + token)
+ * 2. le navigateur envoie le fichier au stockage
+ * 3. { action: 'confirm', path, fileName, fileSize, fileType }
+ *    → le document est enregistré
+ */
 export async function POST(
   request: Request,
   { params }: RouteContext
 ) {
-  const auth =
-    await requireSchoolingAccess()
+  const auth = await requireSchoolingAccess()
 
   if ('error' in auth) {
     return auth.error
   }
 
   try {
-    const { id } =
-      await params
+    const { id } = await params
 
-    const {
-      data: meeting,
-      error: meetingError,
-    } =
-      await auth.admin
-        .from('instance_meetings')
-        .select('id')
-        .eq('id', id)
-        .maybeSingle()
+    const guard = await requireEditableMeeting(auth.admin, id)
 
-    if (meetingError) {
-      return NextResponse.json(
-        {
-          error:
-            `Impossible de vérifier la réunion : ${meetingError.message}`,
-        },
-        { status: 500 }
-      )
+    if ('error' in guard) {
+      return guard.error
     }
 
-    if (!meeting) {
-      return NextResponse.json(
-        {
-          error:
-            'Réunion introuvable.',
-        },
-        { status: 404 }
-      )
+    const body = (await request.json().catch(() => null)) as {
+      action?: unknown
+      path?: unknown
+      fileName?: unknown
+      fileSize?: unknown
+      fileType?: unknown
+    } | null
+
+    const action = String(body?.action || '')
+    const fileName = String(body?.fileName || '').trim() || 'document'
+    const fileSize = Number(body?.fileSize || 0)
+    const fileType = String(body?.fileType || '') || 'application/octet-stream'
+
+    if (!Number.isFinite(fileSize) || fileSize <= 0) {
+      return NextResponse.json({ error: 'Le fichier est vide.' }, { status: 400 })
     }
 
-    const formData =
-      await request.formData()
-
-    const entry =
-      formData.get('file')
-
-    if (!(entry instanceof File)) {
+    if (fileSize > MAX_FILE_SIZE) {
       return NextResponse.json(
-        {
-          error:
-            'Aucun fichier sélectionné.',
-        },
+        { error: 'Le fichier dépasse la limite de 50 Mo.' },
         { status: 400 }
       )
     }
 
-    if (entry.size <= 0) {
-      return NextResponse.json(
-        {
-          error:
-            'Le fichier est vide.',
-        },
-        { status: 400 }
-      )
-    }
+    if (action === 'prepare') {
+      const storagePath = `${id}/${crypto.randomUUID()}-${formatDocumentName(fileName)}`
 
-    if (
-      entry.size >
-      MAX_FILE_SIZE
-    ) {
-      return NextResponse.json(
-        {
-          error:
-            'Le fichier dépasse la limite de 50 Mo.',
-        },
-        { status: 400 }
-      )
-    }
-
-    const originalName =
-      entry.name ||
-      'document'
-
-    const safeName =
-      formatDocumentName(
-        originalName
-      )
-
-    const storagePath =
-      `${id}/${crypto.randomUUID()}-${safeName}`
-
-    const fileBuffer =
-      await entry.arrayBuffer()
-
-    const {
-      error: uploadError,
-    } =
-      await auth.admin.storage
+      const { data, error } = await auth.admin.storage
         .from(BUCKET)
-        .upload(
-          storagePath,
-          fileBuffer,
-          {
-            contentType:
-              entry.type ||
-              'application/octet-stream',
-            upsert: false,
-          }
-        )
+        .createSignedUploadUrl(storagePath)
 
-    if (uploadError) {
+      if (error || !data) {
+        return NextResponse.json(
+          {
+            error: `Impossible de préparer l’envoi : ${error?.message || 'erreur inconnue'}`,
+          },
+          { status: 500 }
+        )
+      }
+
+      return NextResponse.json({
+        path: data.path,
+        token: data.token,
+      })
+    }
+
+    if (action !== 'confirm') {
+      return NextResponse.json({ error: 'Action inconnue.' }, { status: 400 })
+    }
+
+    const storagePath = String(body?.path || '')
+
+    // Le chemin doit appartenir à cette réunion.
+    if (!storagePath.startsWith(`${id}/`) || storagePath.includes('..')) {
+      return NextResponse.json({ error: 'Chemin de fichier invalide.' }, { status: 400 })
+    }
+
+    // Le fichier doit bien être arrivé dans le stockage.
+    const { data: signedData, error: signedError } = await auth.admin.storage
+      .from(BUCKET)
+      .createSignedUrl(storagePath, 3600)
+
+    if (signedError || !signedData?.signedUrl) {
       return NextResponse.json(
-        {
-          error:
-            `Impossible d’envoyer le fichier : ${uploadError.message}`,
-        },
-        { status: 500 }
+        { error: 'Le fichier n’est pas arrivé dans le stockage. Réessaie l’envoi.' },
+        { status: 400 }
       )
     }
 
-    const {
-      data: document,
-      error: insertError,
-    } =
-      await auth.admin
-        .from(
-          'instance_meeting_documents'
-        )
-        .insert({
-          meeting_id:
-            id,
-          file_name:
-            originalName,
-          file_url:
-            storagePath,
-          file_type:
-            entry.type ||
-            'application/octet-stream',
-          file_size:
-            entry.size,
-        })
-        .select(
-          'id,meeting_id,file_name,file_url,file_type,file_size,created_at,updated_at'
-        )
-        .single()
+    const { data: document, error: insertError } = await auth.admin
+      .from('instance_meeting_documents')
+      .insert({
+        meeting_id: id,
+        file_name: fileName,
+        file_url: storagePath,
+        file_type: fileType,
+        file_size: fileSize,
+      })
+      .select(
+        'id,meeting_id,file_name,file_url,file_type,file_size,created_at,updated_at'
+      )
+      .single()
 
     if (insertError) {
-      await auth.admin.storage
-        .from(BUCKET)
-        .remove([
-          storagePath,
-        ])
+      await auth.admin.storage.from(BUCKET).remove([storagePath])
 
       return NextResponse.json(
-        {
-          error:
-            `Impossible d’enregistrer le document : ${insertError.message}`,
-        },
+        { error: `Impossible d’enregistrer le document : ${insertError.message}` },
         { status: 500 }
       )
     }
-
-    const {
-      data: signedData,
-    } =
-      await auth.admin.storage
-        .from(BUCKET)
-        .createSignedUrl(
-          storagePath,
-          3600
-        )
 
     return NextResponse.json({
       ok: true,
       document: {
         ...document,
-        download_url:
-          signedData?.signedUrl ||
-          null,
+        download_url: signedData.signedUrl,
       },
     })
   } catch (error) {
@@ -398,6 +342,12 @@ export async function DELETE(
   try {
     const { id } =
       await params
+
+    const guard = await requireEditableMeeting(auth.admin, id)
+
+    if ('error' in guard) {
+      return guard.error
+    }
 
     const body =
       (await request.json()) as {

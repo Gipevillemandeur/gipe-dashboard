@@ -1,5 +1,38 @@
 import { NextResponse } from 'next/server';
+import { createHash } from 'crypto';
 import { createAdminClient } from '@/lib/supabase/admin';
+
+/*
+ * PROTECTION DES CODES
+ * - 3 mauvais codes depuis un même appareil → bloqué pour la classe ;
+ * - 30 mauvais codes au total sur la classe → classe bloquée ;
+ * - tout est levé dès que le code de la classe change ;
+ * - la classe TEST (démonstration) n'est jamais bloquée.
+ */
+const MAX_DEVICE_FAILURES = 3;
+const MAX_CLASS_FAILURES = 30;
+
+const BLOCKED_MESSAGE =
+  'Trop de codes erronés pour cette classe. Demande un nouveau code au GIPE.';
+
+/* Empreinte brouillée (non réversible) : rien n'est stocké en clair. */
+function fingerprint(value: string, length: number) {
+  const salt = process.env.SUPABASE_SECRET_KEY || 'gipe';
+
+  return createHash('sha256')
+    .update(`${salt}|${value}`)
+    .digest('hex')
+    .slice(0, length);
+}
+
+function deviceOf(request: Request) {
+  const ip =
+    request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+    request.headers.get('x-real-ip') ||
+    'inconnu';
+
+  return fingerprint(`ip:${ip}`, 32);
+}
 
 function cors(response: NextResponse) {
   response.headers.set('Access-Control-Allow-Origin', '*');
@@ -209,8 +242,91 @@ export async function GET(request: Request) {
       );
     }
 
+    const isDemo =
+      classRow.kind === 'demo' ||
+      String(classRow.name).trim().toUpperCase() === 'TEST';
+
+    const codeFingerprint = fingerprint(`code:${expected}`, 32);
+    const device = deviceOf(request);
+
+    if (!isDemo) {
+      const { data: attempts, error: attemptsError } = await admin
+        .from('gipe_code_attempts')
+        .select('device,failures')
+        .eq('class_id', classRow.id)
+        .eq('code_fingerprint', codeFingerprint);
+
+      if (attemptsError) {
+        console.error('Erreur lecture essais de code :', attemptsError);
+
+        return cors(
+          NextResponse.json(
+            { error: 'Vérification du code momentanément impossible.' },
+            { status: 503 }
+          )
+        );
+      }
+
+      const deviceFailures =
+        attempts?.find((row) => row.device === device)?.failures || 0;
+
+      const classFailures = (attempts || []).reduce(
+        (sum, row) => sum + (row.failures || 0),
+        0
+      );
+
+      if (
+        deviceFailures >= MAX_DEVICE_FAILURES ||
+        classFailures >= MAX_CLASS_FAILURES
+      ) {
+        return cors(
+          NextResponse.json(
+            { error: BLOCKED_MESSAGE, requiresCode: true, blocked: true },
+            { status: 429 }
+          )
+        );
+      }
+    }
+
     // Le code est obligatoire.
     if (expected !== code) {
+      // Un code vide (première ouverture) ne compte pas comme un essai.
+      if (!isDemo && code) {
+        const { data: counts } = await admin.rpc(
+          'gipe_register_code_failure',
+          {
+            p_class_id: classRow.id,
+            p_device: device,
+            p_code_fingerprint: codeFingerprint,
+          }
+        );
+
+        const deviceFailures = Number(
+          (counts as any)?.deviceFailures || 0
+        );
+
+        if (deviceFailures >= MAX_DEVICE_FAILURES) {
+          return cors(
+            NextResponse.json(
+              { error: BLOCKED_MESSAGE, requiresCode: true, blocked: true },
+              { status: 429 }
+            )
+          );
+        }
+
+        const remaining = MAX_DEVICE_FAILURES - deviceFailures;
+
+        return cors(
+          NextResponse.json(
+            {
+              error: `Code incorrect. Il reste ${remaining} essai${remaining > 1 ? 's' : ''}.`,
+              requiresCode: true,
+            },
+            { status: 403 }
+          )
+        );
+      }
+
       return cors(
         NextResponse.json(
           {

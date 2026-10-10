@@ -16,7 +16,7 @@ export default async function ClassesPage() {
   const totalStudents = realClasses.reduce((sum, c) => sum + c.students, 0)
 
   return (
-    <main className="page">
+    <main className="page scol">
       <section className="hero">
         <div>
           <div className="eyebrow">
@@ -44,6 +44,14 @@ export default async function ClassesPage() {
           </div>
         </div>
       </section>
+
+      {snapshot.error && (
+        <div className="load-error" role="alert">
+          <strong>Les classes n’ont pas pu être chargées.</strong>
+          <span>{snapshot.error}</span>
+          <span>Recharge la page dans quelques instants.</span>
+        </div>
+      )}
 
       <section className="cards">
         <article className="stat-card">
@@ -168,115 +176,127 @@ export default async function ClassesPage() {
       </section>
 
       <style>{`
-        .page {
+        .scol.page {
           display: grid;
           gap: 24px;
           padding: 28px;
         }
 
-        .hero {
+        .scol .hero {
           display: flex;
           align-items: flex-start;
           justify-content: space-between;
           gap: 24px;
         }
 
-        .eyebrow {
+        .scol .eyebrow {
           display: inline-flex;
           align-items: center;
           gap: 8px;
-          color: #64748b;
+          color: #756a67;
           font-size: 14px;
           font-weight: 700;
           margin-bottom: 8px;
         }
 
-        h1 {
+        .scol h1 {
           margin: 0;
-          color: #0f172a;
+          color: #241c1b;
           font-size: clamp(28px, 4vw, 38px);
           line-height: 1.1;
           letter-spacing: -0.03em;
         }
 
-        .hero p {
+        .scol .hero p {
           margin: 10px 0 0;
           max-width: 700px;
-          color: #64748b;
+          color: #756a67;
           line-height: 1.6;
         }
 
-        .hero-actions {
+        .scol .hero-actions {
           display: flex;
-          align-items: flex-start;
+          /* le bouton « Scolarité » prend la même hauteur que le cadre « Année active » */
+          align-items: stretch;
           gap: 12px;
         }
 
-        .back-link {
+        .scol .back-link {
           display: inline-flex;
           align-items: center;
           gap: 7px;
           min-height: 44px;
           padding: 0 14px;
-          border: 1px solid #e2e8f0;
+          border: 1px solid #eadfd4;
           border-radius: 12px;
           background: #fff;
-          color: #475569;
+          color: #5f514b;
           font-size: 14px;
           font-weight: 700;
           text-decoration: none;
           white-space: nowrap;
         }
 
-        .back-link:hover {
-          background: #f8fafc;
+        .scol .back-link:hover {
+          background: #fffaf4;
         }
 
-        .year {
+        .scol .year {
           min-width: 190px;
           padding: 12px 16px;
-          border: 1px solid #e2e8f0;
+          border: 1px solid #eadfd4;
           border-radius: 14px;
           background: #fff;
-          box-shadow: 0 4px 16px rgba(15, 23, 42, 0.04);
+          box-shadow: 0 4px 16px rgba(36, 28, 27, 0.04);
         }
 
-        .year span,
-        .stat-card span,
-        .class-card-stats span {
+        .scol .year span,
+        .scol .stat-card span,
+        .scol .class-card-stats span {
           display: block;
-          color: #64748b;
+          color: #756a67;
           font-size: 12px;
           font-weight: 600;
         }
 
-        .year strong {
+        .scol .year strong {
           display: block;
           margin-top: 4px;
-          color: #0f172a;
+          color: #241c1b;
           font-size: 15px;
         }
 
-        .cards {
+        .scol .load-error {
+          display: grid;
+          gap: 4px;
+          padding: 14px 16px;
+          border: 1px solid #efc8c4;
+          border-radius: 14px;
+          background: #fff0ee;
+          color: #8a2b22;
+          font-size: 14px;
+        }
+
+        .scol .cards {
           display: grid;
           grid-template-columns: repeat(2, minmax(0, 1fr));
           gap: 16px;
           max-width: 600px;
         }
 
-        .stat-card {
+        .scol .stat-card {
           display: flex;
           align-items: center;
           gap: 14px;
           min-height: 94px;
           padding: 18px;
-          border: 1px solid #e2e8f0;
+          border: 1px solid #eadfd4;
           border-radius: 16px;
           background: #fff;
-          box-shadow: 0 4px 16px rgba(15, 23, 42, 0.04);
+          box-shadow: 0 4px 16px rgba(36, 28, 27, 0.04);
         }
 
-        .stat-icon {
+        .scol .stat-icon {
           display: grid;
           place-items: center;
           flex: 0 0 auto;
@@ -287,86 +307,86 @@ export default async function ClassesPage() {
           color: #302b27;
         }
 
-        .stat-card strong {
+        .scol .stat-card strong {
           display: block;
           margin-top: 4px;
-          color: #0f172a;
+          color: #241c1b;
           font-size: 26px;
           line-height: 1;
         }
 
-        .panel {
+        .scol .panel {
           overflow: hidden;
-          border: 1px solid #e2e8f0;
+          border: 1px solid #eadfd4;
           border-radius: 18px;
           background: #fff;
-          box-shadow: 0 4px 16px rgba(15, 23, 42, 0.04);
+          box-shadow: 0 4px 16px rgba(36, 28, 27, 0.04);
         }
 
-        .panel-head {
+        .scol .panel-head {
           padding: 22px 24px;
-          border-bottom: 1px solid #e2e8f0;
+          border-bottom: 1px solid #eadfd4;
         }
 
-        .panel-head h2 {
+        .scol .panel-head h2 {
           margin: 0;
-          color: #0f172a;
+          color: #241c1b;
           font-size: 19px;
         }
 
-        .panel-head p {
+        .scol .panel-head p {
           margin: 6px 0 0;
-          color: #64748b;
+          color: #756a67;
           line-height: 1.55;
         }
 
-        .table-wrap {
+        .scol .table-wrap {
           overflow-x: auto;
         }
 
-        table {
+        .scol table {
           width: 100%;
           border-collapse: collapse;
           min-width: 680px;
         }
 
-        th,
-        td {
+        .scol th,
+        .scol td {
           padding: 15px 20px;
-          border-bottom: 1px solid #eef2f7;
+          border-bottom: 1px solid #f6efe8;
           text-align: left;
           white-space: nowrap;
         }
 
-        th {
-          background: #f8fafc;
-          color: #64748b;
+        .scol th {
+          background: #fffaf4;
+          color: #756a67;
           font-size: 12px;
           font-weight: 700;
           text-transform: uppercase;
           letter-spacing: 0.04em;
         }
 
-        td {
-          color: #334155;
+        .scol td {
+          color: #302b27;
           font-size: 14px;
         }
 
-        tbody tr:last-child td {
+        .scol tbody tr:last-child td {
           border-bottom: 0;
         }
 
-        tbody tr:hover {
+        .scol tbody tr:hover {
           background: #fafafa;
         }
 
-        .class-name {
-          color: #0f172a;
+        .scol .class-name {
+          color: #241c1b;
           font-weight: 700;
         }
 
-        .consult-link,
-        .mobile-consult-link {
+        .scol .consult-link,
+        .scol .mobile-consult-link {
           display: inline-flex;
           align-items: center;
           justify-content: center;
@@ -381,144 +401,144 @@ export default async function ClassesPage() {
           background: #fff;
         }
 
-        .consult-link:hover,
-        .mobile-consult-link:hover {
+        .scol .consult-link:hover,
+        .scol .mobile-consult-link:hover {
           border-color: #8f211c;
           background: #fff8f7;
           text-decoration: none;
         }
 
-        .muted {
-          color: #94a3b8;
+        .scol .muted {
+          color: #a39591;
         }
 
-        .mobile-list {
+        .scol .mobile-list {
           display: none;
         }
 
-        .empty {
+        .scol .empty {
           display: grid;
           justify-items: center;
           gap: 8px;
           padding: 48px 24px;
           text-align: center;
-          color: #64748b;
+          color: #756a67;
         }
 
-        .empty h3 {
+        .scol .empty h3 {
           margin: 4px 0 0;
-          color: #0f172a;
+          color: #241c1b;
           font-size: 18px;
         }
 
-        .empty p {
+        .scol .empty p {
           margin: 0;
           max-width: 520px;
           line-height: 1.5;
         }
 
         @media (max-width: 900px) {
-          .hero {
+          .scol .hero {
             flex-direction: column;
           }
 
-          .hero-actions {
+          .scol .hero-actions {
             width: 100%;
           }
         }
 
         @media (max-width: 760px) {
-          .page {
+          .scol.page {
             gap: 18px;
             padding: 18px 14px;
           }
 
-          .hero-actions {
+          .scol .hero-actions {
             flex-direction: column;
           }
 
-          .back-link,
-          .year {
+          .scol .back-link,
+          .scol .year {
             width: 100%;
           }
 
-          .cards {
+          .scol .cards {
             grid-template-columns: 1fr 1fr;
             max-width: none;
             gap: 10px;
           }
 
-          .stat-card {
+          .scol .stat-card {
             min-height: 82px;
             padding: 14px;
             gap: 10px;
           }
 
-          .stat-icon {
+          .scol .stat-icon {
             width: 38px;
             height: 38px;
             border-radius: 10px;
           }
 
-          .stat-card strong {
+          .scol .stat-card strong {
             font-size: 22px;
           }
 
-          .panel {
+          .scol .panel {
             border-radius: 15px;
           }
 
-          .panel-head {
+          .scol .panel-head {
             padding: 18px;
           }
 
-          .table-wrap {
+          .scol .table-wrap {
             display: none;
           }
 
-          .mobile-list {
+          .scol .mobile-list {
             display: grid;
             gap: 10px;
             padding: 12px;
           }
 
-          .class-card {
+          .scol .class-card {
             padding: 15px;
-            border: 1px solid #e2e8f0;
+            border: 1px solid #eadfd4;
             border-radius: 14px;
             background: #fff;
           }
 
-          .class-card h3 {
+          .scol .class-card h3 {
             margin: 0;
-            color: #0f172a;
+            color: #241c1b;
             font-size: 17px;
           }
 
-          .class-card-top > div > span {
+          .scol .class-card-top > div > span {
             display: block;
             margin-top: 3px;
-            color: #64748b;
+            color: #756a67;
             font-size: 13px;
           }
 
-          .class-card-stats {
+          .scol .class-card-stats {
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 10px;
             margin-top: 14px;
             padding-top: 12px;
-            border-top: 1px solid #eef2f7;
+            border-top: 1px solid #f6efe8;
           }
 
-          .class-card-stats strong {
+          .scol .class-card-stats strong {
             display: block;
             margin-top: 3px;
-            color: #0f172a;
+            color: #241c1b;
             font-size: 18px;
           }
 
-          .mobile-consult-link {
+          .scol .mobile-consult-link {
             width: 100%;
             margin-top: 14px;
             padding: 11px 12px;
@@ -529,7 +549,7 @@ export default async function ClassesPage() {
         }
 
         @media (max-width: 430px) {
-          .cards {
+          .scol .cards {
             grid-template-columns: 1fr;
           }
         }

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { requireOfficePermission } from '@/lib/office-auth'
+import { requireEditableMeeting } from '@/lib/instance-guard'
 
 async function requireSchoolingAccess() {
   try {
@@ -117,6 +118,12 @@ export async function PUT(
 
   try {
     const { id } = await params
+
+    const guard = await requireEditableMeeting(auth.admin, id)
+
+    if ('error' in guard) {
+      return guard.error
+    }
 
     const body =
       (await request.json()) as {

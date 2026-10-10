@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { requireOfficePermission } from '@/lib/office-auth'
+import { requireEditableMeeting } from '@/lib/instance-guard'
 
 const MEETING_TYPES = [
   'Réunion GIPE',
@@ -390,6 +391,13 @@ export async function PUT(
       )
     }
 
+    // Réunions des années clôturées : figées.
+    const guard = await requireEditableMeeting(admin, id)
+
+    if ('error' in guard) {
+      return guard.error
+    }
+
     const {
       data: existing,
       error: existingError,
@@ -508,6 +516,13 @@ export async function DELETE(
         },
         { status: 400 }
       )
+    }
+
+    // Réunions des années clôturées : figées.
+    const guard = await requireEditableMeeting(admin, id)
+
+    if ('error' in guard) {
+      return guard.error
     }
 
     const {
