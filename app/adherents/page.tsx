@@ -1,14 +1,35 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Users,
   Plus,
   Search,
   CreditCard,
   GraduationCap,
+  History,
   X,
 } from 'lucide-react';
+
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+
+/* Famille d'une année précédente (renouvellement) */
+type PreviousFamily = {
+  adherentId: string;
+  lastName: string;
+  firstName: string;
+  address: string;
+  phone: string;
+  email: string;
+  lastYear: string;
+  alreadyMember: boolean;
+  children: {
+    id: string;
+    lastName: string;
+    firstName: string;
+    previousClass: string;
+  }[];
+};
 
 type Child = {
   id?: string;
@@ -47,9 +68,13 @@ type FormChild = {
   lastName: string;
   firstName: string;
   classId: string;
+  // classe de l'année précédente (renouvellement)
+  previousClass?: string;
 };
 
 type AdherentForm = {
+  // famille reprise d'une année précédente
+  adherentId?: string;
   lastName: string;
   firstName: string;
   address: string;
@@ -97,18 +122,28 @@ export default function AdherentsPage() {
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState<AdherentForm>(emptyForm);
 
+  // Erreurs affichées DANS la fenêtre (et non derrière).
+  const [formError, setFormError] = useState('');
+
+  // Enfant déjà inscrit par une autre adhésion : confirmation.
+  const [sharedChildWarning, setSharedChildWarning] =
+    useState('');
+
+  // Renouvellement : familles des années précédentes.
+  const [families, setFamilies] = useState<PreviousFamily[]>([]);
+  const [searchingFamilies, setSearchingFamilies] = useState(false);
+  const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   async function load() {
     setLoading(true);
     setError('');
 
     try {
-      const [membersResponse, configResponse] = await Promise.all([
-        fetch('/api/adherents', { cache: 'no-store' }),
-        fetch('/api/configuration', { cache: 'no-store' }),
-      ]);
+      const membersResponse = await fetch('/api/adherents', {
+        cache: 'no-store',
+      });
 
       const membersData = await membersResponse.json();
-      const configData = await configResponse.json();
 
       if (!membersResponse.ok) {
         throw new Error(
@@ -116,17 +151,13 @@ export default function AdherentsPage() {
         );
       }
 
-      if (!configResponse.ok) {
-        throw new Error(
-          configData.error || 'Impossible de charger les classes.'
-        );
-      }
-
       setMembers(membersData.members || []);
       setSchoolYear(membersData.schoolYear || null);
 
+      // Les classes viennent de l'API Adhérents : pas besoin
+      // de l'autorisation « Configuration ».
       setClasses(
-        (configData.classes || []).map((item: any) => ({
+        (membersData.classes || []).map((item: any) => ({
           id: item.id,
           name: item.name,
         }))
@@ -170,20 +201,25 @@ export default function AdherentsPage() {
     });
   }, [members, search]);
 
+  /*
+   * Répartition : un ADHÉRENT compte une fois dans chaque
+   * classe où il a au moins un enfant (comme le bilan).
+   */
   const byClass = useMemo(() => {
-    const counts: Record<string, number> = {};
+    const sets: Record<string, Set<string>> = {};
 
     for (const member of members) {
       for (const child of member.children) {
         if (!child.className) continue;
 
-        counts[child.className] =
-          (counts[child.className] || 0) + 1;
+        sets[child.className] =
+          sets[child.className] || new Set<string>();
+        sets[child.className].add(member.id);
       }
     }
 
-    return Object.entries(counts)
-      .map(([name, count]) => ({ name, count }))
+    return Object.entries(sets)
+      .map(([name, ids]) => ({ name, count: ids.size }))
       .sort((a, b) =>
         a.name.localeCompare(b.name, 'fr', {
           numeric: true,
@@ -232,11 +268,80 @@ export default function AdherentsPage() {
     }));
   }
 
+  function resetFormMessages() {
+    setFormError('');
+    setSharedChildWarning('');
+    setFamilies([]);
+  }
+
   function openNewMember() {
     setEditingMember(null);
     setForm(emptyForm);
-    setError('');
+    resetFormMessages();
     setShowForm(true);
+  }
+
+  /*
+   * Renouvellement : recherche des familles des années
+   * précédentes pendant la saisie du nom / prénom.
+   */
+  function searchFamilies(lastName: string, firstName: string) {
+    if (searchTimer.current) clearTimeout(searchTimer.current);
+
+    const query = `${lastName} ${firstName}`.trim();
+
+    if (query.length < 2) {
+      setFamilies([]);
+      return;
+    }
+
+    searchTimer.current = setTimeout(async () => {
+      setSearchingFamilies(true);
+
+      try {
+        const response = await fetch(
+          `/api/adherents?previous=${encodeURIComponent(query)}`,
+          { cache: 'no-store' }
+        );
+        const data = await response.json();
+        setFamilies(response.ok ? data.families || [] : []);
+      } catch {
+        setFamilies([]);
+      } finally {
+        setSearchingFamilies(false);
+      }
+    }, 350);
+  }
+
+  function updateName(field: 'lastName' | 'firstName', value: string) {
+    const next = { ...form, [field]: value, adherentId: undefined };
+    setForm(next);
+
+    if (!editingMember && next.renewal) {
+      searchFamilies(next.lastName, next.firstName);
+    }
+  }
+
+  function pickFamily(family: PreviousFamily) {
+    setForm((current) => ({
+      ...current,
+      adherentId: family.adherentId,
+      renewal: true,
+      lastName: family.lastName,
+      firstName: family.firstName,
+      address: family.address,
+      phone: family.phone,
+      email: family.email,
+      children: family.children.map((child) => ({
+        id: child.id,
+        lastName: child.lastName,
+        firstName: child.firstName,
+        classId: '',
+        previousClass: child.previousClass,
+      })),
+    }));
+    setFamilies([]);
+    setFormError('');
   }
 
   function openEditMember(member: Member) {
@@ -270,7 +375,7 @@ export default function AdherentsPage() {
       })),
     });
 
-    setError('');
+    resetFormMessages();
     setShowForm(true);
   }
 
@@ -280,17 +385,44 @@ export default function AdherentsPage() {
     setShowForm(false);
     setEditingMember(null);
     setForm(emptyForm);
+    resetFormMessages();
   }
 
-  async function saveMember() {
+  async function saveMember(allowSharedChildren = false) {
+    setFormError('');
+    setSharedChildWarning('');
+
+    if (!form.lastName.trim() || !form.firstName.trim()) {
+      setFormError('Le nom et le prénom sont obligatoires.');
+      return;
+    }
+
+    if (form.email.trim() && !EMAIL_PATTERN.test(form.email.trim())) {
+      setFormError(
+        'L’adresse e-mail semble mal écrite (exemple : prenom.nom@gmail.com).'
+      );
+      return;
+    }
+
+    if (
+      form.children.some(
+        (child) =>
+          (child.lastName.trim() || child.firstName.trim()) &&
+          !child.classId
+      )
+    ) {
+      setFormError('Choisis la classe de chaque enfant.');
+      return;
+    }
+
     setSaving(true);
-    setError('');
 
     try {
       const isEditing = Boolean(editingMember);
 
       const payload = {
         ...form,
+        allowSharedChildren,
         ...(isEditing
           ? {
               id: editingMember?.id,
@@ -311,6 +443,12 @@ export default function AdherentsPage() {
 
       const data = await response.json();
 
+      if (response.status === 409 && data.sharedChild) {
+        // Demande de confirmation dans la fenêtre.
+        setSharedChildWarning(data.error);
+        return;
+      }
+
       if (!response.ok) {
         throw new Error(
           data.error ||
@@ -321,10 +459,11 @@ export default function AdherentsPage() {
       setShowForm(false);
       setEditingMember(null);
       setForm(emptyForm);
+      resetFormMessages();
 
       await load();
     } catch (e) {
-      setError(
+      setFormError(
         e instanceof Error
           ? e.message
           : 'Impossible d’enregistrer l’adhérent.'
@@ -768,6 +907,33 @@ export default function AdherentsPage() {
             </div>
 
             <div className="adherents-form">
+              <label className="adherents-renewal">
+                <input
+                  type="checkbox"
+                  checked={form.renewal}
+                  onChange={(e) => {
+                    const renewal = e.target.checked;
+                    setForm({ ...form, renewal, adherentId: renewal ? form.adherentId : undefined });
+
+                    if (renewal && !editingMember) {
+                      searchFamilies(form.lastName, form.firstName);
+                    } else {
+                      setFamilies([]);
+                    }
+                  }}
+                />
+                <span>
+                  <strong>Renouvellement</strong>
+                  {!editingMember && (
+                    <small>
+                      Famille déjà adhérente une année précédente : tape
+                      le nom, puis choisis-la pour reprendre ses
+                      informations et ses enfants.
+                    </small>
+                  )}
+                </span>
+              </label>
+
               <div>
                 <h3 className="section-title">
                   Informations adhérent
@@ -779,11 +945,7 @@ export default function AdherentsPage() {
                     placeholder="Nom *"
                     value={form.lastName}
                     onChange={(e) =>
-                      setForm({
-                        ...form,
-                        lastName:
-                          e.target.value,
-                      })
+                      updateName('lastName', e.target.value)
                     }
                   />
 
@@ -792,11 +954,7 @@ export default function AdherentsPage() {
                     placeholder="Prénom *"
                     value={form.firstName}
                     onChange={(e) =>
-                      setForm({
-                        ...form,
-                        firstName:
-                          e.target.value,
-                      })
+                      updateName('firstName', e.target.value)
                     }
                   />
 
@@ -840,6 +998,58 @@ export default function AdherentsPage() {
                     }
                   />
                 </div>
+
+                {!editingMember && form.renewal && (
+                  <div className="adherents-families">
+                    {form.adherentId ? (
+                      <div className="adherents-family-picked">
+                        <History size={15} />
+                        Famille reprise de l’an dernier : vérifie les
+                        coordonnées et choisis la nouvelle classe de
+                        chaque enfant.
+                      </div>
+                    ) : searchingFamilies ? (
+                      <div className="adherents-family-hint">
+                        Recherche…
+                      </div>
+                    ) : families.length > 0 ? (
+                      families.map((family) => (
+                        <button
+                          key={family.adherentId}
+                          type="button"
+                          className="adherents-family"
+                          onClick={() => pickFamily(family)}
+                          disabled={family.alreadyMember}
+                        >
+                          <strong>
+                            {family.lastName.toUpperCase()}{' '}
+                            {family.firstName}
+                          </strong>
+                          <span>
+                            {family.alreadyMember
+                              ? 'Déjà adhérent(e) cette année'
+                              : `Adhérent(e) en ${family.lastYear}`}
+                            {family.children.length > 0 &&
+                              ` · ${family.children
+                                .map(
+                                  (c) =>
+                                    `${c.firstName}${c.previousClass ? ` (${c.previousClass})` : ''}`
+                                )
+                                .join(', ')}`}
+                          </span>
+                          {!family.alreadyMember && (
+                            <em>Reprendre</em>
+                          )}
+                        </button>
+                      ))
+                    ) : (form.lastName + form.firstName).trim().length >= 2 ? (
+                      <div className="adherents-family-hint">
+                        Aucune famille trouvée dans les années
+                        précédentes.
+                      </div>
+                    ) : null}
+                  </div>
+                )}
               </div>
 
               <div>
@@ -956,6 +1166,12 @@ export default function AdherentsPage() {
                         >
                           <X size={14} />
                         </button>
+
+                        {child.previousClass && (
+                          <div className="adherents-child-hint">
+                            L’an dernier : {child.previousClass}
+                          </div>
+                        )}
                       </div>
                     )
                   )}
@@ -1033,21 +1249,6 @@ export default function AdherentsPage() {
                   </div>
 
                   <div className="adherents-checkbox-group">
-                    <label>
-                      <input
-                        type="checkbox"
-                        checked={form.renewal}
-                        onChange={(e) =>
-                          setForm({
-                            ...form,
-                            renewal:
-                              e.target.checked,
-                          })
-                        }
-                      />{' '}
-                      Renouvellement
-                    </label>
-
                     <label>
                       <input
                         type="checkbox"
@@ -1236,6 +1437,49 @@ export default function AdherentsPage() {
                 )}
               </div>
 
+              {form.paymentReceived && (
+                <div className="adherents-treasury-note">
+                  <CreditCard size={15} />
+                  La cotisation sera ajoutée automatiquement dans la
+                  Trésorerie (recette « Adhésions »), et mise à jour si
+                  tu modifies le montant ici.
+                </div>
+              )}
+
+              {formError && (
+                <div className="notice notice-error adherents-form-error">
+                  {formError}
+                </div>
+              )}
+
+              {sharedChildWarning && (
+                <div className="adherents-shared-warning">
+                  <strong>Attention :</strong> {sharedChildWarning}
+                  <span>
+                    C’est normal si l’autre parent a aussi adhéré.
+                    Sinon, c’est peut-être un doublon.
+                  </span>
+                  <div>
+                    <button
+                      type="button"
+                      className="btn"
+                      onClick={() => setSharedChildWarning('')}
+                      disabled={saving}
+                    >
+                      Annuler
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-primary"
+                      onClick={() => void saveMember(true)}
+                      disabled={saving}
+                    >
+                      Enregistrer quand même
+                    </button>
+                  </div>
+                </div>
+              )}
+
               <div className="adherents-form-actions">
                 <button
                   className="btn"
@@ -1249,7 +1493,7 @@ export default function AdherentsPage() {
                 <button
                   className="btn btn-primary"
                   type="button"
-                  onClick={saveMember}
+                  onClick={() => void saveMember()}
                   disabled={saving}
                 >
                   {saving
@@ -1265,6 +1509,138 @@ export default function AdherentsPage() {
       )}
 
       <style jsx>{`
+        .adherents-renewal {
+          display: flex;
+          gap: 10px;
+          align-items: flex-start;
+          padding: 12px 14px;
+          border: 1px solid #eadfd5;
+          border-radius: 10px;
+          background: #fffaf3;
+          cursor: pointer;
+        }
+
+        .adherents-renewal input {
+          width: 17px;
+          height: 17px;
+          margin-top: 2px;
+          accent-color: #8f211c;
+        }
+
+        .adherents-renewal span {
+          display: grid;
+          gap: 3px;
+        }
+
+        .adherents-renewal small {
+          color: #756a67;
+          font-size: 12px;
+          line-height: 1.4;
+        }
+
+        .adherents-families {
+          display: grid;
+          gap: 6px;
+          margin-top: 10px;
+        }
+
+        .adherents-family {
+          display: grid;
+          grid-template-columns: auto minmax(0, 1fr) auto;
+          gap: 10px;
+          align-items: center;
+          padding: 10px 12px;
+          border: 1px solid #eadfd5;
+          border-radius: 10px;
+          background: #fff;
+          text-align: left;
+          cursor: pointer;
+          font-size: 13px;
+        }
+
+        .adherents-family:hover:not(:disabled) {
+          border-color: #8f211c;
+        }
+
+        .adherents-family:disabled {
+          opacity: 0.55;
+          cursor: not-allowed;
+        }
+
+        .adherents-family span {
+          color: #756a67;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+
+        .adherents-family em {
+          font-style: normal;
+          font-weight: 700;
+          color: #8f211c;
+        }
+
+        .adherents-family-hint,
+        .adherents-family-picked {
+          font-size: 12px;
+          color: #756a67;
+        }
+
+        .adherents-family-picked {
+          display: flex;
+          gap: 8px;
+          align-items: center;
+          padding: 10px 12px;
+          border-radius: 10px;
+          background: #f2fbf4;
+          color: #27643a;
+          font-weight: 600;
+        }
+
+        .adherents-child-hint {
+          grid-column: 1 / -1;
+          margin-top: -4px;
+          font-size: 12px;
+          color: #8f211c;
+        }
+
+        .adherents-treasury-note {
+          display: flex;
+          gap: 8px;
+          align-items: flex-start;
+          padding: 10px 12px;
+          border-radius: 10px;
+          background: #f7f2eb;
+          color: #6f6663;
+          font-size: 12px;
+          line-height: 1.45;
+        }
+
+        .adherents-form-error {
+          margin: 0;
+        }
+
+        .adherents-shared-warning {
+          display: grid;
+          gap: 6px;
+          padding: 12px 14px;
+          border: 1px solid #ead9b8;
+          border-radius: 10px;
+          background: #fffaf0;
+          color: #72551e;
+          font-size: 13px;
+        }
+
+        .adherents-shared-warning span {
+          font-size: 12px;
+        }
+
+        .adherents-shared-warning div {
+          display: flex;
+          justify-content: flex-end;
+          gap: 8px;
+          margin-top: 4px;
+        }
+
         .adherents-error {
           margin-bottom: 18px;
         }

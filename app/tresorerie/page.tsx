@@ -21,6 +21,8 @@ type Transaction = {
   amount: number;
   paymentMethod: string | null;
   note: string | null;
+  // recette créée automatiquement par une adhésion
+  fromMembership?: boolean;
 };
 
 type FormState = {
@@ -627,6 +629,14 @@ export default function TresoreriePage() {
                     <td>
                       <div style={{ fontWeight: 700 }}>
                         {item.label}
+                        {item.fromMembership && (
+                          <span
+                            className="tresorerie-auto-badge"
+                            title="Recette créée automatiquement depuis la page Adhérents"
+                          >
+                            Adhésion
+                          </span>
+                        )}
                       </div>
 
                       {item.note && (
@@ -661,6 +671,14 @@ export default function TresoreriePage() {
                     </td>
 
                     <td style={{ textAlign: 'right' }}>
+                      {item.fromMembership ? (
+                        <span
+                          className="tresorerie-auto-hint"
+                          title="À modifier depuis la page Adhérents"
+                        >
+                          Via Adhérents
+                        </span>
+                      ) : (
                       <div className="tresorerie-row-actions">
                         <button
                           type="button"
@@ -689,6 +707,7 @@ export default function TresoreriePage() {
                           <Trash2 size={14} />
                         </button>
                       </div>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -1095,6 +1114,25 @@ export default function TresoreriePage() {
       )}
 
       <style jsx>{`
+        .tresorerie-auto-badge {
+          display: inline-block;
+          margin-left: 7px;
+          padding: 2px 7px;
+          border-radius: 999px;
+          background: #eef6ff;
+          border: 1px solid #cfe0f5;
+          color: #1e4f8a;
+          font-size: 10px;
+          font-weight: 700;
+          vertical-align: 1px;
+        }
+
+        .tresorerie-auto-hint {
+          font-size: 11px;
+          color: #756a67;
+          white-space: nowrap;
+        }
+
         .tresorerie-required {
           color: #b91c1c;
         }

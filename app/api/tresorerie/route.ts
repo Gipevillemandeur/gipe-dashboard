@@ -82,7 +82,7 @@ async function checkTransactionIsEditable(
 ) {
   const { data, error } = await admin
     .from('gipe_transactions')
-    .select('id, school_year_id')
+    .select('id, school_year_id, membership_id')
     .eq('id', id)
     .maybeSingle()
 
@@ -97,6 +97,16 @@ async function checkTransactionIsEditable(
     return NextResponse.json(
       { error: 'Opération introuvable.' },
       { status: 404 }
+    )
+  }
+
+  if (data.membership_id) {
+    return NextResponse.json(
+      {
+        error:
+          'Cette recette vient d’une adhésion : modifie-la (ou passe-la en « non payé ») depuis la page Adhérents.',
+      },
+      { status: 409 }
     )
   }
 
@@ -182,6 +192,7 @@ export async function GET() {
       amount,
       payment_method,
       note,
+      membership_id,
       created_at,
       updated_at
     `)
@@ -218,6 +229,8 @@ export async function GET() {
       amount: Number(transaction.amount),
       paymentMethod: transaction.payment_method,
       note: transaction.note,
+      // Recette créée automatiquement par une adhésion
+      fromMembership: Boolean(transaction.membership_id),
     })
   )
 

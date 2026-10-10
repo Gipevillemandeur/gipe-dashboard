@@ -196,7 +196,7 @@ export async function buildAnnualReport(
 
     admin
       .from('gipe_transactions')
-      .select('transaction_type,category,label,amount')
+      .select('*')
       .eq('school_year_id', year.id),
 
     admin
@@ -303,7 +303,11 @@ export async function buildAnnualReport(
 
     const row = categories.get(category)!;
 
-    const label = String((transaction as any).label || '');
+    // Les cotisations (créées depuis la page Adhérents) sont
+    // regroupées sur une seule ligne dans le détail du bilan.
+    const label = (transaction as any).membership_id
+      ? 'Cotisations des adhérents'
+      : String((transaction as any).label || '');
 
     if (isIncome(transaction.transaction_type)) {
       row.recettes += amount;
