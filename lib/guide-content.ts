@@ -117,7 +117,18 @@ Ce dashboard réunit tout ce dont le bureau a besoin au quotidien : les classes 
 ## Ce que le dashboard fait tout seul
 - La cotisation reçue crée automatiquement une **recette « Adhésions »** dans la Trésorerie (et la met à jour si on modifie l’adhésion). Inutile de la saisir deux fois.
 - Il refuse les **doublons** : un même parent ne peut pas adhérer deux fois la même année.
-- Il prévient si un enfant est **déjà rattaché à une autre adhésion** (l’autre parent, par exemple) : on peut alors confirmer.`,
+- Il prévient si un enfant est **déjà rattaché à une autre adhésion** (l’autre parent, par exemple) : on peut alors confirmer.
+
+## Les tableaux en bas de page
+- **Parents volontaires pour les conseils de classe** : classe par classe, qui peut y aller. Vert = un parent de la classe, orange = seulement un volontaire « toutes classes », rouge = personne.
+- **Conseil d’administration** : les membres du CA, ceux du bureau en premier et surlignés en rose.
+
+## Les e-mails (bouton « E-mails »)
+- **Message** : un message à tous les adhérents, au CA, au bureau, aux volontaires des conseils ou aux parents d’une classe. « Bonjour Prénom, » est ajouté tout seul. Toujours faire « M’envoyer un test » avant.
+- **Reçus** : le reçu d’adhésion, à cocher adhérent par adhérent. Rien ne part sans un clic, et la date d’envoi est notée.
+- **Historique** : ce qui a été envoyé, et le bouton « Reprendre l’envoi » si le quota du jour a coupé un envoi.
+
+> L’envoi gratuit est limité à 90 e-mails par jour. Au-delà, le reste attend le lendemain dans l’Historique.`,
   },
   {
     slug: 'tresorerie',

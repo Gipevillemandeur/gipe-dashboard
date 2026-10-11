@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import AdherentEmails from '@/components/AdherentEmails';
 import {
   Users,
   Plus,
@@ -10,6 +11,7 @@ import {
   History,
   UserCheck,
   Landmark,
+  Mail,
   X,
 } from 'lucide-react';
 
@@ -120,6 +122,7 @@ export default function AdherentsPage() {
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
   const [showForm, setShowForm] = useState(false);
+  const [showEmails, setShowEmails] = useState(false);
   const [editingMember, setEditingMember] = useState<Member | null>(null);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState<AdherentForm>(emptyForm);
@@ -587,6 +590,15 @@ export default function AdherentsPage() {
         </div>
 
         <div className="topbar-right adherents-topbar-action">
+          <button
+            className="btn"
+            onClick={() => setShowEmails(true)}
+            disabled={loading}
+          >
+            <Mail size={14} />
+            E-mails
+          </button>
+
           <button
             className="btn btn-primary"
             onClick={openNewMember}
@@ -1087,6 +1099,14 @@ export default function AdherentsPage() {
             </div>
           )}
         </section>
+      )}
+
+      {showEmails && (
+        <AdherentEmails
+          members={members}
+          classes={classes}
+          onClose={() => setShowEmails(false)}
+        />
       )}
 
       {showForm && (
@@ -1720,6 +1740,16 @@ export default function AdherentsPage() {
       )}
 
       <style jsx>{`
+        .adherents-topbar-action {
+          flex-wrap: wrap;
+        }
+
+        .adherents-topbar-action .btn {
+          display: inline-flex;
+          align-items: center;
+          gap: 7px;
+        }
+
         .adherents-extra {
           margin-top: 18px;
         }
