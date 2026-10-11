@@ -7,6 +7,9 @@ import {
   ArrowUpCircle,
   Banknote,
   Building2,
+  CheckCircle2,
+  Clock3,
+  Undo2,
   CreditCard,
   FileCheck2,
   Loader2,
@@ -18,7 +21,7 @@ import {
   X,
 } from 'lucide-react';
 
-type Account = 'bank' | 'cash';
+type Account = 'bank' | 'cash' | 'cheques';
 type TxType = 'income' | 'expense' | 'transfer';
 type View = 'all' | Account;
 
@@ -33,6 +36,7 @@ type Transaction = {
   note: string | null;
   account: Account;
   transferTo: Account | null;
+  depositedAt: string | null;
   createdAt?: string;
   // recette créée automatiquement par une adhésion
   fromMembership?: boolean;
@@ -72,7 +76,11 @@ const paymentMethods = [
   { value: 'other', label: 'Autre' },
 ];
 
-const ACCOUNT_NAMES: Record<Account, string> = { bank: 'Banque', cash: 'Caisse' };
+const ACCOUNT_NAMES: Record<Account, string> = {
+  bank: 'Banque',
+  cash: 'Caisse',
+  cheques: 'Chèques à remettre',
+};
 
 // Date du jour en heure locale (et non en heure UTC).
 function today() {
@@ -112,6 +120,11 @@ function paymentLabel(value: string | null) {
 
 function round2(value: number) {
   return Math.round(value * 100) / 100;
+}
+
+/* Date d'une opération dans un journal : un chèque compte à la banque le jour de sa remise. */
+function journalDate(item: Transaction, account: Account) {
+  return account === 'bank' && item.depositedAt ? item.depositedAt : item.date;
 }
 
 /* Effet d'une opération sur un compte (+ entrée, − sortie, 0 sans rapport). */
@@ -155,7 +168,14 @@ function putToGoogle(uploadUrl: string, file: File): Promise<{ ok: boolean; file
 
 export default function TresoreriePage() {
   const [schoolYear, setSchoolYear] = useState<string | null>(null);
-  const [initialBalances, setInitialBalances] = useState<Record<Account, number>>({ bank: 0, cash: 0 });
+  const [initialBalances, setInitialBalances] = useState<Record<Account, number>>({
+    bank: 0,
+    cash: 0,
+    cheques: 0,
+  });
+  const [selectedCheques, setSelectedCheques] = useState<Set<string>>(new Set());
+  const [depositDate, setDepositDate] = useState(today());
+  const [depositing, setDepositing] = useState(false);
   const [ready, setReady] = useState(true);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
@@ -194,6 +214,7 @@ export default function TresoreriePage() {
       setInitialBalances({
         bank: Number(data.initialBalances?.bank || 0),
         cash: Number(data.initialBalances?.cash || 0),
+        cheques: 0,
       });
       setReady(data.ready !== false);
       setTransactions(data.transactions || []);
@@ -219,13 +240,16 @@ export default function TresoreriePage() {
 
     const bank = initialBalances.bank + transactions.reduce((sum, item) => sum + effectOn(item, 'bank'), 0);
     const cash = initialBalances.cash + transactions.reduce((sum, item) => sum + effectOn(item, 'cash'), 0);
+    const cheques = transactions.reduce((sum, item) => sum + effectOn(item, 'cheques'), 0);
 
     return {
       income: round2(income),
       expense: round2(expense),
       bank: round2(bank),
       cash: round2(cash),
-      balance: round2(bank + cash),
+      cheques: round2(cheques),
+      chequesCount: transactions.filter((item) => item.account === 'cheques').length,
+      balance: round2(bank + cash + cheques),
       initial: round2(initialBalances.bank + initialBalances.cash),
     };
   }, [transactions, initialBalances]);
@@ -284,7 +308,8 @@ export default function TresoreriePage() {
       .filter((item) => effectOn(item, view) !== 0)
       .sort(
         (a, b) =>
-          a.date.localeCompare(b.date) || String(a.createdAt || '').localeCompare(String(b.createdAt || ''))
+          journalDate(a, view).localeCompare(journalDate(b, view)) ||
+          String(a.createdAt || '').localeCompare(String(b.createdAt || ''))
       );
 
     let balance = initialBalances[view];
@@ -352,15 +377,116 @@ export default function TresoreriePage() {
       type,
       // On ne vide la catégorie que si le type change vraiment
       category: current.type === type ? current.category : '',
+      account:
+        type === 'transfer' ? current.account : accountFor(type, current.paymentMethod, current.account),
     }));
   }
 
-  /* Le moyen de paiement choisit le compte (modifiable ensuite). */
+  /* ---------------- Chèques à remettre ---------------- */
+
+  const pendingCheques = useMemo(
+    () =>
+      transactions
+        .filter((item) => item.account === 'cheques')
+        .sort((a, b) => a.date.localeCompare(b.date)),
+    [transactions]
+  );
+
+  const deposits = useMemo(() => {
+    const groups = new Map<string, Transaction[]>();
+    for (const item of transactions) {
+      if (!item.depositedAt) continue;
+      groups.set(item.depositedAt, [...(groups.get(item.depositedAt) || []), item]);
+    }
+    return [...groups.entries()]
+      .sort((a, b) => b[0].localeCompare(a[0]))
+      .map(([date, items]) => ({
+        date,
+        items,
+        total: round2(items.reduce((sum, item) => sum + item.amount, 0)),
+      }));
+  }, [transactions]);
+
+  const selectedTotal = round2(
+    pendingCheques.filter((item) => selectedCheques.has(item.id)).reduce((sum, item) => sum + item.amount, 0)
+  );
+
+  function toggleCheque(id: string) {
+    setSelectedCheques((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  async function depositCheques() {
+    setDepositing(true);
+    setError('');
+    setNotice('');
+
+    try {
+      const response = await fetch('/api/tresorerie', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'deposit', ids: [...selectedCheques], depositDate }),
+      });
+
+      const data = await readJson(response);
+      if (!response.ok) throw new Error(data.error || 'Remise impossible.');
+
+      setNotice(
+        `${data.count} chèque${data.count > 1 ? 's' : ''} remis en banque le ${formatDate(depositDate)} (${formatMoney(data.total)}).`
+      );
+      setSelectedCheques(new Set());
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Remise impossible.');
+    } finally {
+      setDepositing(false);
+    }
+  }
+
+  async function undeposit(item: Transaction) {
+    setDepositing(true);
+    setError('');
+    setNotice('');
+
+    try {
+      const response = await fetch('/api/tresorerie', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'undeposit', id: item.id }),
+      });
+
+      const data = await readJson(response);
+      if (!response.ok) throw new Error(data.error || 'Annulation impossible.');
+
+      setNotice(`Remise annulée : « ${item.label} » est de nouveau dans les chèques à remettre.`);
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Annulation impossible.');
+    } finally {
+      setDepositing(false);
+    }
+  }
+
+  /*
+   * Le moyen de paiement choisit le compte (modifiable ensuite) :
+   * espèces → caisse ; chèque reçu → chèques à remettre ; sinon banque.
+   */
+  function accountFor(type: FormState['type'], method: string, fallback: FormState['account']) {
+    if (method === 'cash') return 'cash';
+    if (method === 'cheque') return type === 'income' ? 'cheques' : 'bank';
+    if (method) return 'bank';
+    return fallback === 'cheques' && type !== 'income' ? '' : fallback;
+  }
+
   function setPaymentMethod(value: string) {
     setForm((current) => ({
       ...current,
       paymentMethod: value,
-      account: value === 'cash' ? 'cash' : value ? 'bank' : current.account,
+      account: accountFor(current.type, value, current.account),
     }));
   }
 
@@ -388,7 +514,7 @@ export default function TresoreriePage() {
       const data = await readJson(response);
       if (!response.ok) throw new Error(data.error || 'Impossible d’enregistrer les soldes de départ.');
 
-      setInitialBalances({ bank: data.initialBalances.bank, cash: data.initialBalances.cash });
+      setInitialBalances({ bank: data.initialBalances.bank, cash: data.initialBalances.cash, cheques: 0 });
       setSavingInitialBalance(false);
       closeInitialBalanceForm();
     } catch (err) {
@@ -608,10 +734,22 @@ export default function TresoreriePage() {
       );
     }
 
+    if (item.account === 'cheques') {
+      return (
+        <span className="tresorerie-account tresorerie-account-cheques">
+          <Clock3 size={12} />
+          Chèque à remettre
+        </span>
+      );
+    }
+
     return (
       <span className={`tresorerie-account tresorerie-account-${item.account}`}>
         {item.account === 'cash' ? <Banknote size={12} /> : <Building2 size={12} />}
         {ACCOUNT_NAMES[item.account]}
+        {item.depositedAt && (
+          <small className="tresorerie-deposited">remis le {formatDate(item.depositedAt)}</small>
+        )}
       </span>
     );
   }
@@ -813,6 +951,7 @@ export default function TresoreriePage() {
               <span style={{ color: totals.cash < 0 ? '#b91c1c' : undefined }}>
                 Caisse {formatMoney(totals.cash)}
               </span>
+              {totals.cheques > 0 && <span>Chèques à remettre {formatMoney(totals.cheques)}</span>}
             </div>
           </div>
         </div>
@@ -834,16 +973,36 @@ export default function TresoreriePage() {
             Journal de caisse
             <span className="tresorerie-tab-amount">{formatMoney(totals.cash)}</span>
           </button>
+          <button
+            type="button"
+            className={view === 'cheques' ? 'active' : ''}
+            onClick={() => setView('cheques')}
+          >
+            <Clock3 size={15} />
+            Chèques à remettre
+            <span className={`tresorerie-tab-amount ${totals.chequesCount > 0 ? 'tresorerie-tab-alert' : ''}`}>
+              {totals.chequesCount}
+            </span>
+          </button>
         </div>
 
         <div className="section-head tresorerie-section-head">
           <div>
             <h2 className="section-title">
-              {view === 'all' ? 'Opérations' : view === 'bank' ? 'Compte bancaire' : 'Journal de caisse'}
+              {view === 'all'
+                ? 'Opérations'
+                : view === 'bank'
+                  ? 'Compte bancaire'
+                  : view === 'cash'
+                    ? 'Journal de caisse'
+                    : 'Chèques à remettre'}
             </h2>
             <p className="section-sub">
-              {shownCount} opération{shownCount > 1 ? 's' : ''} affichée{shownCount > 1 ? 's' : ''}
-              {view !== 'all' && ' · du plus ancien au plus récent, avec le solde après chaque ligne'}
+              {view === 'cheques'
+                ? 'Les chèques reçus comptent sur le compte bancaire seulement une fois remis.'
+                : `${shownCount} opération${shownCount > 1 ? 's' : ''} affichée${shownCount > 1 ? 's' : ''}`}
+              {(view === 'bank' || view === 'cash') &&
+                ' · du plus ancien au plus récent, avec le solde après chaque ligne'}
             </p>
           </div>
 
@@ -859,6 +1018,123 @@ export default function TresoreriePage() {
 
         {loading ? (
           <p className="kicker">Chargement de la trésorerie…</p>
+        ) : view === 'cheques' ? (
+          <div className="tresorerie-cheques">
+            {pendingCheques.length === 0 ? (
+              <div className="tresorerie-empty">
+                <CheckCircle2 size={34} style={{ opacity: 0.35 }} />
+                <h3 style={{ margin: '12px 0 4px' }}>Aucun chèque à remettre</h3>
+                <p className="section-sub">Tous les chèques reçus ont été déposés à la banque.</p>
+              </div>
+            ) : (
+              <>
+                <div className="tresorerie-cheque-tools">
+                  <button
+                    type="button"
+                    className="btn"
+                    onClick={() =>
+                      setSelectedCheques(
+                        selectedCheques.size === pendingCheques.length
+                          ? new Set()
+                          : new Set(pendingCheques.map((item) => item.id))
+                      )
+                    }
+                  >
+                    {selectedCheques.size === pendingCheques.length ? 'Tout décocher' : 'Tout cocher'}
+                  </button>
+                  <span>
+                    {pendingCheques.length} chèque{pendingCheques.length > 1 ? 's' : ''} en attente ·{' '}
+                    {formatMoney(totals.cheques)}
+                  </span>
+                </div>
+
+                <div className="tresorerie-cheque-list">
+                  {pendingCheques.map((item) => (
+                    <label
+                      key={item.id}
+                      className={`tresorerie-cheque ${selectedCheques.has(item.id) ? 'checked' : ''}`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedCheques.has(item.id)}
+                        onChange={() => toggleCheque(item.id)}
+                      />
+                      <span className="tresorerie-cheque-date">{formatDate(item.date)}</span>
+                      <span className="tresorerie-cheque-label">
+                        <strong>{item.label}</strong>
+                        {item.note && <small>{item.note}</small>}
+                      </span>
+                      <span className="tresorerie-cheque-amount">{formatMoney(item.amount)}</span>
+                    </label>
+                  ))}
+                </div>
+
+                <div className="tresorerie-deposit-bar">
+                  <div>
+                    <strong>{selectedCheques.size}</strong> chèque{selectedCheques.size > 1 ? 's' : ''} coché
+                    {selectedCheques.size > 1 ? 's' : ''} · <strong>{formatMoney(selectedTotal)}</strong>
+                  </div>
+                  <label className="tresorerie-deposit-date">
+                    Date de remise
+                    <input
+                      type="date"
+                      className="input"
+                      value={depositDate}
+                      onChange={(event) => setDepositDate(event.target.value)}
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={depositCheques}
+                    disabled={!ready || depositing || selectedCheques.size === 0 || !depositDate}
+                  >
+                    {depositing ? <Loader2 size={14} className="tresorerie-spin" /> : <Building2 size={14} />}
+                    Remis en banque
+                  </button>
+                </div>
+              </>
+            )}
+
+            <p className="tresorerie-help">
+              Un chèque revient impayé ? Supprime l’opération (ou, pour une cotisation, modifie l’adhésion dans
+              Adhérents) : le compte bancaire n’a jamais été faussé.
+            </p>
+
+            {deposits.length > 0 && (
+              <div className="tresorerie-deposits">
+                <h3>Remises effectuées</h3>
+                {deposits.map((group) => (
+                  <details key={group.date} className="tresorerie-deposit">
+                    <summary>
+                      <span>Remise du {formatDate(group.date)}</span>
+                      <span>
+                        {group.items.length} chèque{group.items.length > 1 ? 's' : ''} ·{' '}
+                        <strong>{formatMoney(group.total)}</strong>
+                      </span>
+                    </summary>
+                    {group.items.map((item) => (
+                      <div key={item.id} className="tresorerie-deposit-item">
+                        <span>{formatDate(item.date)}</span>
+                        <span className="tresorerie-cheque-label">{item.label}</span>
+                        <span>{formatMoney(item.amount)}</span>
+                        <button
+                          type="button"
+                          className="btn"
+                          onClick={() => undeposit(item)}
+                          disabled={depositing}
+                          title="Annuler la remise de ce chèque"
+                        >
+                          <Undo2 size={13} />
+                          Annuler
+                        </button>
+                      </div>
+                    ))}
+                  </details>
+                ))}
+              </div>
+            )}
+          </div>
         ) : view === 'all' && searched.length === 0 ? (
           <div className="tresorerie-empty">
             <CreditCard size={34} style={{ opacity: 0.35 }} />
@@ -935,7 +1211,7 @@ export default function TresoreriePage() {
 
                 {journal.map(({ item, delta, balance }) => (
                   <tr key={item.id}>
-                    <td style={{ whiteSpace: 'nowrap' }}>{formatDate(item.date)}</td>
+                    <td style={{ whiteSpace: 'nowrap' }}>{formatDate(journalDate(item, view as Account))}</td>
                     {labelCell(item, true)}
                     <td style={{ textAlign: 'right', color: '#166534', fontWeight: 700, whiteSpace: 'nowrap' }}>
                       {delta > 0 ? formatMoney(delta) : ''}
@@ -995,7 +1271,7 @@ export default function TresoreriePage() {
             </div>
 
             <form onSubmit={saveInitialBalance}>
-              {(['bank', 'cash'] as Account[]).map((account) => (
+              {(['bank', 'cash'] as const).map((account) => (
                 <div key={account} className="tresorerie-initial-balance-field" style={{ marginTop: 12 }}>
                   <label className="form-label" htmlFor={`initial-${account}`}>
                     {account === 'bank' ? 'Compte bancaire' : 'Caisse (espèces)'}
@@ -1218,7 +1494,9 @@ export default function TresoreriePage() {
                       <label className="form-label">
                         Compte <span className="tresorerie-required">*</span>
                       </label>
-                      <div className="tresorerie-type-buttons">
+                      <div
+                        className={`tresorerie-type-buttons ${form.type === 'income' ? 'tresorerie-type-buttons-3' : ''}`}
+                      >
                         <button
                           type="button"
                           className={form.account === 'bank' ? 'btn btn-primary' : 'btn'}
@@ -1237,9 +1515,21 @@ export default function TresoreriePage() {
                           <Banknote size={14} />
                           Caisse
                         </button>
+                        {form.type === 'income' && (
+                          <button
+                            type="button"
+                            className={form.account === 'cheques' ? 'btn btn-primary' : 'btn'}
+                            onClick={() => setForm((current) => ({ ...current, account: 'cheques' }))}
+                            aria-pressed={form.account === 'cheques'}
+                          >
+                            <Clock3 size={14} />
+                            Chèque à remettre
+                          </button>
+                        )}
                       </div>
                       <p className="tresorerie-help">
-                        Choisi automatiquement selon le mode de paiement (espèces → caisse), modifiable.
+                        Choisi automatiquement selon le mode de paiement (espèces → caisse, chèque reçu → chèques à
+                        remettre), modifiable.
                       </p>
                     </div>
 
@@ -1467,6 +1757,160 @@ export default function TresoreriePage() {
           font-size: 11px;
           color: #756a67;
           white-space: nowrap;
+        }
+
+        .tresorerie-table-wrap :global(.tresorerie-account-cheques) {
+          color: #a2671c;
+        }
+
+        .tresorerie-table-wrap :global(.tresorerie-deposited) {
+          margin-left: 4px;
+          color: #756a67;
+          font-size: 10px;
+          font-weight: 600;
+        }
+
+        .tresorerie-tab-alert {
+          background: #fff1e0 !important;
+          border-color: #f0c99a !important;
+          color: #a2671c !important;
+        }
+
+        .tresorerie-cheques {
+          display: grid;
+          gap: 12px;
+        }
+
+        .tresorerie-cheque-tools {
+          display: flex;
+          flex-wrap: wrap;
+          align-items: center;
+          gap: 12px;
+          color: #5f514b;
+          font-size: 13px;
+          font-weight: 700;
+        }
+
+        .tresorerie-cheque-list {
+          display: grid;
+          gap: 6px;
+        }
+
+        .tresorerie-cheque {
+          display: grid;
+          grid-template-columns: auto 90px minmax(0, 1fr) auto;
+          align-items: center;
+          gap: 12px;
+          padding: 10px 12px;
+          border: 1px solid #eadfd5;
+          border-radius: 10px;
+          background: #fff;
+          cursor: pointer;
+          font-size: 13px;
+        }
+
+        .tresorerie-cheque.checked {
+          border-color: #d9a39d;
+          background: #fff8f7;
+        }
+
+        .tresorerie-cheque-date {
+          color: #756a67;
+          white-space: nowrap;
+        }
+
+        .tresorerie-cheque-label {
+          display: flex;
+          flex-direction: column;
+          min-width: 0;
+        }
+
+        .tresorerie-cheque-label small {
+          color: #756a67;
+          font-size: 11px;
+        }
+
+        .tresorerie-cheque-amount {
+          font-weight: 800;
+          color: #166534;
+          white-space: nowrap;
+        }
+
+        .tresorerie-deposit-bar {
+          display: flex;
+          flex-wrap: wrap;
+          align-items: flex-end;
+          justify-content: space-between;
+          gap: 12px;
+          padding: 12px 14px;
+          border: 1px solid #eadfd5;
+          border-radius: 12px;
+          background: #fffaf3;
+          font-size: 13px;
+        }
+
+        .tresorerie-deposit-date {
+          display: grid;
+          gap: 4px;
+          color: #5f514b;
+          font-size: 12px;
+          font-weight: 700;
+        }
+
+        .tresorerie-deposits {
+          display: grid;
+          gap: 8px;
+          margin-top: 6px;
+        }
+
+        .tresorerie-deposits h3 {
+          margin: 0;
+          font-size: 15px;
+          color: #241c1b;
+        }
+
+        .tresorerie-deposit {
+          border: 1px solid #eadfd5;
+          border-radius: 10px;
+          background: #fff;
+        }
+
+        .tresorerie-deposit summary {
+          display: flex;
+          justify-content: space-between;
+          gap: 12px;
+          padding: 10px 12px;
+          font-size: 13px;
+          font-weight: 700;
+          cursor: pointer;
+        }
+
+        .tresorerie-deposit-item {
+          display: grid;
+          grid-template-columns: 90px minmax(0, 1fr) auto auto;
+          align-items: center;
+          gap: 12px;
+          padding: 8px 12px;
+          border-top: 1px solid #f1e8df;
+          font-size: 13px;
+        }
+
+        @media (max-width: 700px) {
+          .tresorerie-cheque {
+            grid-template-columns: auto minmax(0, 1fr) auto;
+          }
+
+          .tresorerie-cheque-date {
+            display: none;
+          }
+
+          .tresorerie-deposit-item {
+            grid-template-columns: minmax(0, 1fr) auto;
+          }
+
+          .tresorerie-deposit-bar .btn {
+            width: 100%;
+          }
         }
 
         .tresorerie-notice-ok {

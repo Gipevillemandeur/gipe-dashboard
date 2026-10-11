@@ -63,7 +63,7 @@ export type DashboardSnapshot = {
   upcomingEvents: UpcomingEvent[];
   recentActivity: RecentActivity[];
   // Solde actuel, visible par tout le bureau (lecture seule)
-  treasury: { total: number; bank: number; cash: number } | null;
+  treasury: { total: number; bank: number; cash: number; cheques: number } | null;
 };
 
 function failure(error: string, role = '', schoolYear = ''): DashboardSnapshot {
@@ -187,12 +187,14 @@ export async function getDashboardSnapshot(): Promise<DashboardSnapshot> {
       const balances = {
         bank: Number((activeYear as any).initial_balance || 0),
         cash: Number((activeYear as any).initial_cash_balance || 0),
+        cheques: 0,
       };
 
       for (const t of ((treasuryResult as any).data || []) as any[]) {
         const amount = Number(t.amount || 0);
         if (!Number.isFinite(amount)) continue;
-        const account: 'bank' | 'cash' = t.account === 'cash' ? 'cash' : 'bank';
+        const account: 'bank' | 'cash' | 'cheques' =
+          t.account === 'cash' ? 'cash' : t.account === 'cheques' ? 'cheques' : 'bank';
 
         if (t.transaction_type === 'transfer') {
           balances[account] -= amount;
@@ -208,7 +210,8 @@ export async function getDashboardSnapshot(): Promise<DashboardSnapshot> {
       treasury = {
         bank: round(balances.bank),
         cash: round(balances.cash),
-        total: round(balances.bank + balances.cash),
+        cheques: round(balances.cheques),
+        total: round(balances.bank + balances.cash + balances.cheques),
       };
     }
 

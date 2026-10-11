@@ -204,7 +204,7 @@ export async function buildAnnualReportPdf(report: AnnualReport) {
   ]);
 
   builder.paragraph(
-    `${report.isClosed ? 'Solde final' : 'Solde actuel'} : ${euro(report.accounts.bank.final)} en banque et ${euro(report.accounts.cash.final)} en caisse.`,
+    `${report.isClosed ? 'Solde final' : 'Solde actuel'} : ${euro(report.accounts.bank.final)} en banque et ${euro(report.accounts.cash.final)} en caisse${report.accounts.cheques.final ? `, plus ${euro(report.accounts.cheques.final)} de chèques à remettre` : ''}.`,
     { color: COLORS.grey }
   );
 

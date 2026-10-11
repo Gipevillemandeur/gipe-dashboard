@@ -214,6 +214,9 @@ export async function buildTreasuryPdf(
     [
       ['Banque', euro(report.accounts.bank.initial), euro(report.accounts.bank.final)],
       ['Caisse', euro(report.accounts.cash.initial), euro(report.accounts.cash.final)],
+      ...(report.accounts.cheques.final
+        ? [['Chèques à remettre', '-', euro(report.accounts.cheques.final)]]
+        : []),
       ['Total', euro(report.initialBalance), euro(report.solde)],
     ],
     { boldLastRow: true }
@@ -241,7 +244,7 @@ export async function buildTreasuryPdf(
 }
 
 
-const ACCOUNT_NAMES = { bank: 'Banque', cash: 'Caisse' } as const;
+const ACCOUNT_NAMES = { bank: 'Banque', cash: 'Caisse', cheques: 'Chèques à remettre' } as const;
 
 function txKind(t: TransactionRow) {
   if (t.type === 'transfer') return 'Mouvement';
@@ -263,8 +266,11 @@ function txSigned(t: TransactionRow) {
 /* Journal d'un compte : opérations du compte avec le solde après chaque ligne. */
 function accountJournal(rows: TransactionRow[], account: 'bank' | 'cash', initial: number) {
   let balance = initial;
+  // Un chèque compte à la banque à sa date de remise.
+  const when = (t: TransactionRow) => (account === 'bank' && t.depositedAt ? t.depositedAt : t.date);
   return rows
     .filter((t) => t.account === account || (t.type === 'transfer' && t.transferTo === account))
+    .sort((a, b) => when(a).localeCompare(when(b)))
     .map((t) => {
       const delta =
         t.type === 'transfer'
@@ -309,8 +315,8 @@ export function buildTreasuryXlsx(
         ['Date', 'Libellé', 'Entrée', 'Sortie', 'Solde'],
         ['', 'Solde de départ', null, null, report.accounts.bank.initial],
         ...accountJournal(rows, 'bank', report.accounts.bank.initial).map(({ t, delta, balance }) => [
-          dateFr(t.date),
-          t.label,
+          dateFr(t.depositedAt || t.date),
+          t.depositedAt ? `${t.label} (chèque remis le ${dateFr(t.depositedAt)})` : t.label,
           delta > 0 ? delta : null,
           delta < 0 ? -delta : null,
           balance,
@@ -342,6 +348,7 @@ export function buildTreasuryXlsx(
         [report.isClosed ? 'Solde final' : 'Solde actuel', report.solde, null],
         ['  dont banque', report.accounts.bank.final, null],
         ['  dont caisse', report.accounts.cash.final, null],
+        ['  dont chèques à remettre', report.accounts.cheques.final, null],
         [null, null, null],
         ['Catégorie', 'Recettes', 'Dépenses'],
         ...report.financialByCategory.map((c) => [

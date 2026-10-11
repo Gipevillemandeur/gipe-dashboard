@@ -137,7 +137,7 @@ Ce dashboard réunit tout ce dont le bureau a besoin au quotidien : les classes 
     presidentOnly: false,
     body: `## Deux comptes : la banque et la caisse
 - Chaque opération est rattachée au **compte bancaire** ou à la **caisse** (les espèces).
-- Le compte se choisit tout seul selon le mode de paiement (espèces → caisse), et reste modifiable.
+- Le compte se choisit tout seul selon le mode de paiement (espèces → caisse, chèque reçu → chèques à remettre), et reste modifiable.
 - En haut de la page : les **soldes de départ**, les recettes, les dépenses et le **solde actuel**, avec le détail banque / caisse.
 - Trois onglets : **Toutes les opérations**, **Compte bancaire** et **Journal de caisse**. Les deux derniers montrent le solde après chaque ligne, comme un relevé.
 
@@ -145,6 +145,14 @@ Ce dashboard réunit tout ce dont le bureau a besoin au quotidien : les classes 
 - **Recette** ou **Dépense** : date, montant, catégorie, mode de paiement, compte, libellé. Le type n’est jamais pré-sélectionné, pour éviter les erreurs.
 - **Caisse ↔ banque** : pour un dépôt d’espèces à la banque, ou un retrait d’espèces pour la caisse. Ce n’est **ni une recette ni une dépense** : l’argent change seulement de place, le résultat de l’année ne bouge pas.
 - Les cotisations des adhérents arrivent **automatiquement** (catégorie « Adhésions ») : en espèces dans la caisse, sinon à la banque.
+
+## Les chèques à remettre
+- Une recette payée **par chèque** (y compris une cotisation saisie dans Adhérents) arrive d’abord dans **Chèques à remettre** : elle ne compte pas encore sur le compte bancaire.
+- Le jour du dépôt à la banque : onglet **Chèques à remettre**, cocher les chèques déposés, indiquer la **date de remise**, puis **« Remis en banque »**. Ils passent alors sur le compte bancaire à cette date.
+- **Remises effectuées** : chaque remise (date, nombre de chèques, total) pour pointer avec le relevé bancaire. Une remise faite par erreur peut être annulée.
+- **Chèque impayé** : supprimer l’opération (ou, pour une cotisation, modifier l’adhésion dans Adhérents).
+
+! L’année ne peut pas être clôturée tant qu’il reste des chèques à remettre.
 
 ## Les justificatifs
 - Le **trombone 📎** sur la ligne d’une opération permet de joindre la photo du ticket ou la facture (PDF ou photo, 30 Mo maximum).

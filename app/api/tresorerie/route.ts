@@ -22,11 +22,15 @@ import { trashDriveFile } from '@/lib/receipts'
  */
 
 type Admin = ReturnType<typeof createAdminClient>
-type Account = 'bank' | 'cash'
+type Account = 'bank' | 'cash' | 'cheques'
 type TxType = 'income' | 'expense' | 'transfer'
 
-const ACCOUNTS: Account[] = ['bank', 'cash']
-const ACCOUNT_LABELS: Record<Account, string> = { bank: 'banque', cash: 'caisse' }
+const ACCOUNTS: Account[] = ['bank', 'cash', 'cheques']
+const ACCOUNT_LABELS: Record<Account, string> = {
+  bank: 'banque',
+  cash: 'caisse',
+  cheques: 'chèques à remettre',
+}
 const PAYMENT_METHODS = ['cheque', 'cash', 'transfer', 'online', 'other']
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/
 
@@ -153,11 +157,15 @@ function buildFields(body: any, current?: any) {
   const account = pick('account', current?.account)
   if (!isAccount(account)) return { error: 'Choisis le compte : banque ou caisse.' }
 
+  if (account === 'cheques' && type !== 'income') {
+    return { error: 'Seule une recette peut aller dans « chèques à remettre ».' }
+  }
+
   const note = String(pick('note', current?.note) || '').trim() || null
 
   if (type === 'transfer') {
     const transferTo = pick('transferTo', current?.transfer_to)
-    if (!isAccount(transferTo) || transferTo === account) {
+    if (account === 'cheques' || !isAccount(transferTo) || transferTo === 'cheques' || transferTo === account) {
       return { error: 'Un mouvement va de la caisse vers la banque, ou de la banque vers la caisse.' }
     }
 
@@ -202,6 +210,8 @@ function buildFields(body: any, current?: any) {
       label,
       payment_method: paymentMethod,
       note,
+      // Toujours en attente tant qu'il est dans « chèques à remettre ».
+      ...(account === 'cheques' ? { deposited_at: null } : {}),
     },
   }
 }
@@ -217,6 +227,7 @@ function toClient(row: any) {
     paymentMethod: row.payment_method,
     note: row.note,
     account: (row.account as Account) || 'bank',
+    depositedAt: row.deposited_at || null,
     transferTo: row.transfer_to || null,
     createdAt: row.created_at,
     // Recette créée automatiquement par une adhésion
@@ -330,6 +341,77 @@ export async function PUT(request: Request) {
   try {
     const body = await request.json().catch(() => null)
     if (!body) return fail('Données invalides.')
+
+    /*
+     * Remise de chèques en banque : { action: 'deposit', ids, depositDate }
+     */
+    if (body.action === 'deposit') {
+      const ids = (Array.isArray(body.ids) ? body.ids : []).map(String).filter(Boolean)
+      const depositDate = String(body.depositDate || '')
+
+      if (ids.length === 0) return fail('Coche au moins un chèque.')
+      if (!DATE_PATTERN.test(depositDate)) return fail('La date de remise est invalide.')
+
+      const year = await activeYear(admin)
+      if (!year) return fail("Aucune année scolaire active n'est définie.", 409)
+
+      const { data: pending, error: pendingError } = await admin
+        .from('gipe_transactions')
+        .select('id,amount')
+        .eq('school_year_id', year.id)
+        .eq('account', 'cheques')
+        .in('id', ids)
+
+      if (pendingError) return fail(pendingError.message, 500)
+      if (!pending || pending.length === 0) return fail('Ces chèques ont déjà été remis.', 409)
+
+      const { error } = await admin
+        .from('gipe_transactions')
+        .update({ account: 'bank', deposited_at: depositDate, updated_at: new Date().toISOString() })
+        .in('id', pending.map((row) => row.id))
+
+      if (error) return fail(`Remise impossible : ${error.message}`, 500)
+
+      const total = pending.reduce((sum, row) => sum + Number(row.amount || 0), 0)
+
+      await logActivity(
+        'Trésorerie',
+        `a remis ${pending.length} chèque${pending.length > 1 ? 's' : ''} en banque (${euros(total)})`
+      )
+
+      return NextResponse.json({ ok: true, count: pending.length, total })
+    }
+
+    /*
+     * Annuler la remise d'un chèque : { action: 'undeposit', id }
+     */
+    if (body.action === 'undeposit') {
+      const id = String(body.id || '').trim()
+      const year = await activeYear(admin)
+      if (!year) return fail("Aucune année scolaire active n'est définie.", 409)
+
+      const { data: row, error: rowError } = await admin
+        .from('gipe_transactions')
+        .select('id,label,deposited_at,school_year_id')
+        .eq('id', id)
+        .maybeSingle()
+
+      if (rowError) return fail(rowError.message, 500)
+      if (!row || row.school_year_id !== year.id || !row.deposited_at) {
+        return fail('Ce chèque n’a pas de remise à annuler.', 409)
+      }
+
+      const { error } = await admin
+        .from('gipe_transactions')
+        .update({ account: 'cheques', deposited_at: null, updated_at: new Date().toISOString() })
+        .eq('id', id)
+
+      if (error) return fail(`Annulation impossible : ${error.message}`, 500)
+
+      await logActivity('Trésorerie', `a annulé la remise en banque du chèque ${quote(row.label)}`)
+
+      return NextResponse.json({ ok: true })
+    }
 
     /*
      * Soldes de départ de l'année (banque et caisse).

@@ -70,6 +70,8 @@ export type AnnualReport = {
   accounts: {
     bank: { initial: number; final: number };
     cash: { initial: number; final: number };
+    // Chèques reçus pas encore remis en banque
+    cheques: { initial: number; final: number };
   };
   financialByCategory: CategoryTotal[];
   incomeDetails: CategoryDetail[];
@@ -104,9 +106,10 @@ export type TransactionRow = {
   amount: number;
   paymentMethod: string;
   note: string;
-  account: 'bank' | 'cash';
+  account: 'bank' | 'cash' | 'cheques';
   transferTo: 'bank' | 'cash' | null;
   hasReceipt: boolean;
+  depositedAt: string | null;
 };
 
 function round2(value: number) {
@@ -294,9 +297,9 @@ export async function buildAnnualReport(
   let totalDepenses = 0;
 
   // Mouvements de chaque compte (banque / caisse).
-  const flows = { bank: 0, cash: 0 };
-  const accountOf = (value: unknown): 'bank' | 'cash' =>
-    value === 'cash' ? 'cash' : 'bank';
+  const flows = { bank: 0, cash: 0, cheques: 0 };
+  const accountOf = (value: unknown): 'bank' | 'cash' | 'cheques' =>
+    value === 'cash' ? 'cash' : value === 'cheques' ? 'cheques' : 'bank';
 
   for (const transaction of transactionsResult.data || []) {
     const amount = Number(transaction.amount || 0);
@@ -452,6 +455,7 @@ export async function buildAnnualReport(
     accounts: {
       bank: { initial: initialBank, final: round2(initialBank + flows.bank) },
       cash: { initial: initialCash, final: round2(initialCash + flows.cash) },
+      cheques: { initial: 0, final: round2(flows.cheques) },
     },
     financialByCategory,
     incomeDetails,
@@ -568,7 +572,8 @@ export async function loadTransactionRows(
     amount: round2(Number(t.amount || 0)),
     paymentMethod: t.payment_method || '',
     note: t.note || '',
-    account: t.account === 'cash' ? 'cash' : 'bank',
+    account: t.account === 'cash' ? 'cash' : t.account === 'cheques' ? 'cheques' : 'bank',
+    depositedAt: t.deposited_at || null,
     transferTo: t.transfer_to === 'cash' ? 'cash' : t.transfer_to === 'bank' ? 'bank' : null,
     hasReceipt: Boolean(t.receipt_file_id),
   }));

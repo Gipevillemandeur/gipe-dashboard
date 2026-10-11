@@ -234,6 +234,12 @@ export default async function DashboardPage() {
               {new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(snapshot.treasury.bank)}
               {' · '}Caisse{' '}
               {new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(snapshot.treasury.cash)}
+              {snapshot.treasury.cheques > 0 && (
+                <>
+                  {' · '}Chèques à remettre{' '}
+                  {new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(snapshot.treasury.cheques)}
+                </>
+              )}
             </div>
 
           </div>
