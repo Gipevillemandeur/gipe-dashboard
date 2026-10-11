@@ -62,6 +62,8 @@ export type DashboardSnapshot = {
   upcomingMeetings: UpcomingMeeting[];
   upcomingEvents: UpcomingEvent[];
   recentActivity: RecentActivity[];
+  // Solde actuel, visible par tout le bureau (lecture seule)
+  treasury: { total: number; bank: number; cash: number } | null;
 };
 
 function failure(error: string, role = '', schoolYear = ''): DashboardSnapshot {
@@ -75,6 +77,7 @@ function failure(error: string, role = '', schoolYear = ''): DashboardSnapshot {
     upcomingMeetings: [],
     upcomingEvents: [],
     recentActivity: [],
+    treasury: null,
   };
 }
 
@@ -102,7 +105,7 @@ export async function getDashboardSnapshot(): Promise<DashboardSnapshot> {
 
     const { data: activeYear, error: yearError } = await admin
       .from('school_years')
-      .select('id,label')
+      .select('*')
       .eq('is_active', true)
       .maybeSingle();
 
@@ -128,7 +131,7 @@ export async function getDashboardSnapshot(): Promise<DashboardSnapshot> {
       )
       .map(([area]) => area);
 
-    const [classesResult, adherentsResult, meetingsResult, activityResult, agendaResult] = await Promise.all([
+    const [classesResult, adherentsResult, meetingsResult, activityResult, agendaResult, treasuryResult] = await Promise.all([
       admin
         .from('classes')
         .select('id,name,level,kind,active,students(count),class_teachers(count)')
@@ -169,7 +172,45 @@ export async function getDashboardSnapshot(): Promise<DashboardSnapshot> {
             .order('start_time', { ascending: true })
             .limit(5)
         : Promise.resolve({ data: [], error: null }),
+
+      // Trésorerie : le solde est visible par tout le bureau.
+      admin.from('gipe_transactions').select('*').eq('school_year_id', activeYear.id),
     ]);
+
+    /*
+     * Solde actuel = soldes de départ + recettes − dépenses.
+     * Les mouvements caisse ↔ banque ne changent que la répartition.
+     */
+    let treasury: DashboardSnapshot['treasury'] = null;
+
+    if (!(treasuryResult as any).error) {
+      const balances = {
+        bank: Number((activeYear as any).initial_balance || 0),
+        cash: Number((activeYear as any).initial_cash_balance || 0),
+      };
+
+      for (const t of ((treasuryResult as any).data || []) as any[]) {
+        const amount = Number(t.amount || 0);
+        if (!Number.isFinite(amount)) continue;
+        const account: 'bank' | 'cash' = t.account === 'cash' ? 'cash' : 'bank';
+
+        if (t.transaction_type === 'transfer') {
+          balances[account] -= amount;
+          balances[t.transfer_to === 'cash' ? 'cash' : 'bank'] += amount;
+        } else if (t.transaction_type === 'income') {
+          balances[account] += amount;
+        } else if (t.transaction_type === 'expense') {
+          balances[account] -= amount;
+        }
+      }
+
+      const round = (v: number) => Math.round(v * 100) / 100;
+      treasury = {
+        bank: round(balances.bank),
+        cash: round(balances.cash),
+        total: round(balances.bank + balances.cash),
+      };
+    }
 
     const meetings = (meetingsResult.data || []) as any[];
 
@@ -239,6 +280,7 @@ export async function getDashboardSnapshot(): Promise<DashboardSnapshot> {
       adherents: adherentsResult.count || 0,
       role,
       upcomingEvents,
+      treasury,
       upcomingMeetings: (meetingsResult.data || []).map((m: any) => ({
         id: m.id,
         date: m.meeting_date,

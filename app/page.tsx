@@ -4,6 +4,7 @@ import {
   GraduationCap,
   Users,
   HeartHandshake,
+  WalletCards,
 } from 'lucide-react';
 
 import { getDashboardSnapshot } from '@/lib/dashboard-data';
@@ -113,7 +114,7 @@ export default async function DashboardPage() {
         </div>
       )}
 
-      <div className="page-grid cards-3">
+      <div className={`page-grid ${snapshot.treasury ? 'cards-4' : 'cards-3'}`}>
 
         {/* CLASSES */}
 
@@ -198,6 +199,45 @@ export default async function DashboardPage() {
           </div>
 
         </div>
+
+
+        {/* SOLDE ACTUEL : simple information pour tout le bureau, non cliquable */}
+
+        {snapshot.treasury && (
+          <div className="card stat">
+            <div className="stat-top">
+
+              <div className="stat-label">
+                Solde actuel
+              </div>
+
+              <div className="stat-icon">
+                <WalletCards size={17} />
+              </div>
+
+            </div>
+
+            <div
+              className="stat-value"
+              style={{
+                color: snapshot.treasury.total < 0 ? '#b91c1c' : undefined,
+              }}
+            >
+              {new Intl.NumberFormat('fr-FR', {
+                style: 'currency',
+                currency: 'EUR',
+              }).format(snapshot.treasury.total)}
+            </div>
+
+            <div className="stat-note">
+              Banque{' '}
+              {new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(snapshot.treasury.bank)}
+              {' · '}Caisse{' '}
+              {new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(snapshot.treasury.cash)}
+            </div>
+
+          </div>
+        )}
 
       </div>
 
