@@ -8,6 +8,8 @@ import {
   CreditCard,
   GraduationCap,
   History,
+  UserCheck,
+  Landmark,
   X,
 } from 'lucide-react';
 
@@ -226,6 +228,74 @@ export default function AdherentsPage() {
         })
       );
   }, [members]);
+
+  /*
+   * Parents volontaires pour les conseils de classe,
+   * classe par classe.
+   * - « Classe enfant » : volontaire pour la/les classe(s)
+   *   de ses enfants ;
+   * - « Toute classe » : volontaire partout (renfort).
+   */
+  const delegates = useMemo(() => {
+    const allClasses = members
+      .filter((m) => m.councilParticipation === 'all_classes')
+      .sort((a, b) =>
+        `${a.lastName} ${a.firstName}`.localeCompare(
+          `${b.lastName} ${b.firstName}`,
+          'fr'
+        )
+      );
+
+    const rows = classes.map((cls) => {
+      const parents = members
+        .filter(
+          (m) =>
+            m.councilParticipation !== 'no' &&
+            m.children.some(
+              (child) =>
+                child.classId === cls.id ||
+                (!child.classId && child.className === cls.name)
+            )
+        )
+        .sort((a, b) =>
+          `${a.lastName} ${a.firstName}`.localeCompare(
+            `${b.lastName} ${b.firstName}`,
+            'fr'
+          )
+        );
+
+      const reinforcements = allClasses.filter(
+        (m) => !parents.some((p) => p.id === m.id)
+      );
+
+      return { cls, parents, reinforcements };
+    });
+
+    return {
+      rows,
+      allClasses,
+      covered: rows.filter((row) => row.parents.length > 0).length,
+    };
+  }, [members, classes]);
+
+  /*
+   * Conseil d'administration : membres du CA
+   * (les membres du bureau en font forcément partie).
+   */
+  const caMembers = useMemo(
+    () =>
+      members
+        .filter((m) => m.caMember || m.boardMember)
+        .sort(
+          (a, b) =>
+            Number(b.boardMember) - Number(a.boardMember) ||
+            `${a.lastName} ${a.firstName}`.localeCompare(
+              `${b.lastName} ${b.firstName}`,
+              'fr'
+            )
+        ),
+    [members]
+  );
 
   function addChild() {
     setForm((current) => ({
@@ -878,6 +948,147 @@ export default function AdherentsPage() {
         )}
       </section>
 
+      {!loading && (
+        <section className="card section-card adherents-extra">
+          <div className="section-head">
+            <div>
+              <h2 className="section-title adherents-extra-title">
+                <UserCheck size={18} />
+                Parents volontaires pour les conseils de classe
+              </h2>
+              <p className="section-sub">
+                {classes.length === 0
+                  ? 'Aucune classe pour l’année en cours : importe d’abord le listing du collège.'
+                  : `${delegates.covered} classe${delegates.covered > 1 ? 's' : ''} sur ${classes.length} avec au moins un parent de la classe volontaire.`}
+              </p>
+            </div>
+          </div>
+
+          {delegates.allClasses.length > 0 && (
+            <div className="adherents-all-classes">
+              <strong>Volontaires pour toutes les classes :</strong>{' '}
+              {delegates.allClasses
+                .map((m) => `${m.lastName} ${m.firstName}`)
+                .join(', ')}
+            </div>
+          )}
+
+          {classes.length > 0 && (
+            <div className="adherents-delegates">
+              {delegates.rows.map(({ cls, parents, reinforcements }) => {
+                const status =
+                  parents.length > 0
+                    ? 'ok'
+                    : reinforcements.length > 0
+                      ? 'warn'
+                      : 'empty';
+
+                return (
+                  <div
+                    key={cls.id}
+                    className={`adherents-delegate-row delegate-${status}`}
+                  >
+                    <div className="adherents-delegate-class">
+                      {cls.name}
+                    </div>
+
+                    <div className="adherents-delegate-people">
+                      {parents.length > 0 ? (
+                        parents.map((m) => (
+                          <span key={m.id} className="adherents-delegate-chip">
+                            {m.lastName} {m.firstName}
+                            {m.councilParticipation === 'all_classes' && (
+                              <em> · toutes classes</em>
+                            )}
+                          </span>
+                        ))
+                      ) : status === 'warn' ? (
+                        <span className="adherents-delegate-note">
+                          Aucun parent de la classe — renfort possible :{' '}
+                          {reinforcements.length <= 3
+                            ? reinforcements
+                                .map((m) => `${m.lastName} ${m.firstName}`)
+                                .join(', ')
+                            : `${reinforcements.length} volontaires toutes classes`}
+                        </span>
+                      ) : (
+                        <span className="adherents-delegate-note">
+                          Aucun volontaire
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </section>
+      )}
+
+      {!loading && (
+        <section className="card section-card adherents-extra">
+          <div className="section-head">
+            <div>
+              <h2 className="section-title adherents-extra-title">
+                <Landmark size={18} />
+                Conseil d’administration
+              </h2>
+              <p className="section-sub">
+                {caMembers.length} membre{caMembers.length > 1 ? 's' : ''} du CA,
+                dont {caMembers.filter((m) => m.boardMember).length} membre
+                {caMembers.filter((m) => m.boardMember).length > 1 ? 's' : ''} du
+                bureau (surlignés).
+              </p>
+            </div>
+          </div>
+
+          {caMembers.length === 0 ? (
+            <p className="kicker">
+              Aucun membre du CA pour le moment : coche la case « CA »
+              dans la fiche de l’adhérent.
+            </p>
+          ) : (
+            <div className="adherents-ca-list">
+              {caMembers.map((m) => (
+                <button
+                  key={m.id}
+                  type="button"
+                  className={`adherents-ca-row ${m.boardMember ? 'is-board' : ''}`}
+                  onClick={() => openEditMember(m)}
+                >
+                  <div className="adherents-ca-name">
+                    <strong>
+                      {m.lastName} {m.firstName}
+                    </strong>
+                    {m.boardMember && (
+                      <span className="adherents-ca-badge">Bureau</span>
+                    )}
+                  </div>
+
+                  <div className="adherents-ca-children">
+                    {m.children.length === 0
+                      ? '—'
+                      : m.children
+                          .map((c) =>
+                            c.className
+                              ? `${c.firstName} (${c.className})`
+                              : c.firstName
+                          )
+                          .join(', ')}
+                  </div>
+
+                  <div className="adherents-ca-contact">
+                    {m.phone && <span>{m.phone}</span>}
+                    {m.email && <span>{m.email}</span>}
+                    {!m.phone && !m.email && <span>—</span>}
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
+
       {showForm && (
         <div className="adherents-modal-backdrop">
           <div className="card adherents-modal">
@@ -1509,6 +1720,174 @@ export default function AdherentsPage() {
       )}
 
       <style jsx>{`
+        .adherents-extra {
+          margin-top: 18px;
+        }
+
+        .adherents-extra-title {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .adherents-all-classes {
+          margin: 4px 0 14px;
+          padding: 10px 12px;
+          border: 1px solid #eadfd5;
+          border-radius: 10px;
+          background: #fffaf3;
+          color: #5f514b;
+          font-size: 13px;
+          line-height: 1.5;
+        }
+
+        .adherents-delegates {
+          display: grid;
+          gap: 8px;
+        }
+
+        .adherents-delegate-row {
+          display: grid;
+          grid-template-columns: 90px minmax(0, 1fr);
+          align-items: center;
+          gap: 12px;
+          padding: 9px 12px;
+          border: 1px solid #eadfd5;
+          border-left-width: 4px;
+          border-radius: 10px;
+          background: #fff;
+        }
+
+        .delegate-ok {
+          border-left-color: #2f8a57;
+        }
+
+        .delegate-warn {
+          border-left-color: #d79a2b;
+          background: #fffaf0;
+        }
+
+        .delegate-empty {
+          border-left-color: #b4302a;
+          background: #fff5f3;
+        }
+
+        .adherents-delegate-class {
+          font-weight: 800;
+          color: #241c1b;
+        }
+
+        .adherents-delegate-people {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 6px;
+          min-width: 0;
+        }
+
+        .adherents-delegate-chip {
+          padding: 3px 9px;
+          border-radius: 999px;
+          background: #f2f8f4;
+          border: 1px solid #cfe5d7;
+          color: #23492f;
+          font-size: 12px;
+          font-weight: 700;
+        }
+
+        .adherents-delegate-chip em {
+          font-style: normal;
+          font-weight: 500;
+          color: #4f6b57;
+        }
+
+        .adherents-delegate-note {
+          color: #6b5d58;
+          font-size: 13px;
+        }
+
+        .delegate-empty .adherents-delegate-note {
+          color: #9b2a23;
+          font-weight: 700;
+        }
+
+        .adherents-ca-list {
+          display: grid;
+          gap: 8px;
+        }
+
+        .adherents-ca-row {
+          display: grid;
+          grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr) minmax(0, 1fr);
+          align-items: center;
+          gap: 12px;
+          width: 100%;
+          padding: 11px 14px;
+          border: 1px solid #eadfd5;
+          border-radius: 10px;
+          background: #fff;
+          color: #3a2f2c;
+          font: inherit;
+          font-size: 13px;
+          text-align: left;
+          cursor: pointer;
+        }
+
+        .adherents-ca-row:hover {
+          border-color: #d9c4b6;
+        }
+
+        /* Membres du bureau : même rose que la carte « Connecté en tant que ». */
+        .adherents-ca-row.is-board {
+          background: #fff1f0;
+          border-color: #efcac6;
+        }
+
+        .adherents-ca-name {
+          display: flex;
+          flex-wrap: wrap;
+          align-items: center;
+          gap: 8px;
+          min-width: 0;
+        }
+
+        .adherents-ca-name strong {
+          color: #241c1b;
+        }
+
+        .adherents-ca-badge {
+          padding: 2px 8px;
+          border-radius: 999px;
+          background: #8f211c;
+          color: #fff;
+          font-size: 11px;
+          font-weight: 800;
+        }
+
+        .adherents-ca-children,
+        .adherents-ca-contact {
+          min-width: 0;
+          color: #6b5d58;
+          overflow-wrap: anywhere;
+        }
+
+        .adherents-ca-contact {
+          display: flex;
+          flex-direction: column;
+          gap: 2px;
+        }
+
+        @media (max-width: 760px) {
+          .adherents-delegate-row {
+            grid-template-columns: minmax(0, 1fr);
+            gap: 6px;
+          }
+
+          .adherents-ca-row {
+            grid-template-columns: minmax(0, 1fr);
+            gap: 6px;
+          }
+        }
+
         .adherents-renewal {
           display: flex;
           gap: 10px;
