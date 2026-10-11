@@ -16,6 +16,7 @@ import { PDF, XLSX_MIME, uploadYearFile } from '@/lib/drive-archive';
 import { archiveInstanceMeeting } from '@/lib/instance-meeting-drive';
 import { checkYearAccess, errorMessage } from '@/lib/year-access';
 import { logActivity } from '@/lib/activity';
+import { archiveReceiptFolder, folderIdFromUrl } from '@/lib/receipts';
 
 // Une étape peut envoyer plusieurs fichiers vers le Drive.
 export const maxDuration = 60;
@@ -131,6 +132,7 @@ export async function GET(request: Request) {
       { key: 'bilan', label: 'Bilan annuel (PDF)' },
       { key: 'adherents', label: 'Adhérents (PDF + Excel)' },
       { key: 'tresorerie', label: 'Trésorerie (PDF + Excel)' },
+      { key: 'justificatifs', label: 'Justificatifs de la trésorerie' },
       ...report.meetings.map((m) => ({
         key: `meeting:${m.id}`,
         label: `Instance : ${m.date.split('-').reverse().join('/')} – ${m.type} – ${m.subject}`,
@@ -275,6 +277,35 @@ export async function POST(request: Request) {
       });
 
       yearFolderUrl = result.yearFolderUrl;
+    } else if (step === 'justificatifs') {
+      /*
+       * « Justificatifs / <année> » rejoint
+       * « Archives / <année> / Trésorerie / Justificatifs ».
+       */
+      const fresh = await findClosure(admin, yearId);
+      const yearFolderId = folderIdFromUrl(fresh?.drive_folder_url);
+
+      if (!yearFolderId) {
+        return NextResponse.json(
+          { error: 'Le dossier de l’année dans les archives est introuvable : relance d’abord l’étape « Bilan annuel ».' },
+          { status: 409 }
+        );
+      }
+
+      try {
+        await archiveReceiptFolder(year, yearFolderId);
+      } catch (driveError) {
+        const message = driveError instanceof Error ? driveError.message : '';
+        return NextResponse.json(
+          {
+            error:
+              message === 'DRIVE_NOT_CONNECTED'
+                ? 'Google Drive n’est pas connecté : reconnecte-le depuis Docs Drive, puis relance l’archivage.'
+                : `Justificatifs non rangés : ${message || 'erreur Google Drive.'}`,
+          },
+          { status: 502 }
+        );
+      }
     } else if (step.startsWith('meeting:')) {
       const meetingId = step.slice('meeting:'.length);
 

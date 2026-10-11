@@ -1,10 +1,16 @@
 'use client';
 
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowDownCircle,
+  ArrowLeftRight,
   ArrowUpCircle,
+  Banknote,
+  Building2,
   CreditCard,
+  FileCheck2,
+  Loader2,
+  Paperclip,
   Pencil,
   Plus,
   Trash2,
@@ -12,37 +18,42 @@ import {
   X,
 } from 'lucide-react';
 
+type Account = 'bank' | 'cash';
+type TxType = 'income' | 'expense' | 'transfer';
+type View = 'all' | Account;
+
 type Transaction = {
   id: string;
   date: string;
-  type: 'income' | 'expense';
+  type: TxType;
   category: string;
   label: string;
   amount: number;
   paymentMethod: string | null;
   note: string | null;
+  account: Account;
+  transferTo: Account | null;
+  createdAt?: string;
   // recette créée automatiquement par une adhésion
   fromMembership?: boolean;
+  receipt: { fileId: string; name: string; url: string | null } | null;
 };
 
 type FormState = {
   date: string;
-  // '' = pas encore choisi : oblige à choisir Recette ou Dépense
-  type: '' | 'income' | 'expense';
+  // '' = pas encore choisi : oblige à choisir le type
+  type: '' | TxType;
   category: string;
   label: string;
   amount: string;
   paymentMethod: string;
+  // '' = pas encore choisi
+  account: '' | Account;
+  direction: 'cash_to_bank' | 'bank_to_cash';
   note: string;
 };
 
-const incomeCategories = [
-  'Adhésions',
-  'Subvention',
-  'Don',
-  'Vente',
-  'Autre recette',
-];
+const incomeCategories = ['Adhésions', 'Subvention', 'Don', 'Vente', 'Autre recette'];
 
 const expenseCategories = [
   'Fournitures',
@@ -61,13 +72,13 @@ const paymentMethods = [
   { value: 'other', label: 'Autre' },
 ];
 
-// Date du jour en heure locale (et non en heure UTC,
-// qui donnait la veille entre minuit et 2 h du matin).
+const ACCOUNT_NAMES: Record<Account, string> = { bank: 'Banque', cash: 'Caisse' };
+
+// Date du jour en heure locale (et non en heure UTC).
 function today() {
   const now = new Date();
   const month = String(now.getMonth() + 1).padStart(2, '0');
   const day = String(now.getDate()).padStart(2, '0');
-
   return `${now.getFullYear()}-${month}-${day}`;
 }
 
@@ -82,14 +93,13 @@ const emptyForm: FormState = {
   label: '',
   amount: '',
   paymentMethod: '',
+  account: '',
+  direction: 'cash_to_bank',
   note: '',
 };
 
 function formatMoney(value: number) {
-  return new Intl.NumberFormat('fr-FR', {
-    style: 'currency',
-    currency: 'EUR',
-  }).format(value);
+  return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(value);
 }
 
 function formatDate(value: string) {
@@ -97,59 +107,98 @@ function formatDate(value: string) {
 }
 
 function paymentLabel(value: string | null) {
-  return (
-    paymentMethods.find((item) => item.value === value)?.label || '—'
-  );
+  return paymentMethods.find((item) => item.value === value)?.label || '—';
+}
+
+function round2(value: number) {
+  return Math.round(value * 100) / 100;
+}
+
+/* Effet d'une opération sur un compte (+ entrée, − sortie, 0 sans rapport). */
+function effectOn(item: Transaction, account: Account) {
+  if (item.type === 'transfer') {
+    if (item.account === account) return -item.amount;
+    if (item.transferTo === account) return item.amount;
+    return 0;
+  }
+  if (item.account !== account) return 0;
+  return item.type === 'income' ? item.amount : -item.amount;
+}
+
+async function readJson(response: Response) {
+  try {
+    return await response.json();
+  } catch {
+    return {};
+  }
+}
+
+/* Envoi direct du fichier vers Google Drive (sans passer par Vercel). */
+function putToGoogle(uploadUrl: string, file: File): Promise<{ ok: boolean; fileId: string | null }> {
+  return new Promise((resolve) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('PUT', uploadUrl);
+    xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
+    xhr.onload = () => {
+      let fileId: string | null = null;
+      try {
+        fileId = JSON.parse(xhr.responseText)?.id || null;
+      } catch {
+        fileId = null;
+      }
+      resolve({ ok: xhr.status >= 200 && xhr.status < 300, fileId });
+    };
+    xhr.onerror = () => resolve({ ok: false, fileId: null });
+    xhr.send(file);
+  });
 }
 
 export default function TresoreriePage() {
   const [schoolYear, setSchoolYear] = useState<string | null>(null);
-  const [initialBalance, setInitialBalance] = useState(0);
+  const [initialBalances, setInitialBalances] = useState<Record<Account, number>>({ bank: 0, cash: 0 });
+  const [ready, setReady] = useState(true);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [savingInitialBalance, setSavingInitialBalance] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
   const [search, setSearch] = useState('');
+  const [view, setView] = useState<View>('all');
   const [showForm, setShowForm] = useState(false);
   const [showInitialBalanceForm, setShowInitialBalanceForm] = useState(false);
-  const [initialBalanceInput, setInitialBalanceInput] = useState('0');
+  const [initialInputs, setInitialInputs] = useState({ bank: '0', cash: '0' });
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm);
   const [formError, setFormError] = useState('');
-  const [transactionToDelete, setTransactionToDelete] =
-    useState<Transaction | null>(null);
+  const [transactionToDelete, setTransactionToDelete] = useState<Transaction | null>(null);
+  const [receiptToRemove, setReceiptToRemove] = useState<Transaction | null>(null);
+  const [receiptBusyId, setReceiptBusyId] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const receiptTargetRef = useRef<Transaction | null>(null);
 
   async function load() {
     setLoading(true);
     setError('');
 
     try {
-      const response = await fetch('/api/tresorerie', {
-        cache: 'no-store',
-      });
-
-      const data = await response.json();
+      const response = await fetch('/api/tresorerie', { cache: 'no-store' });
+      const data = await readJson(response);
 
       if (!response.ok) {
-        throw new Error(
-          data.error || 'Impossible de charger la trésorerie.'
-        );
+        throw new Error(data.error || 'Impossible de charger la trésorerie.');
       }
 
       setSchoolYear(data.schoolYear || null);
-      setInitialBalance(Number(data.initialBalance || 0));
-      setInitialBalanceInput(
-        String(Number(data.initialBalance || 0)).replace('.', ',')
-      );
+      setInitialBalances({
+        bank: Number(data.initialBalances?.bank || 0),
+        cash: Number(data.initialBalances?.cash || 0),
+      });
+      setReady(data.ready !== false);
       setTransactions(data.transactions || []);
     } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : 'Impossible de charger la trésorerie.'
-      );
+      setError(err instanceof Error ? err.message : 'Impossible de charger la trésorerie.');
     } finally {
       setLoading(false);
     }
@@ -168,43 +217,38 @@ export default function TresoreriePage() {
       .filter((item) => item.type === 'expense')
       .reduce((sum, item) => sum + item.amount, 0);
 
-    const currentBalance =
-      initialBalance + income - expense;
+    const bank = initialBalances.bank + transactions.reduce((sum, item) => sum + effectOn(item, 'bank'), 0);
+    const cash = initialBalances.cash + transactions.reduce((sum, item) => sum + effectOn(item, 'cash'), 0);
 
     return {
-      income: Math.round(income * 100) / 100,
-      expense: Math.round(expense * 100) / 100,
-      balance: Math.round(currentBalance * 100) / 100,
+      income: round2(income),
+      expense: round2(expense),
+      bank: round2(bank),
+      cash: round2(cash),
+      balance: round2(bank + cash),
+      initial: round2(initialBalances.bank + initialBalances.cash),
     };
-  }, [transactions, initialBalance]);
+  }, [transactions, initialBalances]);
 
   /*
-   * Catégories proposées selon le type choisi.
-   * En modification, une ancienne catégorie qui ne fait
-   * plus partie de la liste reste proposée (sinon elle
-   * serait effacée sans qu'on s'en rende compte).
+   * Catégories proposées selon le type choisi. Une ancienne
+   * catégorie hors liste reste proposée en modification.
    */
   const categories = useMemo(() => {
     const base =
-      form.type === 'income'
-        ? incomeCategories
-        : form.type === 'expense'
-          ? expenseCategories
-          : [];
+      form.type === 'income' ? incomeCategories : form.type === 'expense' ? expenseCategories : [];
 
-    return form.category && !base.includes(form.category)
-      ? [form.category, ...base]
-      : base;
+    return form.category && !base.includes(form.category) ? [form.category, ...base] : base;
   }, [form.type, form.category]);
 
-  /*
-   * Touche Échap : ferme la fenêtre ouverte.
-   */
+  /* Touche Échap : ferme la fenêtre ouverte. */
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
       if (event.key !== 'Escape') return;
 
-      if (transactionToDelete) {
+      if (receiptToRemove) {
+        if (!receiptBusyId) setReceiptToRemove(null);
+      } else if (transactionToDelete) {
         if (!deletingId) setTransactionToDelete(null);
       } else if (showInitialBalanceForm) {
         closeInitialBalanceForm();
@@ -214,28 +258,47 @@ export default function TresoreriePage() {
     }
 
     window.addEventListener('keydown', onKeyDown);
-
-    return () =>
-      window.removeEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
   });
 
-  const filteredTransactions = useMemo(() => {
+  const searched = useMemo(() => {
     const value = search.trim().toLowerCase();
-
     if (!value) return transactions;
 
     return transactions.filter((item) =>
-      [
-        item.label,
-        item.category,
-        item.note || '',
-        paymentLabel(item.paymentMethod),
-      ]
+      [item.label, item.category, item.note || '', paymentLabel(item.paymentMethod)]
         .join(' ')
         .toLowerCase()
         .includes(value)
     );
   }, [transactions, search]);
+
+  /*
+   * Journal d'un compte : du plus ancien au plus récent,
+   * avec le solde après chaque ligne.
+   */
+  const journal = useMemo(() => {
+    if (view === 'all') return [];
+
+    const ordered = [...transactions]
+      .filter((item) => effectOn(item, view) !== 0)
+      .sort(
+        (a, b) =>
+          a.date.localeCompare(b.date) || String(a.createdAt || '').localeCompare(String(b.createdAt || ''))
+      );
+
+    let balance = initialBalances[view];
+    const rows = ordered.map((item) => {
+      const delta = effectOn(item, view);
+      balance = round2(balance + delta);
+      return { item, delta, balance };
+    });
+
+    const ids = new Set(searched.map((item) => item.id));
+    return rows.filter((row) => ids.has(row.item.id));
+  }, [view, transactions, initialBalances, searched]);
+
+  const shownCount = view === 'all' ? searched.length : journal.length;
 
   function openNew() {
     setEditingId(null);
@@ -249,10 +312,12 @@ export default function TresoreriePage() {
     setForm({
       date: item.date,
       type: item.type,
-      category: item.category,
+      category: item.type === 'transfer' ? '' : item.category,
       label: item.label,
       amount: String(item.amount).replace('.', ','),
       paymentMethod: item.paymentMethod || '',
+      account: item.account,
+      direction: item.type === 'transfer' && item.account === 'bank' ? 'bank_to_cash' : 'cash_to_bank',
       note: item.note || '',
     });
     setFormError('');
@@ -260,9 +325,10 @@ export default function TresoreriePage() {
   }
 
   function openInitialBalanceForm() {
-    setInitialBalanceInput(
-      String(initialBalance).replace('.', ',')
-    );
+    setInitialInputs({
+      bank: String(initialBalances.bank).replace('.', ','),
+      cash: String(initialBalances.cash).replace('.', ','),
+    });
     setFormError('');
     setShowInitialBalanceForm(true);
   }
@@ -279,7 +345,7 @@ export default function TresoreriePage() {
     setShowInitialBalanceForm(false);
   }
 
-  function setType(type: 'income' | 'expense') {
+  function setType(type: TxType) {
     setFormError('');
     setForm((current) => ({
       ...current,
@@ -289,13 +355,23 @@ export default function TresoreriePage() {
     }));
   }
 
+  /* Le moyen de paiement choisit le compte (modifiable ensuite). */
+  function setPaymentMethod(value: string) {
+    setForm((current) => ({
+      ...current,
+      paymentMethod: value,
+      account: value === 'cash' ? 'cash' : value ? 'bank' : current.account,
+    }));
+  }
+
   async function saveInitialBalance(event: FormEvent) {
     event.preventDefault();
 
-    const numericBalance = parseAmount(initialBalanceInput);
+    const bank = parseAmount(initialInputs.bank || '0');
+    const cash = parseAmount(initialInputs.cash || '0');
 
-    if (!Number.isFinite(numericBalance)) {
-      setFormError('Le solde initial est invalide.');
+    if (!Number.isFinite(bank) || !Number.isFinite(cash)) {
+      setFormError('Un des soldes de départ est invalide.');
       return;
     }
 
@@ -305,71 +381,43 @@ export default function TresoreriePage() {
     try {
       const response = await fetch('/api/tresorerie', {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          initialBalance: numericBalance,
-        }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ initialBalances: { bank, cash } }),
       });
 
-      const data = await response.json();
+      const data = await readJson(response);
+      if (!response.ok) throw new Error(data.error || 'Impossible d’enregistrer les soldes de départ.');
 
-      if (!response.ok) {
-        throw new Error(
-          data.error || 'Impossible d’enregistrer le solde initial.'
-        );
-      }
-
-      setInitialBalance(Number(data.initialBalance || 0));
-      setInitialBalanceInput(
-        String(Number(data.initialBalance || 0)).replace('.', ',')
-      );
-      setShowInitialBalanceForm(false);
+      setInitialBalances({ bank: data.initialBalances.bank, cash: data.initialBalances.cash });
+      setSavingInitialBalance(false);
+      closeInitialBalanceForm();
     } catch (err) {
-      setFormError(
-        err instanceof Error
-          ? err.message
-          : 'Impossible d’enregistrer le solde initial.'
-      );
+      setFormError(err instanceof Error ? err.message : 'Impossible d’enregistrer les soldes de départ.');
     } finally {
       setSavingInitialBalance(false);
     }
   }
 
-  async function deleteTransaction() {
-    const item = transactionToDelete;
+  async function confirmDelete() {
+    if (!transactionToDelete) return;
 
-    if (!item || deletingId) return;
-
-    setDeletingId(item.id);
+    setDeletingId(transactionToDelete.id);
     setFormError('');
 
     try {
       const response = await fetch('/api/tresorerie', {
         method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ id: item.id }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: transactionToDelete.id }),
       });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(
-          data.error || 'Impossible de supprimer l’opération.'
-        );
-      }
+      const data = await readJson(response);
+      if (!response.ok) throw new Error(data.error || 'Impossible de supprimer l’opération.');
 
       setTransactionToDelete(null);
       await load();
     } catch (err) {
-      setFormError(
-        err instanceof Error
-          ? err.message
-          : 'Impossible de supprimer l’opération.'
-      );
+      setFormError(err instanceof Error ? err.message : 'Impossible de supprimer l’opération.');
     } finally {
       setDeletingId(null);
     }
@@ -377,54 +425,304 @@ export default function TresoreriePage() {
 
   async function save(event: FormEvent) {
     event.preventDefault();
-    setFormError('');
 
     if (!form.type) {
-      setFormError('Choisis d’abord s’il s’agit d’une recette ou d’une dépense.');
+      setFormError('Choisis le type : recette, dépense ou mouvement caisse ↔ banque.');
       return;
     }
 
     const amount = parseAmount(form.amount);
-
     if (!Number.isFinite(amount) || amount <= 0) {
-      setFormError('Le montant doit être un nombre supérieur à 0.');
+      setFormError('Le montant doit être supérieur à 0.');
       return;
     }
 
+    if (form.type !== 'transfer' && !form.account) {
+      setFormError('Choisis le compte : banque ou caisse.');
+      return;
+    }
+
+    const payload =
+      form.type === 'transfer'
+        ? {
+            type: 'transfer',
+            date: form.date,
+            amount: form.amount,
+            account: form.direction === 'cash_to_bank' ? 'cash' : 'bank',
+            transferTo: form.direction === 'cash_to_bank' ? 'bank' : 'cash',
+            label: form.label,
+            note: form.note,
+          }
+        : {
+            type: form.type,
+            date: form.date,
+            amount: form.amount,
+            account: form.account,
+            category: form.category,
+            label: form.label,
+            paymentMethod: form.paymentMethod,
+            note: form.note,
+          };
+
     setSaving(true);
+    setFormError('');
 
     try {
       const response = await fetch('/api/tresorerie', {
         method: editingId ? 'PUT' : 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          ...(editingId ? { id: editingId } : {}),
-          ...form,
-        }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...(editingId ? { id: editingId } : {}), ...payload }),
       });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(
-          data.error || 'Impossible d’enregistrer l’opération.'
-        );
-      }
+      const data = await readJson(response);
+      if (!response.ok) throw new Error(data.error || 'Impossible d’enregistrer l’opération.');
 
       setSaving(false);
       closeForm();
       await load();
     } catch (err) {
-      setFormError(
-        err instanceof Error
-          ? err.message
-          : 'Impossible d’enregistrer l’opération.'
-      );
+      setFormError(err instanceof Error ? err.message : 'Impossible d’enregistrer l’opération.');
     } finally {
       setSaving(false);
     }
+  }
+
+  /* ---------------- Justificatifs ---------------- */
+
+  function pickReceipt(item: Transaction) {
+    receiptTargetRef.current = item;
+    setError('');
+    setNotice('');
+    fileInputRef.current?.click();
+  }
+
+  async function uploadReceipt(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    const item = receiptTargetRef.current;
+    event.target.value = '';
+
+    if (!file || !item) return;
+
+    setReceiptBusyId(item.id);
+    setError('');
+    setNotice('');
+
+    try {
+      const prepareResponse = await fetch('/api/tresorerie/justificatif', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'prepare',
+          transactionId: item.id,
+          name: file.name,
+          mimeType: file.type || 'application/octet-stream',
+          size: file.size,
+        }),
+      });
+
+      const prepared = await readJson(prepareResponse);
+      if (!prepareResponse.ok || !prepared.uploadUrl) {
+        throw new Error(prepared.error || 'Impossible de préparer l’envoi du justificatif.');
+      }
+
+      const sent = await putToGoogle(prepared.uploadUrl, file);
+      if (!sent.ok) {
+        throw new Error('L’envoi du justificatif vers Google Drive a échoué. Vérifie ta connexion et réessaie.');
+      }
+
+      const confirmResponse = await fetch('/api/tresorerie/justificatif', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'confirm',
+          transactionId: item.id,
+          fileId: sent.fileId,
+          fileName: prepared.fileName,
+        }),
+      });
+
+      const confirmed = await readJson(confirmResponse);
+      if (!confirmResponse.ok) throw new Error(confirmed.error || 'Justificatif non enregistré.');
+
+      setTransactions((current) =>
+        current.map((tx) => (tx.id === item.id ? { ...tx, receipt: confirmed.receipt } : tx))
+      );
+      setNotice(`Justificatif joint à « ${item.label} » et rangé dans le Drive (Justificatifs → ${schoolYear}).`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Justificatif non envoyé.');
+    } finally {
+      setReceiptBusyId(null);
+      receiptTargetRef.current = null;
+    }
+  }
+
+  async function confirmRemoveReceipt() {
+    const item = receiptToRemove;
+    if (!item) return;
+
+    setReceiptBusyId(item.id);
+    setFormError('');
+
+    try {
+      const response = await fetch('/api/tresorerie/justificatif', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'remove', transactionId: item.id }),
+      });
+
+      const data = await readJson(response);
+      if (!response.ok) throw new Error(data.error || 'Impossible de retirer le justificatif.');
+
+      setTransactions((current) => current.map((tx) => (tx.id === item.id ? { ...tx, receipt: null } : tx)));
+      setReceiptToRemove(null);
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : 'Impossible de retirer le justificatif.');
+    } finally {
+      setReceiptBusyId(null);
+    }
+  }
+
+  /* ---------------- Affichage ---------------- */
+
+  function typeBadge(item: Transaction) {
+    const styles =
+      item.type === 'income'
+        ? { background: '#ecfdf5', color: '#166534', border: '1px solid #bbf7d0' }
+        : item.type === 'expense'
+          ? { background: '#fef2f2', color: '#b91c1c', border: '1px solid #fecaca' }
+          : { background: '#eef6ff', color: '#1e4f8a', border: '1px solid #cfe0f5' };
+
+    return (
+      <span className="badge" style={styles}>
+        {item.type === 'income' ? 'Recette' : item.type === 'expense' ? 'Dépense' : 'Mouvement'}
+      </span>
+    );
+  }
+
+  function accountCell(item: Transaction) {
+    if (item.type === 'transfer' && item.transferTo) {
+      return (
+        <span className="tresorerie-account">
+          {ACCOUNT_NAMES[item.account]} → {ACCOUNT_NAMES[item.transferTo]}
+        </span>
+      );
+    }
+
+    return (
+      <span className={`tresorerie-account tresorerie-account-${item.account}`}>
+        {item.account === 'cash' ? <Banknote size={12} /> : <Building2 size={12} />}
+        {ACCOUNT_NAMES[item.account]}
+      </span>
+    );
+  }
+
+  function labelCell(item: Transaction, withCategory = false) {
+    return (
+      <td>
+        <div style={{ fontWeight: 700 }}>
+          {item.label}
+          {item.fromMembership && (
+            <span
+              className="tresorerie-auto-badge"
+              title="Recette créée automatiquement depuis la page Adhérents"
+            >
+              Adhésion
+            </span>
+          )}
+        </div>
+
+        {(withCategory || item.note) && (
+          <div style={{ fontSize: 10, color: '#756a67', marginTop: 3 }}>
+            {[withCategory && item.type !== 'transfer' ? item.category : '', item.note || '']
+              .filter(Boolean)
+              .join(' · ')}
+          </div>
+        )}
+      </td>
+    );
+  }
+
+  function actionsCell(item: Transaction) {
+    const busy = receiptBusyId === item.id;
+
+    return (
+      <td style={{ textAlign: 'right' }}>
+        <div className="tresorerie-row-actions">
+          {busy ? (
+            <span className="btn" aria-label="Envoi en cours">
+              <Loader2 size={14} className="tresorerie-spin" />
+            </span>
+          ) : item.receipt ? (
+            <>
+              <a
+                className="btn tresorerie-receipt-link"
+                href={item.receipt.url || '#'}
+                target="_blank"
+                rel="noopener noreferrer"
+                title={`Voir le justificatif : ${item.receipt.name}`}
+              >
+                <FileCheck2 size={14} />
+              </a>
+              <button
+                type="button"
+                className="btn"
+                title="Retirer le justificatif"
+                onClick={() => {
+                  setFormError('');
+                  setReceiptToRemove(item);
+                }}
+                disabled={!ready}
+              >
+                <X size={13} />
+              </button>
+            </>
+          ) : (
+            <button
+              type="button"
+              className="btn"
+              title="Joindre un justificatif (photo ou PDF)"
+              onClick={() => pickReceipt(item)}
+              disabled={!ready || !!receiptBusyId}
+            >
+              <Paperclip size={14} />
+            </button>
+          )}
+
+          {item.fromMembership ? (
+            <span className="tresorerie-auto-hint" title="À modifier depuis la page Adhérents">
+              Via Adhérents
+            </span>
+          ) : (
+            <>
+              <button
+                type="button"
+                className="btn"
+                onClick={() => openEdit(item)}
+                disabled={!!deletingId}
+                title="Modifier"
+              >
+                <Pencil size={14} />
+              </button>
+
+              <button
+                type="button"
+                className="btn"
+                onClick={() => {
+                  setFormError('');
+                  setTransactionToDelete(item);
+                }}
+                disabled={deletingId === item.id}
+                title="Supprimer"
+                aria-label={`Supprimer ${item.label}`}
+                style={{ color: '#b91c1c' }}
+              >
+                <Trash2 size={14} />
+              </button>
+            </>
+          )}
+        </div>
+      </td>
+    );
   }
 
   return (
@@ -433,59 +731,55 @@ export default function TresoreriePage() {
         <div>
           <div className="eyebrow">Trésorerie</div>
           <h1>Gestion de la trésorerie</h1>
-          <div className="kicker">
-            Année scolaire {schoolYear || '—'}
-          </div>
+          <div className="kicker">Année scolaire {schoolYear || '—'}</div>
         </div>
 
         <div className="topbar-right">
-          <button
-            type="button"
-            className="btn btn-primary"
-            onClick={openNew}
-          >
+          <button type="button" className="btn btn-primary" onClick={openNew}>
             <Plus size={14} />
             Ajouter une opération
           </button>
         </div>
       </div>
 
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*,application/pdf"
+        style={{ display: 'none' }}
+        onChange={uploadReceipt}
+      />
+
+      {!ready && (
+        <div className="notice notice-error" style={{ marginBottom: 18 }}>
+          La gestion banque / caisse n’est pas encore installée : lance{' '}
+          <strong>migration_tresorerie_v3.sql</strong> dans Supabase.
+        </div>
+      )}
+
       {error && (
-        <div
-          className="notice notice-error"
-          style={{ marginBottom: 18 }}
-        >
+        <div className="notice notice-error" style={{ marginBottom: 18 }}>
           {error}
         </div>
       )}
 
-      <section
-        className="card tresorerie-summary-card"
-        style={{
-          padding: 22,
-          marginBottom: 18,
-        }}
-      >
+      {notice && (
+        <div className="notice tresorerie-notice-ok" style={{ marginBottom: 18 }}>
+          {notice}
+        </div>
+      )}
+
+      <section className="card tresorerie-summary-card" style={{ padding: 22, marginBottom: 18 }}>
         <div className="tresorerie-summary-grid">
           <div className="tresorerie-stat tresorerie-stat-initial">
             <WalletCards size={18} />
-
-            <div className="stat-label tresorerie-stat-label">
-              SOLDE INITIAL
+            <div className="stat-label tresorerie-stat-label">SOLDES DE DÉPART</div>
+            <div className="tresorerie-stat-value">{formatMoney(totals.initial)}</div>
+            <div className="tresorerie-split">
+              <span>Banque {formatMoney(initialBalances.bank)}</span>
+              <span>Caisse {formatMoney(initialBalances.cash)}</span>
             </div>
-
-            <div className="tresorerie-stat-value">
-              {formatMoney(initialBalance)}
-            </div>
-
-            <button
-              type="button"
-              className="btn"
-              onClick={openInitialBalanceForm}
-              style={{
-                marginTop: 10,
-              }}
-            >
+            <button type="button" className="btn" onClick={openInitialBalanceForm} style={{ marginTop: 10 }}>
               <Pencil size={13} />
               Modifier
             </button>
@@ -493,59 +787,63 @@ export default function TresoreriePage() {
 
           <div className="tresorerie-stat">
             <ArrowUpCircle size={18} />
-
-            <div className="stat-label tresorerie-stat-label">
-              RECETTES
-            </div>
-
-            <div className="tresorerie-stat-value">
-              {formatMoney(totals.income)}
-            </div>
+            <div className="stat-label tresorerie-stat-label">RECETTES</div>
+            <div className="tresorerie-stat-value">{formatMoney(totals.income)}</div>
           </div>
 
           <div className="tresorerie-stat">
             <ArrowDownCircle size={18} />
-
-            <div className="stat-label tresorerie-stat-label">
-              DÉPENSES
-            </div>
-
-            <div className="tresorerie-stat-value">
-              {formatMoney(totals.expense)}
-            </div>
+            <div className="stat-label tresorerie-stat-label">DÉPENSES</div>
+            <div className="tresorerie-stat-value">{formatMoney(totals.expense)}</div>
           </div>
 
           <div className="tresorerie-stat tresorerie-stat-balance">
             <WalletCards size={18} />
-
-            <div className="stat-label tresorerie-stat-label">
-              SOLDE ACTUEL
-            </div>
-
+            <div className="stat-label tresorerie-stat-label">SOLDE ACTUEL</div>
             <div
               className="tresorerie-stat-value"
-              style={{
-                color:
-                  totals.balance < 0
-                    ? '#b91c1c'
-                    : undefined,
-              }}
+              style={{ color: totals.balance < 0 ? '#b91c1c' : undefined }}
             >
               {formatMoney(totals.balance)}
+            </div>
+            <div className="tresorerie-split">
+              <span style={{ color: totals.bank < 0 ? '#b91c1c' : undefined }}>
+                Banque {formatMoney(totals.bank)}
+              </span>
+              <span style={{ color: totals.cash < 0 ? '#b91c1c' : undefined }}>
+                Caisse {formatMoney(totals.cash)}
+              </span>
             </div>
           </div>
         </div>
       </section>
 
       <section className="card section-card tresorerie-operations-card">
+        <div className="tresorerie-tabs" role="tablist">
+          <button type="button" className={view === 'all' ? 'active' : ''} onClick={() => setView('all')}>
+            <CreditCard size={15} />
+            Toutes les opérations
+          </button>
+          <button type="button" className={view === 'bank' ? 'active' : ''} onClick={() => setView('bank')}>
+            <Building2 size={15} />
+            Compte bancaire
+            <span className="tresorerie-tab-amount">{formatMoney(totals.bank)}</span>
+          </button>
+          <button type="button" className={view === 'cash' ? 'active' : ''} onClick={() => setView('cash')}>
+            <Banknote size={15} />
+            Journal de caisse
+            <span className="tresorerie-tab-amount">{formatMoney(totals.cash)}</span>
+          </button>
+        </div>
+
         <div className="section-head tresorerie-section-head">
           <div>
-            <h2 className="section-title">Opérations</h2>
-
+            <h2 className="section-title">
+              {view === 'all' ? 'Opérations' : view === 'bank' ? 'Compte bancaire' : 'Journal de caisse'}
+            </h2>
             <p className="section-sub">
-              {filteredTransactions.length} opération
-              {filteredTransactions.length > 1 ? 's' : ''} affichée
-              {filteredTransactions.length > 1 ? 's' : ''}
+              {shownCount} opération{shownCount > 1 ? 's' : ''} affichée{shownCount > 1 ? 's' : ''}
+              {view !== 'all' && ' · du plus ancien au plus récent, avec le solde après chaque ligne'}
             </p>
           </div>
 
@@ -560,31 +858,21 @@ export default function TresoreriePage() {
         </div>
 
         {loading ? (
-          <p className="kicker">
-            Chargement de la trésorerie…
-          </p>
-        ) : filteredTransactions.length === 0 ? (
+          <p className="kicker">Chargement de la trésorerie…</p>
+        ) : view === 'all' && searched.length === 0 ? (
           <div className="tresorerie-empty">
-            <CreditCard
-              size={34}
-              style={{ opacity: 0.35 }}
-            />
-
-            <h3 style={{ margin: '12px 0 4px' }}>
-              Aucune opération
-            </h3>
-
-            <p className="section-sub">
-              Ajoute la première recette ou dépense de l’année.
-            </p>
+            <CreditCard size={34} style={{ opacity: 0.35 }} />
+            <h3 style={{ margin: '12px 0 4px' }}>Aucune opération</h3>
+            <p className="section-sub">Ajoute la première recette ou dépense de l’année.</p>
           </div>
-        ) : (
+        ) : view === 'all' ? (
           <div className="tresorerie-table-wrap">
             <table className="table">
               <thead>
                 <tr>
                   <th>Date</th>
                   <th>Type</th>
+                  <th>Compte</th>
                   <th>Catégorie</th>
                   <th>Libellé</th>
                   <th>Mode</th>
@@ -594,123 +882,89 @@ export default function TresoreriePage() {
               </thead>
 
               <tbody>
-                {filteredTransactions.map((item) => (
+                {searched.map((item) => (
                   <tr key={item.id}>
-                    <td style={{ whiteSpace: 'nowrap' }}>
-                      {formatDate(item.date)}
-                    </td>
-
-                    <td>
-                      <span
-                        className="badge"
-                        style={{
-                          background:
-                            item.type === 'income'
-                              ? '#ecfdf5'
-                              : '#fef2f2',
-                          color:
-                            item.type === 'income'
-                              ? '#166534'
-                              : '#b91c1c',
-                          border:
-                            item.type === 'income'
-                              ? '1px solid #bbf7d0'
-                              : '1px solid #fecaca',
-                        }}
-                      >
-                        {item.type === 'income'
-                          ? 'Recette'
-                          : 'Dépense'}
-                      </span>
-                    </td>
-
-                    <td>{item.category}</td>
-
-                    <td>
-                      <div style={{ fontWeight: 700 }}>
-                        {item.label}
-                        {item.fromMembership && (
-                          <span
-                            className="tresorerie-auto-badge"
-                            title="Recette créée automatiquement depuis la page Adhérents"
-                          >
-                            Adhésion
-                          </span>
-                        )}
-                      </div>
-
-                      {item.note && (
-                        <div
-                          style={{
-                            fontSize: 10,
-                            color: '#756a67',
-                            marginTop: 3,
-                          }}
-                        >
-                          {item.note}
-                        </div>
-                      )}
-                    </td>
-
-                    <td>
-                      {paymentLabel(item.paymentMethod)}
-                    </td>
-
+                    <td style={{ whiteSpace: 'nowrap' }}>{formatDate(item.date)}</td>
+                    <td>{typeBadge(item)}</td>
+                    <td>{accountCell(item)}</td>
+                    <td>{item.type === 'transfer' ? '—' : item.category}</td>
+                    {labelCell(item)}
+                    <td>{item.type === 'transfer' ? '—' : paymentLabel(item.paymentMethod)}</td>
                     <td
                       style={{
                         whiteSpace: 'nowrap',
                         fontWeight: 800,
                         color:
-                          item.type === 'income'
-                            ? '#166534'
-                            : '#b91c1c',
+                          item.type === 'income' ? '#166534' : item.type === 'expense' ? '#b91c1c' : '#1e4f8a',
                       }}
                     >
-                      {item.type === 'income' ? '+' : '-'}
+                      {item.type === 'income' ? '+' : item.type === 'expense' ? '-' : '⇄ '}
                       {formatMoney(item.amount)}
                     </td>
-
-                    <td style={{ textAlign: 'right' }}>
-                      {item.fromMembership ? (
-                        <span
-                          className="tresorerie-auto-hint"
-                          title="À modifier depuis la page Adhérents"
-                        >
-                          Via Adhérents
-                        </span>
-                      ) : (
-                      <div className="tresorerie-row-actions">
-                        <button
-                          type="button"
-                          className="btn"
-                          onClick={() => openEdit(item)}
-                          disabled={!!deletingId}
-                          title="Modifier"
-                        >
-                          <Pencil size={14} />
-                        </button>
-
-                        <button
-                          type="button"
-                          className="btn"
-                          onClick={() => {
-                            setFormError('');
-                            setTransactionToDelete(item);
-                          }}
-                          disabled={deletingId === item.id}
-                          title="Supprimer"
-                          aria-label={`Supprimer ${item.label}`}
-                          style={{
-                            color: '#b91c1c',
-                          }}
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
-                      )}
-                    </td>
+                    {actionsCell(item)}
                   </tr>
                 ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="tresorerie-table-wrap">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Libellé</th>
+                  <th style={{ textAlign: 'right' }}>Entrée</th>
+                  <th style={{ textAlign: 'right' }}>Sortie</th>
+                  <th style={{ textAlign: 'right' }}>Solde</th>
+                  <th />
+                </tr>
+              </thead>
+
+              <tbody>
+                {!search.trim() && (
+                  <tr className="tresorerie-journal-start">
+                    <td />
+                    <td>Solde de départ</td>
+                    <td />
+                    <td />
+                    <td style={{ textAlign: 'right', fontWeight: 800 }}>{formatMoney(initialBalances[view])}</td>
+                    <td />
+                  </tr>
+                )}
+
+                {journal.map(({ item, delta, balance }) => (
+                  <tr key={item.id}>
+                    <td style={{ whiteSpace: 'nowrap' }}>{formatDate(item.date)}</td>
+                    {labelCell(item, true)}
+                    <td style={{ textAlign: 'right', color: '#166534', fontWeight: 700, whiteSpace: 'nowrap' }}>
+                      {delta > 0 ? formatMoney(delta) : ''}
+                    </td>
+                    <td style={{ textAlign: 'right', color: '#b91c1c', fontWeight: 700, whiteSpace: 'nowrap' }}>
+                      {delta < 0 ? formatMoney(-delta) : ''}
+                    </td>
+                    <td
+                      style={{
+                        textAlign: 'right',
+                        fontWeight: 800,
+                        whiteSpace: 'nowrap',
+                        color: balance < 0 ? '#b91c1c' : undefined,
+                      }}
+                    >
+                      {formatMoney(balance)}
+                    </td>
+                    {actionsCell(item)}
+                  </tr>
+                ))}
+
+                {journal.length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="kicker" style={{ padding: 18 }}>
+                      Aucune opération sur {view === 'bank' ? 'le compte bancaire' : 'la caisse'}
+                      {search.trim() ? ' pour cette recherche' : ' pour le moment'}.
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
@@ -723,14 +977,9 @@ export default function TresoreriePage() {
             <div className="tresorerie-modal-head">
               <div>
                 <div className="eyebrow">Trésorerie</div>
-
-                <h2 className="section-title tresorerie-modal-title">
-                  Solde initial
-                </h2>
-
+                <h2 className="section-title tresorerie-modal-title">Soldes de départ</h2>
                 <p className="section-sub tresorerie-initial-help">
-                  Montant disponible sur le compte au début de l’année
-                  scolaire.
+                  Ce qu’il y avait sur le compte bancaire et dans la caisse au début de l’année scolaire.
                 </p>
               </div>
 
@@ -746,37 +995,30 @@ export default function TresoreriePage() {
             </div>
 
             <form onSubmit={saveInitialBalance}>
-              <div className="tresorerie-initial-balance-field">
-                <label
-                  className="form-label"
-                  htmlFor="initial-balance"
-                >
-                  Solde au début de l’année
-                </label>
+              {(['bank', 'cash'] as Account[]).map((account) => (
+                <div key={account} className="tresorerie-initial-balance-field" style={{ marginTop: 12 }}>
+                  <label className="form-label" htmlFor={`initial-${account}`}>
+                    {account === 'bank' ? 'Compte bancaire' : 'Caisse (espèces)'}
+                  </label>
 
-                <div className="tresorerie-initial-input-wrap">
-                  <input
-                    id="initial-balance"
-                    className="input tresorerie-initial-input"
-                    inputMode="decimal"
-                    placeholder="0,00"
-                    value={initialBalanceInput}
-                    onChange={(event) =>
-                      setInitialBalanceInput(event.target.value)
-                    }
-                    autoFocus
-                    required
-                  />
-
-                  <span>€</span>
+                  <div className="tresorerie-initial-input-wrap">
+                    <input
+                      id={`initial-${account}`}
+                      className="input tresorerie-initial-input"
+                      inputMode="decimal"
+                      placeholder="0,00"
+                      value={initialInputs[account]}
+                      onChange={(event) =>
+                        setInitialInputs((current) => ({ ...current, [account]: event.target.value }))
+                      }
+                      autoFocus={account === 'bank'}
+                    />
+                    <span>€</span>
+                  </div>
                 </div>
-              </div>
+              ))}
 
-              {formError && (
-                <div className="notice notice-error tresorerie-form-error">
-                  {formError}
-                </div>
-              )}
+              {formError && <div className="notice notice-error tresorerie-form-error">{formError}</div>}
 
               <div className="tresorerie-modal-actions">
                 <button
@@ -788,14 +1030,8 @@ export default function TresoreriePage() {
                   Annuler
                 </button>
 
-                <button
-                  type="submit"
-                  className="btn btn-primary"
-                  disabled={savingInitialBalance}
-                >
-                  {savingInitialBalance
-                    ? 'Enregistrement…'
-                    : 'Enregistrer le solde'}
+                <button type="submit" className="btn btn-primary" disabled={savingInitialBalance}>
+                  {savingInitialBalance ? 'Enregistrement…' : 'Enregistrer les soldes'}
                 </button>
               </div>
             </form>
@@ -809,11 +1045,8 @@ export default function TresoreriePage() {
             <div className="tresorerie-modal-head">
               <div>
                 <div className="eyebrow">Trésorerie</div>
-
                 <h2 className="section-title tresorerie-modal-title">
-                  {editingId
-                    ? 'Modifier l’opération'
-                    : 'Ajouter une opération'}
+                  {editingId ? 'Modifier l’opération' : 'Ajouter une opération'}
                 </h2>
               </div>
 
@@ -830,42 +1063,15 @@ export default function TresoreriePage() {
 
             <form onSubmit={save}>
               <div className="tresorerie-form-grid">
-                <div className="tresorerie-form-field">
-                  <label
-                    className="form-label"
-                    htmlFor="transaction-date"
-                  >
-                    Date
-                  </label>
-
-                  <input
-                    id="transaction-date"
-                    type="date"
-                    className="input tresorerie-date-input"
-                    value={form.date}
-                    onChange={(event) =>
-                      setForm((current) => ({
-                        ...current,
-                        date: event.target.value,
-                      }))
-                    }
-                    required
-                  />
-                </div>
-
-                <div className="tresorerie-form-field">
+                <div className="tresorerie-form-field tresorerie-field-full">
                   <label className="form-label">
                     Type <span className="tresorerie-required">*</span>
                   </label>
 
-                  <div className="tresorerie-type-buttons">
+                  <div className="tresorerie-type-buttons tresorerie-type-buttons-3">
                     <button
                       type="button"
-                      className={
-                        form.type === 'income'
-                          ? 'btn btn-primary'
-                          : 'btn'
-                      }
+                      className={form.type === 'income' ? 'btn btn-primary' : 'btn'}
                       onClick={() => setType('income')}
                       aria-pressed={form.type === 'income'}
                     >
@@ -874,179 +1080,214 @@ export default function TresoreriePage() {
 
                     <button
                       type="button"
-                      className={
-                        form.type === 'expense'
-                          ? 'btn btn-primary'
-                          : 'btn'
-                      }
+                      className={form.type === 'expense' ? 'btn btn-primary' : 'btn'}
                       onClick={() => setType('expense')}
                       aria-pressed={form.type === 'expense'}
                     >
                       Dépense
                     </button>
+
+                    <button
+                      type="button"
+                      className={form.type === 'transfer' ? 'btn btn-primary' : 'btn'}
+                      onClick={() => setType('transfer')}
+                      aria-pressed={form.type === 'transfer'}
+                    >
+                      <ArrowLeftRight size={14} />
+                      Caisse ↔ banque
+                    </button>
                   </div>
                 </div>
 
                 <div className="tresorerie-form-field">
-                  <label
-                    className="form-label"
-                    htmlFor="transaction-category"
-                  >
-                    Catégorie
+                  <label className="form-label" htmlFor="transaction-date">
+                    Date
                   </label>
-
-                  <select
-                    id="transaction-category"
-                    className="input"
-                    value={form.category}
-                    disabled={!form.type}
-                    onChange={(event) =>
-                      setForm((current) => ({
-                        ...current,
-                        category: event.target.value,
-                      }))
-                    }
+                  <input
+                    id="transaction-date"
+                    type="date"
+                    className="input tresorerie-date-input"
+                    value={form.date}
+                    onChange={(event) => setForm((current) => ({ ...current, date: event.target.value }))}
                     required
-                  >
-                    <option value="">
-                      {form.type
-                        ? 'Sélectionner une catégorie'
-                        : 'Choisis d’abord le type'}
-                    </option>
-
-                    {categories.map((category) => (
-                      <option key={category} value={category}>
-                        {category}
-                      </option>
-                    ))}
-                  </select>
+                  />
                 </div>
 
                 <div className="tresorerie-form-field">
-                  <label
-                    className="form-label"
-                    htmlFor="transaction-amount"
-                  >
+                  <label className="form-label" htmlFor="transaction-amount">
                     Montant
                   </label>
-
                   <input
                     id="transaction-amount"
                     className="input"
                     inputMode="decimal"
                     placeholder="0,00"
                     value={form.amount}
-                    onChange={(event) =>
-                      setForm((current) => ({
-                        ...current,
-                        amount: event.target.value,
-                      }))
-                    }
+                    onChange={(event) => setForm((current) => ({ ...current, amount: event.target.value }))}
                     required
                   />
                 </div>
+
+                {form.type === 'transfer' ? (
+                  <>
+                    <div className="tresorerie-form-field tresorerie-field-full">
+                      <label className="form-label" htmlFor="transaction-direction">
+                        Mouvement
+                      </label>
+                      <select
+                        id="transaction-direction"
+                        className="input"
+                        value={form.direction}
+                        onChange={(event) =>
+                          setForm((current) => ({
+                            ...current,
+                            direction: event.target.value as FormState['direction'],
+                          }))
+                        }
+                      >
+                        <option value="cash_to_bank">Dépôt d’espèces à la banque (caisse → banque)</option>
+                        <option value="bank_to_cash">Retrait d’espèces pour la caisse (banque → caisse)</option>
+                      </select>
+                      <p className="tresorerie-help">
+                        Ce n’est ni une recette ni une dépense : l’argent change seulement de place.
+                      </p>
+                    </div>
+
+                    <div className="tresorerie-form-field tresorerie-field-full">
+                      <label className="form-label" htmlFor="transaction-label">
+                        Libellé (facultatif)
+                      </label>
+                      <input
+                        id="transaction-label"
+                        className="input"
+                        placeholder={
+                          form.direction === 'cash_to_bank'
+                            ? 'Dépôt d’espèces à la banque'
+                            : 'Retrait d’espèces pour la caisse'
+                        }
+                        value={form.label}
+                        onChange={(event) => setForm((current) => ({ ...current, label: event.target.value }))}
+                      />
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="tresorerie-form-field">
+                      <label className="form-label" htmlFor="transaction-category">
+                        Catégorie
+                      </label>
+                      <select
+                        id="transaction-category"
+                        className="input"
+                        value={form.category}
+                        disabled={!form.type}
+                        onChange={(event) => setForm((current) => ({ ...current, category: event.target.value }))}
+                        required
+                      >
+                        <option value="">
+                          {form.type ? 'Sélectionner une catégorie' : 'Choisis d’abord le type'}
+                        </option>
+                        {categories.map((category) => (
+                          <option key={category} value={category}>
+                            {category}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="tresorerie-form-field">
+                      <label className="form-label" htmlFor="transaction-payment">
+                        Mode de paiement
+                      </label>
+                      <select
+                        id="transaction-payment"
+                        className="input"
+                        value={form.paymentMethod}
+                        onChange={(event) => setPaymentMethod(event.target.value)}
+                      >
+                        <option value="">Non renseigné</option>
+                        {paymentMethods.map((method) => (
+                          <option key={method.value} value={method.value}>
+                            {method.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="tresorerie-form-field tresorerie-field-full">
+                      <label className="form-label">
+                        Compte <span className="tresorerie-required">*</span>
+                      </label>
+                      <div className="tresorerie-type-buttons">
+                        <button
+                          type="button"
+                          className={form.account === 'bank' ? 'btn btn-primary' : 'btn'}
+                          onClick={() => setForm((current) => ({ ...current, account: 'bank' }))}
+                          aria-pressed={form.account === 'bank'}
+                        >
+                          <Building2 size={14} />
+                          Banque
+                        </button>
+                        <button
+                          type="button"
+                          className={form.account === 'cash' ? 'btn btn-primary' : 'btn'}
+                          onClick={() => setForm((current) => ({ ...current, account: 'cash' }))}
+                          aria-pressed={form.account === 'cash'}
+                        >
+                          <Banknote size={14} />
+                          Caisse
+                        </button>
+                      </div>
+                      <p className="tresorerie-help">
+                        Choisi automatiquement selon le mode de paiement (espèces → caisse), modifiable.
+                      </p>
+                    </div>
+
+                    <div className="tresorerie-form-field tresorerie-field-full">
+                      <label className="form-label" htmlFor="transaction-label">
+                        Libellé
+                      </label>
+                      <input
+                        id="transaction-label"
+                        className="input"
+                        placeholder="Ex. Vente de gâteaux"
+                        value={form.label}
+                        onChange={(event) => setForm((current) => ({ ...current, label: event.target.value }))}
+                        required
+                      />
+                    </div>
+                  </>
+                )}
 
                 <div className="tresorerie-form-field tresorerie-field-full">
-                  <label
-                    className="form-label"
-                    htmlFor="transaction-label"
-                  >
-                    Libellé
-                  </label>
-
-                  <input
-                    id="transaction-label"
-                    className="input"
-                    placeholder="Ex. Cotisation famille Martin"
-                    value={form.label}
-                    onChange={(event) =>
-                      setForm((current) => ({
-                        ...current,
-                        label: event.target.value,
-                      }))
-                    }
-                    required
-                  />
-                </div>
-
-                <div className="tresorerie-form-field">
-                  <label
-                    className="form-label"
-                    htmlFor="transaction-payment"
-                  >
-                    Mode de paiement
-                  </label>
-
-                  <select
-                    id="transaction-payment"
-                    className="input"
-                    value={form.paymentMethod}
-                    onChange={(event) =>
-                      setForm((current) => ({
-                        ...current,
-                        paymentMethod: event.target.value,
-                      }))
-                    }
-                  >
-                    <option value="">
-                      Non renseigné
-                    </option>
-
-                    {paymentMethods.map((method) => (
-                      <option
-                        key={method.value}
-                        value={method.value}
-                      >
-                        {method.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="tresorerie-form-field">
-                  <label
-                    className="form-label"
-                    htmlFor="transaction-note"
-                  >
+                  <label className="form-label" htmlFor="transaction-note">
                     Note
                   </label>
-
                   <input
                     id="transaction-note"
                     className="input"
                     placeholder="Facultatif"
                     value={form.note}
-                    onChange={(event) =>
-                      setForm((current) => ({
-                        ...current,
-                        note: event.target.value,
-                      }))
-                    }
+                    onChange={(event) => setForm((current) => ({ ...current, note: event.target.value }))}
                   />
                 </div>
               </div>
 
-              {formError && (
-                <div className="notice notice-error tresorerie-form-error">
-                  {formError}
-                </div>
+              {!editingId && (
+                <p className="tresorerie-help" style={{ marginTop: 12 }}>
+                  Le justificatif (photo du ticket, facture en PDF) se joint ensuite avec le trombone 📎 sur la
+                  ligne de l’opération.
+                </p>
               )}
 
+              {formError && <div className="notice notice-error tresorerie-form-error">{formError}</div>}
+
               <div className="tresorerie-modal-actions">
-                <button
-                  type="button"
-                  className="btn"
-                  onClick={closeForm}
-                  disabled={saving}
-                >
+                <button type="button" className="btn" onClick={closeForm} disabled={saving}>
                   Annuler
                 </button>
 
-                <button
-                  type="submit"
-                  className="btn btn-primary"
-                  disabled={saving}
-                >
+                <button type="submit" className="btn btn-primary" disabled={saving}>
                   {saving
                     ? 'Enregistrement…'
                     : editingId
@@ -1063,10 +1304,7 @@ export default function TresoreriePage() {
         <div className="tresorerie-modal-overlay">
           <div className="card tresorerie-modal tresorerie-initial-modal">
             <div className="eyebrow">Trésorerie</div>
-
-            <h2 className="section-title tresorerie-modal-title">
-              Supprimer l’opération ?
-            </h2>
+            <h2 className="section-title tresorerie-modal-title">Supprimer l’opération ?</h2>
 
             <div className="tresorerie-delete-summary">
               <strong>{transactionToDelete.label}</strong>
@@ -1074,20 +1312,20 @@ export default function TresoreriePage() {
                 {formatDate(transactionToDelete.date)} ·{' '}
                 {transactionToDelete.type === 'income'
                   ? 'Recette'
-                  : 'Dépense'}{' '}
+                  : transactionToDelete.type === 'expense'
+                    ? 'Dépense'
+                    : 'Mouvement'}{' '}
                 · {formatMoney(transactionToDelete.amount)}
               </span>
             </div>
 
             <p className="section-sub">
               Cette opération sera définitivement supprimée.
+              {transactionToDelete.receipt &&
+                ' Son justificatif ira dans la corbeille du Google Drive (récupérable 30 jours).'}
             </p>
 
-            {formError && (
-              <div className="notice notice-error tresorerie-form-error">
-                {formError}
-              </div>
-            )}
+            {formError && <div className="notice notice-error tresorerie-form-error">{formError}</div>}
 
             <div className="tresorerie-modal-actions">
               <button
@@ -1102,7 +1340,7 @@ export default function TresoreriePage() {
               <button
                 type="button"
                 className="btn tresorerie-danger-button"
-                onClick={() => void deleteTransaction()}
+                onClick={confirmDelete}
                 disabled={!!deletingId}
               >
                 <Trash2 size={14} />
@@ -1113,7 +1351,233 @@ export default function TresoreriePage() {
         </div>
       )}
 
+      {receiptToRemove && (
+        <div className="tresorerie-modal-overlay">
+          <div className="card tresorerie-modal tresorerie-initial-modal">
+            <div className="eyebrow">Trésorerie</div>
+            <h2 className="section-title tresorerie-modal-title">Retirer le justificatif ?</h2>
+
+            <div className="tresorerie-delete-summary">
+              <strong>{receiptToRemove.receipt?.name}</strong>
+              <span>
+                Opération : {receiptToRemove.label} · {formatMoney(receiptToRemove.amount)}
+              </span>
+            </div>
+
+            <p className="section-sub">
+              Le fichier ira dans la corbeille du Google Drive (récupérable 30 jours). L’opération, elle, ne
+              change pas.
+            </p>
+
+            {formError && <div className="notice notice-error tresorerie-form-error">{formError}</div>}
+
+            <div className="tresorerie-modal-actions">
+              <button
+                type="button"
+                className="btn"
+                onClick={() => setReceiptToRemove(null)}
+                disabled={!!receiptBusyId}
+              >
+                Annuler
+              </button>
+
+              <button
+                type="button"
+                className="btn tresorerie-danger-button"
+                onClick={confirmRemoveReceipt}
+                disabled={!!receiptBusyId}
+              >
+                <X size={14} />
+                {receiptBusyId ? 'Retrait…' : 'Retirer'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <style jsx>{`
+        .btn,
+        .tresorerie-row-actions :global(.btn) {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 6px;
+        }
+
+        /*
+         * Éléments construits par les petites fonctions d'affichage
+         * (cellules du tableau) : styles appliqués via le tableau.
+         */
+        .tresorerie-table-wrap :global(.tresorerie-row-actions) {
+          display: inline-flex;
+          align-items: center;
+          justify-content: flex-end;
+          flex-wrap: nowrap;
+          gap: 6px;
+          white-space: nowrap;
+        }
+
+        .tresorerie-table-wrap :global(.tresorerie-row-actions .btn) {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 6px;
+          text-decoration: none;
+        }
+
+        .tresorerie-table-wrap :global(.tresorerie-receipt-link) {
+          color: #166534;
+          border-color: #bbf7d0;
+          background: #f0fdf4;
+        }
+
+        .tresorerie-table-wrap :global(.tresorerie-account) {
+          display: inline-flex;
+          align-items: center;
+          gap: 5px;
+          white-space: nowrap;
+          font-size: 12px;
+          font-weight: 700;
+          color: #5f514b;
+        }
+
+        .tresorerie-table-wrap :global(.tresorerie-account svg) {
+          display: inline-block;
+          flex-shrink: 0;
+        }
+
+        .tresorerie-table-wrap :global(.tresorerie-account-cash) {
+          color: #8a5a12;
+        }
+
+        .tresorerie-table-wrap :global(.tresorerie-auto-badge) {
+          display: inline-block;
+          margin-left: 7px;
+          padding: 2px 7px;
+          border-radius: 999px;
+          background: #eef6ff;
+          border: 1px solid #cfe0f5;
+          color: #1e4f8a;
+          font-size: 10px;
+          font-weight: 700;
+          vertical-align: 1px;
+        }
+
+        .tresorerie-table-wrap :global(.tresorerie-auto-hint) {
+          font-size: 11px;
+          color: #756a67;
+          white-space: nowrap;
+        }
+
+        .tresorerie-notice-ok {
+          border-color: #cfe5d7;
+          background: #f2f8f4;
+          color: #23492f;
+        }
+
+        .tresorerie-split {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 4px 12px;
+          margin-top: 6px;
+          color: #6b5d58;
+          font-size: 12px;
+          font-weight: 700;
+        }
+
+        .tresorerie-tabs {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 6px;
+          margin-bottom: 14px;
+          border-bottom: 1px solid #eadfd5;
+        }
+
+        .tresorerie-tabs button {
+          display: inline-flex;
+          align-items: center;
+          gap: 7px;
+          padding: 10px 12px;
+          border: 0;
+          border-bottom: 2px solid transparent;
+          background: transparent;
+          color: #756a67;
+          font: inherit;
+          font-size: 13px;
+          font-weight: 700;
+          cursor: pointer;
+        }
+
+        .tresorerie-tabs button.active {
+          color: #8f211c;
+          border-bottom-color: #8f211c;
+        }
+
+        .tresorerie-tab-amount {
+          padding: 2px 8px;
+          border-radius: 999px;
+          background: #fff7ee;
+          border: 1px solid #eadfd5;
+          color: #5f514b;
+          font-size: 11px;
+        }
+
+        .tresorerie-account {
+          display: inline-flex;
+          align-items: center;
+          gap: 5px;
+          white-space: nowrap;
+          font-size: 12px;
+          font-weight: 700;
+          color: #5f514b;
+        }
+
+        .tresorerie-account-cash {
+          color: #8a5a12;
+        }
+
+        .tresorerie-type-buttons-3 {
+          grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+        }
+
+        .tresorerie-help {
+          margin: 6px 0 0;
+          color: #756a67;
+          font-size: 12px;
+          line-height: 1.5;
+        }
+
+        .tresorerie-journal-start td {
+          background: #fffaf3;
+          color: #5f514b;
+          font-weight: 700;
+        }
+
+        .tresorerie-receipt-link {
+          color: #166534;
+          text-decoration: none;
+        }
+
+        :global(.tresorerie-spin) {
+          animation: tresorerie-spin 1s linear infinite;
+        }
+
+        @keyframes tresorerie-spin {
+          to {
+            transform: rotate(360deg);
+          }
+        }
+
+        @media (max-width: 700px) {
+          .tresorerie-type-buttons-3 {
+            grid-template-columns: minmax(0, 1fr) !important;
+          }
+
+          .tresorerie-tabs button {
+            padding: 8px 8px;
+            font-size: 12px;
+          }
+        }
         .tresorerie-auto-badge {
           display: inline-block;
           margin-left: 7px;

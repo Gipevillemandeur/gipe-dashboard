@@ -66,6 +66,11 @@ export type AnnualReport = {
   totalRecettes: number;
   totalDepenses: number;
   solde: number;
+  // Répartition banque / caisse (soldes de départ et de fin)
+  accounts: {
+    bank: { initial: number; final: number };
+    cash: { initial: number; final: number };
+  };
   financialByCategory: CategoryTotal[];
   incomeDetails: CategoryDetail[];
   expenseDetails: CategoryDetail[];
@@ -99,6 +104,9 @@ export type TransactionRow = {
   amount: number;
   paymentMethod: string;
   note: string;
+  account: 'bank' | 'cash';
+  transferTo: 'bank' | 'cash' | null;
+  hasReceipt: boolean;
 };
 
 function round2(value: number) {
@@ -143,7 +151,7 @@ export async function resolveSchoolYear(
 ) {
   const query = admin
     .from('school_years')
-    .select('id,label,is_active,initial_balance,closed_at');
+    .select('*');
 
   const { data, error } = schoolYearId
     ? await query.eq('id', schoolYearId).maybeSingle()
@@ -168,6 +176,7 @@ export async function resolveSchoolYear(
     label: string;
     is_active: boolean;
     initial_balance: number | null;
+    initial_cash_balance?: number | null;
     closed_at: string | null;
   };
 }
@@ -284,10 +293,30 @@ export async function buildAnnualReport(
   let totalRecettes = 0;
   let totalDepenses = 0;
 
+  // Mouvements de chaque compte (banque / caisse).
+  const flows = { bank: 0, cash: 0 };
+  const accountOf = (value: unknown): 'bank' | 'cash' =>
+    value === 'cash' ? 'cash' : 'bank';
+
   for (const transaction of transactionsResult.data || []) {
     const amount = Number(transaction.amount || 0);
 
     if (!Number.isFinite(amount)) continue;
+
+    const account = accountOf((transaction as any).account);
+
+    /*
+     * Mouvement entre la caisse et la banque : ni recette
+     * ni dépense, il ne change que la répartition.
+     */
+    if (String(transaction.transaction_type) === 'transfer') {
+      flows[account] -= amount;
+      flows[accountOf((transaction as any).transfer_to)] += amount;
+      continue;
+    }
+
+    if (isIncome(transaction.transaction_type)) flows[account] += amount;
+    else if (isExpense(transaction.transaction_type)) flows[account] -= amount;
 
     const category =
       String(transaction.category || '').trim() ||
@@ -320,7 +349,9 @@ export async function buildAnnualReport(
     }
   }
 
-  const initialBalance = round2(Number(year.initial_balance || 0));
+  const initialBank = round2(Number(year.initial_balance || 0));
+  const initialCash = round2(Number(year.initial_cash_balance || 0));
+  const initialBalance = round2(initialBank + initialCash);
   totalRecettes = round2(totalRecettes);
   totalDepenses = round2(totalDepenses);
 
@@ -418,6 +449,10 @@ export async function buildAnnualReport(
     totalRecettes,
     totalDepenses,
     solde: round2(initialBalance + totalRecettes - totalDepenses),
+    accounts: {
+      bank: { initial: initialBank, final: round2(initialBank + flows.bank) },
+      cash: { initial: initialCash, final: round2(initialCash + flows.cash) },
+    },
     financialByCategory,
     incomeDetails,
     expenseDetails,
@@ -514,9 +549,7 @@ export async function loadTransactionRows(
 ): Promise<TransactionRow[]> {
   const { data, error } = await admin
     .from('gipe_transactions')
-    .select(
-      'transaction_date,transaction_type,category,label,amount,payment_method,note,created_at'
-    )
+    .select('*')
     .eq('school_year_id', schoolYearId)
     .order('transaction_date', { ascending: true })
     .order('created_at', { ascending: true });
@@ -535,6 +568,9 @@ export async function loadTransactionRows(
     amount: round2(Number(t.amount || 0)),
     paymentMethod: t.payment_method || '',
     note: t.note || '',
+    account: t.account === 'cash' ? 'cash' : 'bank',
+    transferTo: t.transfer_to === 'cash' ? 'cash' : t.transfer_to === 'bank' ? 'bank' : null,
+    hasReceipt: Boolean(t.receipt_file_id),
   }));
 }
 

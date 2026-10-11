@@ -203,6 +203,11 @@ export async function buildAnnualReportPdf(report: AnnualReport) {
     },
   ]);
 
+  builder.paragraph(
+    `${report.isClosed ? 'Solde final' : 'Solde actuel'} : ${euro(report.accounts.bank.final)} en banque et ${euro(report.accounts.cash.final)} en caisse.`,
+    { color: COLORS.grey }
+  );
+
   builder.subTitle('Recettes et dépenses par catégorie');
 
   if (report.financialByCategory.length === 0) {
@@ -295,6 +300,10 @@ export async function buildAnnualReportPdf(report: AnnualReport) {
         color: report.solde < 0 ? COLORS.red : COLORS.green,
       },
     ]);
+    builder.paragraph(
+      `Dont ${euro(report.accounts.bank.final)} en banque et ${euro(report.accounts.cash.final)} en caisse.`,
+      { color: COLORS.grey }
+    );
   }
 
   return builder.save();

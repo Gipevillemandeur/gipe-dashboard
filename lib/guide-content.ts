@@ -133,14 +133,32 @@ Ce dashboard réunit tout ce dont le bureau a besoin au quotidien : les classes 
   {
     slug: 'tresorerie',
     title: 'Trésorerie',
-    summary: 'Recettes, dépenses et solde de l’association.',
+    summary: 'Compte bancaire, caisse, recettes, dépenses et justificatifs.',
     presidentOnly: false,
-    body: `- Chaque opération est une **recette** ou une **dépense**, avec une date, une catégorie, un libellé, un montant et un moyen de paiement.
-- Le type (recette / dépense) n’est **jamais pré-sélectionné** : il faut le choisir à chaque fois, pour éviter les erreurs.
-- Les cotisations des adhérents arrivent **automatiquement** (catégorie « Adhésions »).
-- Le solde de fin d’année devient le **solde de départ** de l’année suivante au moment de la clôture.
+    body: `## Deux comptes : la banque et la caisse
+- Chaque opération est rattachée au **compte bancaire** ou à la **caisse** (les espèces).
+- Le compte se choisit tout seul selon le mode de paiement (espèces → caisse), et reste modifiable.
+- En haut de la page : les **soldes de départ**, les recettes, les dépenses et le **solde actuel**, avec le détail banque / caisse.
+- Trois onglets : **Toutes les opérations**, **Compte bancaire** et **Journal de caisse**. Les deux derniers montrent le solde après chaque ligne, comme un relevé.
 
-> Astuce : saisir les opérations au fil de l’eau, avec le relevé bancaire à côté. Le bilan de fin d’année se fait alors tout seul.`,
+## Saisir une opération
+- **Recette** ou **Dépense** : date, montant, catégorie, mode de paiement, compte, libellé. Le type n’est jamais pré-sélectionné, pour éviter les erreurs.
+- **Caisse ↔ banque** : pour un dépôt d’espèces à la banque, ou un retrait d’espèces pour la caisse. Ce n’est **ni une recette ni une dépense** : l’argent change seulement de place, le résultat de l’année ne bouge pas.
+- Les cotisations des adhérents arrivent **automatiquement** (catégorie « Adhésions ») : en espèces dans la caisse, sinon à la banque.
+
+## Les justificatifs
+- Le **trombone 📎** sur la ligne d’une opération permet de joindre la photo du ticket ou la facture (PDF ou photo, 30 Mo maximum).
+- Le fichier est rangé directement dans le Google Drive : **Justificatifs → année**, avec un nom clair (date – type – libellé – montant). Il ne prend aucune place dans Supabase.
+- L’icône verte ouvre le justificatif ; la croix le retire (il part dans la corbeille du Drive).
+- À la clôture, le dossier de l’année rejoint **Archives → année → Trésorerie → Justificatifs**. Les justificatifs n’apparaissent pas dans le bilan.
+
+## Fin d’année
+- Le solde de la banque et celui de la caisse deviennent les **soldes de départ** de l’année suivante.
+- Le bilan et l’Excel indiquent la répartition banque / caisse ; l’Excel contient aussi le journal de chaque compte.
+
+! Le virement groupé que HelloAsso verse sur le compte ne doit pas être saisi en recette si les adhésions en ligne sont déjà enregistrées dans Adhérents : elles seraient comptées deux fois.
+
+> Astuce : saisir les opérations au fil de l’eau, avec le relevé bancaire et le journal de caisse à côté.`,
   },
   {
     slug: 'agenda-site',

@@ -182,23 +182,42 @@ export async function buildTreasuryPdf(
     builder.table(
       [
         { header: 'Date', width: 1.1 },
-        { header: 'Type', width: 1 },
-        { header: 'Catégorie', width: 1.6 },
-        { header: 'Libellé', width: 3.2 },
-        { header: 'Mode', width: 1.3 },
-        { header: 'Montant', width: 1.4, align: 'right' },
+        { header: 'Type', width: 1.1 },
+        { header: 'Compte', width: 1.4 },
+        { header: 'Catégorie', width: 1.5 },
+        { header: 'Libellé', width: 3 },
+        { header: 'Mode', width: 1.1 },
+        { header: 'Montant', width: 1.3, align: 'right' },
       ],
       rows.map((t) => [
         dateFr(t.date),
-        isIncome(t.type) ? 'Recette' : 'Dépense',
+        txKind(t),
+        txAccount(t),
         t.category,
         t.note ? `${t.label}\n${t.note}` : t.label,
         paymentLabel(t.paymentMethod),
-        `${isIncome(t.type) ? '+' : '-'} ${euro(t.amount)}`,
+        t.type === 'transfer'
+          ? euro(t.amount)
+          : `${isIncome(t.type) ? '+' : '-'} ${euro(t.amount)}`,
       ]),
-      { size: 8.5 }
+      { size: 8 }
     );
   }
+
+  builder.subTitle('Répartition banque / caisse');
+  builder.table(
+    [
+      { header: 'Compte', width: 2 },
+      { header: 'Solde de départ', width: 1.5, align: 'right' },
+      { header: report.isClosed ? 'Solde final' : 'Solde actuel', width: 1.5, align: 'right' },
+    ],
+    [
+      ['Banque', euro(report.accounts.bank.initial), euro(report.accounts.bank.final)],
+      ['Caisse', euro(report.accounts.cash.initial), euro(report.accounts.cash.final)],
+      ['Total', euro(report.initialBalance), euro(report.solde)],
+    ],
+    { boldLastRow: true }
+  );
 
   builder.subTitle('Récapitulatif par catégorie');
   builder.table(
@@ -221,6 +240,45 @@ export async function buildTreasuryPdf(
   return builder.save();
 }
 
+
+const ACCOUNT_NAMES = { bank: 'Banque', cash: 'Caisse' } as const;
+
+function txKind(t: TransactionRow) {
+  if (t.type === 'transfer') return 'Mouvement';
+  return isIncome(t.type) ? 'Recette' : 'Dépense';
+}
+
+function txAccount(t: TransactionRow) {
+  return t.type === 'transfer' && t.transferTo
+    ? `${ACCOUNT_NAMES[t.account]} → ${ACCOUNT_NAMES[t.transferTo]}`
+    : ACCOUNT_NAMES[t.account];
+}
+
+/* Montant signé pour les tableaux (un mouvement n'a pas de signe). */
+function txSigned(t: TransactionRow) {
+  if (t.type === 'transfer') return t.amount;
+  return isIncome(t.type) ? t.amount : -t.amount;
+}
+
+/* Journal d'un compte : opérations du compte avec le solde après chaque ligne. */
+function accountJournal(rows: TransactionRow[], account: 'bank' | 'cash', initial: number) {
+  let balance = initial;
+  return rows
+    .filter((t) => t.account === account || (t.type === 'transfer' && t.transferTo === account))
+    .map((t) => {
+      const delta =
+        t.type === 'transfer'
+          ? t.account === account
+            ? -t.amount
+            : t.amount
+          : isIncome(t.type)
+            ? t.amount
+            : -t.amount;
+      balance = Math.round((balance + delta) * 100) / 100;
+      return { t, delta, balance };
+    });
+}
+
 export function buildTreasuryXlsx(
   report: AnnualReport,
   rows: TransactionRow[]
@@ -228,17 +286,49 @@ export function buildTreasuryXlsx(
   return xlsxBytes([
     {
       name: 'Opérations',
-      widths: [12, 10, 20, 36, 16, 12, 30],
+      widths: [12, 11, 18, 20, 36, 16, 12, 12, 30],
       rows: [
-        ['Date', 'Type', 'Catégorie', 'Libellé', 'Mode', 'Montant', 'Note'],
+        ['Date', 'Type', 'Compte', 'Catégorie', 'Libellé', 'Mode', 'Montant', 'Justificatif', 'Note'],
         ...rows.map((t) => [
           dateFr(t.date),
-          isIncome(t.type) ? 'Recette' : 'Dépense',
+          txKind(t),
+          txAccount(t),
           t.category,
           t.label,
           paymentLabel(t.paymentMethod),
-          isIncome(t.type) ? t.amount : -t.amount,
+          txSigned(t),
+          t.hasReceipt ? 'oui' : 'non',
           t.note,
+        ]),
+      ],
+    },
+    {
+      name: 'Journal banque',
+      widths: [12, 36, 14, 14, 14],
+      rows: [
+        ['Date', 'Libellé', 'Entrée', 'Sortie', 'Solde'],
+        ['', 'Solde de départ', null, null, report.accounts.bank.initial],
+        ...accountJournal(rows, 'bank', report.accounts.bank.initial).map(({ t, delta, balance }) => [
+          dateFr(t.date),
+          t.label,
+          delta > 0 ? delta : null,
+          delta < 0 ? -delta : null,
+          balance,
+        ]),
+      ],
+    },
+    {
+      name: 'Journal de caisse',
+      widths: [12, 36, 14, 14, 14],
+      rows: [
+        ['Date', 'Libellé', 'Entrée', 'Sortie', 'Solde'],
+        ['', 'Solde de départ', null, null, report.accounts.cash.initial],
+        ...accountJournal(rows, 'cash', report.accounts.cash.initial).map(({ t, delta, balance }) => [
+          dateFr(t.date),
+          t.label,
+          delta > 0 ? delta : null,
+          delta < 0 ? -delta : null,
+          balance,
         ]),
       ],
     },
@@ -250,6 +340,8 @@ export function buildTreasuryXlsx(
         ['Total recettes', report.totalRecettes, null],
         ['Total dépenses', report.totalDepenses, null],
         [report.isClosed ? 'Solde final' : 'Solde actuel', report.solde, null],
+        ['  dont banque', report.accounts.bank.final, null],
+        ['  dont caisse', report.accounts.cash.final, null],
         [null, null, null],
         ['Catégorie', 'Recettes', 'Dépenses'],
         ...report.financialByCategory.map((c) => [
