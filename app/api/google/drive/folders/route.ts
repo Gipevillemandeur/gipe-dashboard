@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { logActivity, quote } from '@/lib/activity'
 import { requireOfficePermission } from '@/lib/office-auth'
 import {
   DRIVE_FOLDER_MIME,
@@ -153,6 +154,8 @@ export async function POST(request: Request) {
     }
 
     const folder = (await driveResponse.json()) as GoogleDriveFolder
+
+    await logActivity('Docs Drive', `a créé le dossier ${quote(name)}`)
 
     return NextResponse.json({
       success: true,

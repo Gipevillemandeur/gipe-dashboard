@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { logActivity, quote } from '@/lib/activity'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { requireOfficePermission } from '@/lib/office-auth'
 import { requireEditableMeeting } from '@/lib/instance-guard'
@@ -308,6 +309,11 @@ export async function POST(
       )
     }
 
+    await logActivity(
+      'Instances',
+      `a ajouté le document ${quote(fileName)} à la réunion ${quote(`${guard.meeting.type} – ${guard.meeting.subject}`)}`
+    )
+
     return NextResponse.json({
       ok: true,
       document: {
@@ -379,7 +385,7 @@ export async function DELETE(
           'instance_meeting_documents'
         )
         .select(
-          'id,meeting_id,file_url'
+          'id,meeting_id,file_url,file_name'
         )
         .eq(
           'id',
@@ -456,6 +462,11 @@ export async function DELETE(
         { status: 500 }
       )
     }
+
+    await logActivity(
+      'Instances',
+      `a supprimé le document ${quote(document.file_name)} de la réunion ${quote(`${guard.meeting.type} – ${guard.meeting.subject}`)}`
+    )
 
     return NextResponse.json({
       ok: true,

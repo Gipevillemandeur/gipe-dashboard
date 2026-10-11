@@ -68,6 +68,7 @@ type ArchiveState = {
   steps: Step[];
   running: boolean;
   finished: boolean;
+  cleanup?: { purgedYears: string[]; filesRemoved: number; warning?: string };
   texts?: { moralReport: string; perspectives: string; notes: string };
 };
 
@@ -284,7 +285,13 @@ export default function YearClosure({
         throw new Error(data?.error || 'Impossible de terminer l’archivage.');
       }
 
-      update({ running: false, finished: true });
+      const finishData = await readJson(finish);
+
+      update({
+        running: false,
+        finished: true,
+        cleanup: finishData?.cleanup,
+      });
     } catch (err) {
       update({ running: false });
       setError(err instanceof Error ? err.message : 'Archivage interrompu.');
@@ -714,6 +721,20 @@ export default function YearClosure({
             </ul>
 
             {error && <div className="notice notice-error yc-error">{error}</div>}
+
+            {archive.finished && archive.cleanup && (
+              <div
+                className={`notice ${archive.cleanup.warning ? 'notice-error' : ''} yc-error`}
+              >
+                {archive.cleanup.warning
+                  ? archive.cleanup.warning
+                  : archive.cleanup.purgedYears.length > 0
+                    ? `Ménage fait : les années ${archive.cleanup.purgedYears.join(', ')} ont été retirées de Supabase (elles restent dans le Drive, dossier Archives).`
+                    : archive.cleanup.filesRemoved > 0
+                      ? `Ménage fait : ${archive.cleanup.filesRemoved} document(s) de réunion retiré(s) de Supabase (ils sont dans le Drive).`
+                      : 'Ménage : rien à retirer de Supabase cette année.'}
+              </div>
+            )}
 
             {archive.finished && (
               <div className="yc-reminder">

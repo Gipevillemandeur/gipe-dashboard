@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { logActivity, quote } from '@/lib/activity'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { requireOfficePermission } from '@/lib/office-auth'
 
@@ -463,6 +464,11 @@ export async function POST(
       )
     }
 
+    await logActivity(
+      'Agenda',
+      `a ajouté l’événement ${quote(data?.title)}`
+    )
+
     return NextResponse.json(
       {
         ok: true,
@@ -581,7 +587,7 @@ export async function PUT(
         'internal_agenda_events'
       )
       .select(
-        'id,image_url,published_on_site'
+        'id,title,image_url,published_on_site'
       )
       .eq(
         'id',
@@ -703,6 +709,11 @@ export async function PUT(
       )
     }
 
+    await logActivity(
+      'Agenda',
+      `a modifié l’événement ${quote(data?.title)}`
+    )
+
     return NextResponse.json({
       ok: true,
       event: data,
@@ -759,7 +770,7 @@ export async function DELETE(
         'internal_agenda_events'
       )
       .select(
-        'id,image_url,published_on_site'
+        'id,title,image_url,published_on_site'
       )
       .eq(
         'id',
@@ -828,6 +839,11 @@ export async function DELETE(
         existing.image_url
       )
     }
+
+    await logActivity(
+      'Agenda',
+      `a supprimé l’événement ${quote(existing?.title)}`
+    )
 
     return NextResponse.json({
       ok: true,

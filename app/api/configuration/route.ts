@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getOfficeAccess } from '@/lib/office-auth';
 import { sortDirection } from '@/lib/direction';
+import { logActivity } from '@/lib/activity';
 
 async function requireConfigurationAccess() {
   /*
@@ -324,6 +325,19 @@ export async function PATCH(
     }
   }
 
+  const withCode = body.classes.filter(
+    (item) => item.id && item.accessCode?.trim()
+  ).length;
+
+  await logActivity(
+    'Configuration',
+    withCode === 0
+      ? 'a effacé les codes des classes'
+      : withCode === 1
+        ? 'a changé le code d’une classe'
+        : `a généré les codes de ${withCode} classes`
+  );
+
   return NextResponse.json({
     ok: true,
   });
@@ -502,6 +516,8 @@ export async function PUT(
       );
     }
   }
+
+  await logActivity('Configuration', 'a modifié la direction du collège');
 
   return NextResponse.json({
     ok: true,

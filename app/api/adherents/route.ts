@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { logActivity } from '@/lib/activity';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { requireOfficePermission } from '@/lib/office-auth';
 
@@ -452,6 +453,11 @@ async function save(request: Request, mode: 'create' | 'update') {
       { status: 500 }
     );
   }
+
+  await logActivity(
+    'Adhérents',
+    `a ${mode === 'create' ? 'enregistré' : 'modifié'} l’adhésion de ${lastName.toUpperCase()} ${firstName}`
+  );
 
   return NextResponse.json(
     { success: true, ...(data as object) },

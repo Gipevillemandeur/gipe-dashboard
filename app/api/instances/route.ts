@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { logActivity, quote } from '@/lib/activity'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { requireOfficePermission } from '@/lib/office-auth'
 import { requireEditableMeeting } from '@/lib/instance-guard'
@@ -322,6 +323,8 @@ export async function POST(
       )
     }
 
+    await logActivity('Instances', `a créé la réunion ${quote(`${data?.type} – ${data?.subject}`)}`)
+
     return NextResponse.json(
       {
         ok: true,
@@ -403,7 +406,7 @@ export async function PUT(
       error: existingError,
     } = await admin
       .from('instance_meetings')
-      .select('id')
+      .select('id,type,subject')
       .eq(
         'id',
         id
@@ -470,6 +473,8 @@ export async function PUT(
       )
     }
 
+    await logActivity('Instances', `a modifié la réunion ${quote(`${data?.type} – ${data?.subject}`)}`)
+
     return NextResponse.json({
       ok: true,
       meeting: data,
@@ -530,7 +535,7 @@ export async function DELETE(
       error: existingError,
     } = await admin
       .from('instance_meetings')
-      .select('id')
+      .select('id,type,subject')
       .eq(
         'id',
         id
@@ -576,6 +581,11 @@ export async function DELETE(
         { status: 500 }
       )
     }
+
+    await logActivity(
+      'Instances',
+      `a supprimé la réunion ${quote(`${existing?.type} – ${existing?.subject}`)}`
+    )
 
     return NextResponse.json({
       ok: true,

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { logActivity, quote } from '@/lib/activity';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getOfficeAccess } from '@/lib/office-auth';
 import { GUIDE_SECTIONS, getGuideSection } from '@/lib/guide-content';
@@ -126,6 +127,8 @@ export async function PUT(request: Request) {
       { status: 500 }
     );
   }
+
+  await logActivity('Guide', `a modifié la section ${quote(section.title)} du guide de passation`, auth.access);
 
   return NextResponse.json({ ok: true });
 }

@@ -211,6 +211,12 @@ Dans **Site internet**, on gère ce que voient les parents sur le site du GIPE :
 - Un dossier **Archives → année** dans le Drive : bilan, Adhérents, Trésorerie, Instances (fiches et documents des réunions).
 - La nouvelle année démarre avec le **solde** de l’année clôturée.
 
+## Le ménage automatique
+Une fois l’archivage terminé, le dashboard fait le ménage dans Supabase (la base gratuite a une place limitée) :
+- les **documents des réunions** de l’année clôturée sont retirés de Supabase : ils sont dans le Drive ;
+- on garde l’année en cours et les **2 dernières années clôturées** ; les années plus anciennes (adhérents, enfants, trésorerie, réunions, classes) sont retirées de Supabase.
+- Tout reste consultable dans **Docs Drive → Archives**.
+
 ! Action définitive : une année clôturée ne peut plus être modifiée.`,
   },
   {

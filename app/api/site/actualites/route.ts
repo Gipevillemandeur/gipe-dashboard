@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { logActivity, quote } from '@/lib/activity';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { requireOfficePermission } from '@/lib/office-auth';
 
@@ -336,6 +337,9 @@ export async function POST(
       );
     }
 
+    await logActivity('Site internet', `a ajouté l’actualité ${quote(title)}`)
+
+
     return NextResponse.json(
       {
         ok: true,
@@ -546,6 +550,9 @@ export async function PUT(
       );
     }
 
+    await logActivity('Site internet', `a modifié l’actualité ${quote(title)}`)
+
+
     return NextResponse.json({
       ok: true,
       news: data,
@@ -599,7 +606,7 @@ export async function DELETE(
       await admin
         .from('news')
         .select(
-          'id,image_url'
+          'id,title,image_url'
         )
         .eq('id', id)
         .maybeSingle();
@@ -644,6 +651,9 @@ export async function DELETE(
       admin,
       existing.image_url
     );
+
+    await logActivity('Site internet', `a supprimé l’actualité ${quote(existing?.title)}`)
+
 
     return NextResponse.json({
       ok: true,

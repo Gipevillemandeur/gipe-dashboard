@@ -18,6 +18,30 @@ export type UpcomingMeeting = {
   subject: string;
 };
 
+export type RecentActivity = {
+  id: number;
+  at: string;
+  who: string;
+  area: string;
+  summary: string;
+};
+
+/*
+ * Chaque rubrique du journal n'est montrée qu'aux personnes
+ * qui ont accès à cette rubrique.
+ */
+const AREA_PERMISSIONS: Record<string, string | null> = {
+  'Trésorerie': 'treasury',
+  'Adhérents': 'members',
+  'Agenda': 'agenda',
+  'Instances': 'schooling',
+  'Site internet': 'website',
+  'Configuration': 'configuration',
+  'Docs Drive': 'drive',
+  'Clôture': null,
+  'Guide': null,
+};
+
 export type DashboardSnapshot = {
   connected: boolean;
   error: string | null;
@@ -26,6 +50,7 @@ export type DashboardSnapshot = {
   adherents: number;
   role: string;
   upcomingMeetings: UpcomingMeeting[];
+  recentActivity: RecentActivity[];
 };
 
 function failure(error: string, role = '', schoolYear = ''): DashboardSnapshot {
@@ -37,6 +62,7 @@ function failure(error: string, role = '', schoolYear = ''): DashboardSnapshot {
     adherents: 0,
     role,
     upcomingMeetings: [],
+    recentActivity: [],
   };
 }
 
@@ -83,7 +109,14 @@ export async function getDashboardSnapshot(): Promise<DashboardSnapshot> {
       timeZone: 'Europe/Paris',
     }).format(new Date());
 
-    const [classesResult, adherentsResult, meetingsResult] = await Promise.all([
+    const allowedAreas = Object.entries(AREA_PERMISSIONS)
+      .filter(
+        ([, permission]) =>
+          permission === null || access.permissions.includes(permission)
+      )
+      .map(([area]) => area);
+
+    const [classesResult, adherentsResult, meetingsResult, activityResult] = await Promise.all([
       admin
         .from('classes')
         .select('id,name,level,kind,active,students(count),class_teachers(count)')
@@ -105,6 +138,14 @@ export async function getDashboardSnapshot(): Promise<DashboardSnapshot> {
         .order('meeting_date', { ascending: true })
         .order('meeting_time', { ascending: true })
         .limit(3),
+
+      // Table absente (SQL pas encore lancé) : erreur ignorée.
+      admin
+        .from('gipe_activity_log')
+        .select('id,created_at,actor_email,actor_position,area,summary')
+        .in('area', allowedAreas)
+        .order('created_at', { ascending: false })
+        .limit(4),
     ]);
 
     if (classesResult.error) {
@@ -142,6 +183,15 @@ export async function getDashboardSnapshot(): Promise<DashboardSnapshot> {
         type: m.type || '',
         subject: m.subject || '',
       })),
+      recentActivity: activityResult.error
+        ? []
+        : (activityResult.data || []).map((row: any) => ({
+            id: row.id,
+            at: row.created_at,
+            who: row.actor_position || row.actor_email || 'Quelqu’un',
+            area: row.area,
+            summary: row.summary,
+          })),
     };
   } catch (error) {
     return failure(

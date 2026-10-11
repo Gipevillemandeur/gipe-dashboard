@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { logActivity } from '@/lib/activity';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { resolveSchoolYear } from '@/lib/annual-report';
 import { checkYearAccess, errorMessage } from '@/lib/year-access';
@@ -78,6 +79,11 @@ export async function POST(request: Request) {
     if (textsError) {
       console.error('Erreur enregistrement textes de clôture :', textsError);
     }
+
+    await logActivity(
+      'Clôture',
+      `a clôturé l’année ${closingYear.label} et ouvert l’année ${newYearLabel}`
+    );
 
     return NextResponse.json({
       result,

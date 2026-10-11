@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { euros, logActivity, quote } from '@/lib/activity'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { requireOfficePermission } from '@/lib/office-auth'
 
@@ -378,6 +379,11 @@ export async function POST(
       )
     }
 
+    await logActivity(
+      'Trésorerie',
+      `a ajouté ${data.transaction_type === 'income' ? 'une recette' : 'une dépense'} ${quote(data.label)} (${euros(data.amount)})`
+    )
+
     return NextResponse.json(
       {
         ok: true,
@@ -510,6 +516,11 @@ export async function PUT(
           { status: 500 }
         )
       }
+
+      await logActivity(
+        'Trésorerie',
+        `a modifié le solde initial (${euros(updatedSchoolYear.initial_balance || 0)})`
+      )
 
       return NextResponse.json({
         ok: true,
@@ -683,6 +694,11 @@ export async function PUT(
       )
     }
 
+    await logActivity(
+      'Trésorerie',
+      `a modifié ${data.transaction_type === 'income' ? 'la recette' : 'la dépense'} ${quote(data.label)} (${euros(data.amount)})`
+    )
+
     return NextResponse.json({
       ok: true,
       transaction: {
@@ -747,6 +763,12 @@ export async function DELETE(
       return notEditable
     }
 
+    const { data: before } = await admin
+      .from('gipe_transactions')
+      .select('label,amount,transaction_type')
+      .eq('id', id)
+      .maybeSingle()
+
     const {
       error,
     } = await admin
@@ -766,6 +788,13 @@ export async function DELETE(
             `Impossible de supprimer la transaction : ${error.message}`,
         },
         { status: 500 }
+      )
+    }
+
+    if (before) {
+      await logActivity(
+        'Trésorerie',
+        `a supprimé ${before.transaction_type === 'income' ? 'la recette' : 'la dépense'} ${quote(before.label)} (${euros(before.amount)})`
       )
     }
 

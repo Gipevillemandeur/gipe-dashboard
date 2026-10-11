@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { logActivity } from '@/lib/activity'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { requireOfficePermission } from '@/lib/office-auth'
 import { isPresidentName } from '@/lib/access-core'
@@ -599,6 +600,8 @@ export async function PUT(
       }
     }
 
+    await logActivity('Configuration', 'a modifié les membres du bureau')
+
     return NextResponse.json({
       success: true,
     })
@@ -893,6 +896,11 @@ export async function POST(
         )
       }
 
+      await logActivity(
+        'Configuration',
+        `a envoyé l’accès au dashboard à ${email} (${position.name})`
+      )
+
       return NextResponse.json({
         success: true,
         mode: 'existing',
@@ -963,6 +971,11 @@ export async function POST(
         )
       }
     }
+
+    await logActivity(
+      'Configuration',
+      `a invité ${email} sur le dashboard (${position.name})`
+    )
 
     return NextResponse.json({
       success: true,

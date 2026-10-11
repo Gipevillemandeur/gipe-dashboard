@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { logActivity, quote } from '@/lib/activity'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { requireOfficePermission } from '@/lib/office-auth'
 import { requireEditableMeeting } from '@/lib/instance-guard'
@@ -156,6 +157,8 @@ export async function PUT(
         { status: 500 }
       )
     }
+
+    await logActivity('Instances', `a mis à jour le compte rendu de la réunion ${quote(`${data?.type} – ${data?.subject}`)}`)
 
     return NextResponse.json({
       ok: true,

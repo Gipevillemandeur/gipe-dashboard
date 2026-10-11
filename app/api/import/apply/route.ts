@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { logActivity } from '@/lib/activity';
 import { createHash } from 'crypto';
 import {
   requireOfficePermission,
@@ -385,6 +386,11 @@ export async function POST(
       historyError =
         error;
     }
+
+    await logActivity(
+      'Configuration',
+      `a importé le listing du collège (${summary.classes} classes, ${summary.students} élèves)`
+    );
 
     /*
      * L'import principal est réussi même si

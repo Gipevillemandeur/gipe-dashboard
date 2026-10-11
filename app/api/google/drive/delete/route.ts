@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { logActivity, quote } from '@/lib/activity'
 import { requireOfficePermission } from '@/lib/office-auth'
 import {
   driveErrorResponse,
@@ -31,7 +32,7 @@ export async function DELETE(request: Request) {
     const driveResponse = await fetch(
       `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(
         fileId
-      )}?supportsAllDrives=true&fields=id,trashed`,
+      )}?supportsAllDrives=true&fields=id,name,mimeType,trashed`,
       {
         method: 'PATCH',
         headers: {
@@ -56,6 +57,16 @@ export async function DELETE(request: Request) {
         { status: driveResponse.status || 500 }
       )
     }
+
+    const trashed = (await driveResponse.json().catch(() => ({}))) as {
+      name?: string
+      mimeType?: string
+    }
+
+    await logActivity(
+      'Docs Drive',
+      `a mis à la corbeille ${trashed.mimeType === 'application/vnd.google-apps.folder' ? 'le dossier' : 'le fichier'} ${quote(trashed.name)}`
+    )
 
     return NextResponse.json({
       success: true,

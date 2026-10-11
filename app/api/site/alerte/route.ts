@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { logActivity, quote } from '@/lib/activity';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { requireOfficePermission } from '@/lib/office-auth';
 
@@ -279,6 +280,11 @@ export async function PUT(
       }
     }
   }
+
+  await logActivity(
+    'Site internet',
+    enabled ? `a activé l’alerte du site ${quote(message)}` : 'a désactivé l’alerte du site'
+  );
 
   return NextResponse.json({
     ok: true,

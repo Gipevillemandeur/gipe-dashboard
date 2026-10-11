@@ -12,12 +12,20 @@ export async function requireEditableMeeting(
   admin: SupabaseClient,
   meetingId: string
 ): Promise<
-  | { meeting: { id: string; school_year_id: string; meeting_date: string } }
+  | {
+      meeting: {
+        id: string;
+        school_year_id: string;
+        meeting_date: string;
+        type: string | null;
+        subject: string | null;
+      };
+    }
   | { error: NextResponse }
 > {
   const { data: meeting, error } = await admin
     .from('instance_meetings')
-    .select('id,school_year_id,meeting_date')
+    .select('id,school_year_id,meeting_date,type,subject')
     .eq('id', meetingId)
     .maybeSingle();
 

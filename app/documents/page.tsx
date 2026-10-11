@@ -527,7 +527,14 @@ export default function DocumentsPage() {
         setUploadProgress
       );
 
-      if (!direct.ok) {
+      if (direct.ok) {
+        // Pour « Dernières modifications » (sans attendre).
+        void fetch('/api/google/drive/upload', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'done', name: file.name }),
+        }).catch(() => undefined);
+      } else {
         /*
          * Envoi direct bloqué (réseau, navigateur…) :
          * pour un petit fichier, on repasse par le serveur.

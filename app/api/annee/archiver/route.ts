@@ -15,6 +15,7 @@ import {
 import { PDF, XLSX_MIME, uploadYearFile } from '@/lib/drive-archive';
 import { archiveInstanceMeeting } from '@/lib/instance-meeting-drive';
 import { checkYearAccess, errorMessage } from '@/lib/year-access';
+import { logActivity } from '@/lib/activity';
 
 // Une étape peut envoyer plusieurs fichiers vers le Drive.
 export const maxDuration = 60;
@@ -41,6 +42,70 @@ async function findClosure(
   if (error) throw new Error(error.message);
 
   return (data?.[0] as any) || null;
+}
+
+/*
+ * Ménage après un archivage complet (voir migration_menage_v1.sql) :
+ * documents des réunions de l'année retirés de Supabase, et
+ * années de plus de 2 ans vidées. Un échec ici n'annule pas
+ * l'archivage : on renvoie simplement un avertissement.
+ */
+async function cleanupAfterArchive(
+  admin: ReturnType<typeof createAdminClient>,
+  yearId: string
+): Promise<{ purgedYears: string[]; filesRemoved: number; warning?: string }> {
+  const { data, error } = await admin.rpc('gipe_cleanup_after_archive', {
+    p_year_id: yearId,
+    p_keep: 2,
+  });
+
+  if (error) {
+    console.error('Ménage après archivage :', error);
+    return {
+      purgedYears: [],
+      filesRemoved: 0,
+      warning: error.message.includes('gipe_cleanup_after_archive')
+        ? 'Le ménage automatique n’est pas encore installé (migration_menage_v1.sql à lancer dans Supabase). Rien n’a été supprimé.'
+        : `Le ménage automatique n’a pas pu se faire (rien n’a été supprimé) : ${error.message}`,
+    };
+  }
+
+  const result = (data || {}) as {
+    files?: string[];
+    purgedYears?: string[];
+    counts?: Record<string, number>;
+  };
+
+  const files = (result.files || []).filter(Boolean);
+  let filesRemoved = 0;
+
+  // Fichiers retirés du stockage par paquets de 100.
+  for (let i = 0; i < files.length; i += 100) {
+    const chunk = files.slice(i, i + 100);
+    const { error: removeError } = await admin.storage
+      .from('instance-documents')
+      .remove(chunk);
+
+    if (removeError) {
+      console.error('Suppression des fichiers de réunion :', removeError);
+    } else {
+      filesRemoved += chunk.length;
+    }
+  }
+
+  const deletedSomething = Object.values(result.counts || {}).some((n) => n > 0);
+  const purgedYears = deletedSomething ? result.purgedYears || [] : [];
+
+  if (filesRemoved > 0 || purgedYears.length > 0) {
+    await logActivity(
+      'Clôture',
+      purgedYears.length > 0
+        ? `a fait le ménage de fin d’année (années ${purgedYears.join(', ')} retirées de Supabase, elles restent dans le Drive)`
+        : `a fait le ménage de fin d’année (${filesRemoved} document${filesRemoved > 1 ? 's' : ''} de réunion retiré${filesRemoved > 1 ? 's' : ''} de Supabase)`
+    );
+  }
+
+  return { purgedYears, filesRemoved };
 }
 
 /*
@@ -131,7 +196,9 @@ export async function POST(request: Request) {
 
       if (error) throw new Error(error.message);
 
-      return NextResponse.json({ ok: true });
+      const cleanup = await cleanupAfterArchive(admin, yearId);
+
+      return NextResponse.json({ ok: true, cleanup });
     }
 
     /*

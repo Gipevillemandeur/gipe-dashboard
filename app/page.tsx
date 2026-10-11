@@ -10,6 +10,38 @@ import { getDashboardSnapshot } from '@/lib/dashboard-data';
 
 export const dynamic = 'force-dynamic';
 
+/*
+ * « aujourd’hui à 14:32 », « hier à 09:05 », « le 08/10 à 18:00 »
+ * (heure de Paris).
+ */
+function formatWhen(iso: string) {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return '';
+
+  const day = (d: Date) =>
+    new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris' }).format(d);
+  const time = new Intl.DateTimeFormat('fr-FR', {
+    timeZone: 'Europe/Paris',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(date);
+
+  const now = new Date();
+  const yesterday = new Date(now.getTime() - 24 * 3600 * 1000);
+
+  if (day(date) === day(now)) return `Aujourd’hui à ${time}`;
+  if (day(date) === day(yesterday)) return `Hier à ${time}`;
+
+  const short = new Intl.DateTimeFormat('fr-FR', {
+    timeZone: 'Europe/Paris',
+    day: '2-digit',
+    month: '2-digit',
+    year: date.getFullYear() === now.getFullYear() ? undefined : 'numeric',
+  }).format(date);
+
+  return `Le ${short} à ${time}`;
+}
+
 export default async function DashboardPage() {
   const snapshot = await getDashboardSnapshot();
 
@@ -250,6 +282,47 @@ export default async function DashboardPage() {
 
       </section>
 
+
+      <section
+        className="card section-card"
+        style={{ marginTop: 18 }}
+      >
+        <div className="section-head">
+          <div>
+            <h2 className="section-title">
+              Dernières modifications
+            </h2>
+            <p className="section-sub">
+              Ce qui a été fait récemment dans le dashboard, et par qui.
+            </p>
+          </div>
+        </div>
+
+        <div className="list">
+          {snapshot.recentActivity.length === 0 ? (
+            <div className="list-item">
+              <div className="item-main">
+                <strong>Aucune modification récente</strong>
+                <span>
+                  Les prochaines actions du bureau apparaîtront ici.
+                </span>
+              </div>
+            </div>
+          ) : (
+            snapshot.recentActivity.map((item) => (
+              <div key={item.id} className="list-item">
+                <div className="item-main">
+                  <strong>
+                    {item.who} {item.summary}
+                  </strong>
+                  <span>{formatWhen(item.at)}</span>
+                </div>
+                <span className="badge badge-info">{item.area}</span>
+              </div>
+            ))
+          )}
+        </div>
+      </section>
 
       {snapshot.connected && (
         <div className="footer-note">

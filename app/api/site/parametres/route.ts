@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { logActivity } from '@/lib/activity'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { requireOfficePermission } from '@/lib/office-auth'
 
@@ -152,6 +153,8 @@ export async function PUT(request: Request) {
         )
       }
     }
+
+    await logActivity('Site internet', 'a modifié les paramètres du site')
 
     return NextResponse.json({ ok: true })
   } catch (error) {

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { logActivity, quote } from '@/lib/activity'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { requireOfficeAccess } from '@/lib/office-auth'
 
@@ -186,6 +187,12 @@ export async function POST(request: Request) {
         { status: 500 }
       )
     }
+
+    await logActivity(
+      'Instances',
+      `a créé la réunion ${quote(`${type} – ${subject}`)}`,
+      access
+    )
 
     return NextResponse.json(
       {

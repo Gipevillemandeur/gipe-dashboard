@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { logActivity } from '@/lib/activity';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { requireOfficePermission } from '@/lib/office-auth';
 
@@ -231,6 +232,7 @@ export async function PUT(request: NextRequest) {
         );
       }
 
+      await logActivity('Configuration', 'a modifié une classe');
       return NextResponse.json({
         success: true,
         class: data,
@@ -294,6 +296,7 @@ export async function PUT(request: NextRequest) {
         );
       }
 
+      await logActivity('Configuration', 'a ajouté un élève');
       return NextResponse.json({
         success: true,
         student: data,
@@ -366,6 +369,7 @@ export async function PUT(request: NextRequest) {
         );
       }
 
+      await logActivity('Configuration', 'a modifié un élève');
       return NextResponse.json({
         success: true,
         student: data,
@@ -478,6 +482,7 @@ export async function PUT(request: NextRequest) {
         );
       }
 
+      await logActivity('Configuration', 'a ajouté un professeur à une classe');
       return NextResponse.json({
         success: true,
         teacher: relation,
@@ -626,6 +631,7 @@ export async function PUT(request: NextRequest) {
             );
           }
 
+          await logActivity('Configuration', 'a modifié un professeur');
           return NextResponse.json({
             success: true,
             teacher: data,
@@ -752,6 +758,7 @@ export async function PUT(request: NextRequest) {
           );
         }
 
+        await logActivity('Configuration', 'a remplacé un professeur');
         return NextResponse.json({
           success: true,
         });
@@ -790,6 +797,7 @@ export async function PUT(request: NextRequest) {
         );
       }
 
+      await logActivity('Configuration', 'a modifié un professeur dans une classe');
       return NextResponse.json({
         success: true,
         teacher: data,
@@ -864,6 +872,7 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
+    await logActivity('Configuration', 'a supprimé une classe');
     return NextResponse.json({
       success: true,
     });
@@ -901,6 +910,7 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
+    await logActivity('Configuration', 'a supprimé un élève');
     return NextResponse.json({
       success: true,
     });
@@ -947,6 +957,7 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
+    await logActivity('Configuration', 'a retiré un professeur d’une classe');
     return NextResponse.json({
       success: true,
     });

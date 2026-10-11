@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { logActivity, quote } from '@/lib/activity'
 import { requireOfficePermission } from '@/lib/office-auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 
@@ -301,6 +302,11 @@ export async function POST(request: Request) {
     // ---------------------------------------------------------
     // Succès
     // ---------------------------------------------------------
+    await logActivity(
+      'Site internet',
+      `a publié l’événement ${quote(internalEvent.title)} sur le site`
+    )
+
     return NextResponse.json({
       success: true,
       siteEventId:

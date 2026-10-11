@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { logActivity, quote } from '@/lib/activity'
 import { requireOfficePermission } from '@/lib/office-auth'
 import {
   driveErrorResponse,
@@ -33,6 +34,17 @@ export async function POST(request: Request) {
     const contentType = request.headers.get('content-type') || ''
 
     if (contentType.includes('application/json')) {
+      const body = (await request.clone().json().catch(() => ({}))) as {
+        action?: string
+        name?: string
+      }
+
+      // Le navigateur signale un envoi direct réussi (journal).
+      if (body.action === 'done') {
+        await logActivity('Docs Drive', `a importé le fichier ${quote(body.name)}`)
+        return NextResponse.json({ ok: true })
+      }
+
       return prepareDirectUpload(request)
     }
 
@@ -199,6 +211,8 @@ async function serverUpload(request: Request) {
       { status: uploadResponse.status || 500 }
     )
   }
+
+  await logActivity('Docs Drive', `a importé le fichier ${quote(file.name)}`)
 
   return NextResponse.json({
     success: true,
