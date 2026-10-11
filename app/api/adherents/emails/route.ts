@@ -3,7 +3,9 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { requireOfficePermission, type OfficeAccess } from '@/lib/office-auth';
 import { logActivity, quote } from '@/lib/activity';
 import {
+  DEFAULT_RECEIPT_TEMPLATE,
   DAILY_LIMIT,
+  type ReceiptTemplate,
   EMAIL_PATTERN,
   isEmailConfigured,
   messageEmail,
@@ -172,6 +174,27 @@ function pickAudience(rows: MembershipRow[], audience: Audience) {
   }
 }
 
+/* Texte du reçu : version modifiée si elle existe, sinon l'original. */
+async function loadReceiptTemplate(admin: Admin): Promise<ReceiptTemplate & { customized: boolean; updatedAt?: string; updatedBy?: string | null }> {
+  const { data, error } = await admin
+    .from('gipe_email_templates')
+    .select('subject,body,updated_at,updated_by')
+    .eq('key', 'receipt')
+    .maybeSingle();
+
+  if (error || !data) {
+    return { ...DEFAULT_RECEIPT_TEMPLATE, customized: false };
+  }
+
+  return {
+    subject: data.subject,
+    body: data.body,
+    customized: true,
+    updatedAt: data.updated_at,
+    updatedBy: data.updated_by,
+  };
+}
+
 /* Une seule fois par adresse (deux parents peuvent partager une boîte). */
 function uniqueByEmail(rows: MembershipRow[]) {
   const seen = new Set<string>();
@@ -217,6 +240,9 @@ async function deliver(admin: Admin, messageId: string) {
     );
   }
 
+  const receiptTemplate =
+    message.kind === 'receipt' ? await loadReceiptTemplate(admin) : DEFAULT_RECEIPT_TEMPLATE;
+
   let sent = 0;
   let failed = 0;
 
@@ -230,15 +256,18 @@ async function deliver(admin: Admin, messageId: string) {
 
       const content =
         message.kind === 'receipt' && member
-          ? receiptEmail({
-              firstName: member.firstName,
-              lastName: member.lastName,
-              schoolYear,
-              amount: member.amount,
-              paymentDate: member.paymentDate,
-              paymentMethod: member.paymentMethod,
-              children: member.children,
-            })
+          ? receiptEmail(
+              {
+                firstName: member.firstName,
+                lastName: member.lastName,
+                schoolYear,
+                amount: member.amount,
+                paymentDate: member.paymentDate,
+                paymentMethod: member.paymentMethod,
+                children: member.children,
+              },
+              receiptTemplate
+            )
           : messageEmail({
               subject: message.subject,
               body: message.body || '',
@@ -343,9 +372,11 @@ export async function GET() {
     }
 
     const today = await sentToday(admin);
+    const template = await loadReceiptTemplate(admin);
 
     return NextResponse.json({
       ready: true,
+      receiptTemplate: template,
       configured: isEmailConfigured(),
       quota: {
         limit: DAILY_LIMIT,
@@ -408,6 +439,52 @@ export async function POST(request: Request) {
   try {
     const year = await activeYear(admin);
     const createdBy = access.positionName || access.email || null;
+
+    /*
+     * Texte du reçu : enregistrer ou revenir à l'original.
+     */
+    if (body.action === 'save-template') {
+      const subject = String(body.subject || '').trim();
+      const text = String(body.body || '').replace(/\r\n/g, '\n').trim();
+
+      if (!subject || !text) {
+        return NextResponse.json({ error: 'Le sujet et le texte sont obligatoires.' }, { status: 400 });
+      }
+
+      if (subject.length > 200 || text.length > 5000) {
+        return NextResponse.json({ error: 'Le sujet ou le texte est trop long.' }, { status: 400 });
+      }
+
+      const { error } = await admin.from('gipe_email_templates').upsert(
+        {
+          key: 'receipt',
+          subject,
+          body: text,
+          updated_at: new Date().toISOString(),
+          updated_by: createdBy,
+        },
+        { onConflict: 'key' }
+      );
+
+      if (error) {
+        return NextResponse.json(
+          {
+            error: error.message.includes('gipe_email_templates')
+              ? 'Lance d’abord migration_emails_v2.sql dans Supabase.'
+              : `Enregistrement impossible : ${error.message}`,
+          },
+          { status: 500 }
+        );
+      }
+
+      await logActivity('Adhérents', 'a modifié le texte du reçu d’adhésion', access);
+      return NextResponse.json({ ok: true, receiptTemplate: await loadReceiptTemplate(admin) });
+    }
+
+    if (body.action === 'reset-template') {
+      await admin.from('gipe_email_templates').delete().eq('key', 'receipt');
+      return NextResponse.json({ ok: true, receiptTemplate: await loadReceiptTemplate(admin) });
+    }
 
     /*
      * Suite d'un envoi interrompu par le quota du jour.

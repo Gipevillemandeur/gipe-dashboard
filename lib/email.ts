@@ -171,48 +171,73 @@ export type ReceiptData = {
   children: { firstName: string; lastName: string; className: string }[];
 };
 
-export function receiptEmail(data: ReceiptData) {
-  const subject = `Votre adhésion au GIPE Villemandeur – ${data.schoolYear}`;
+export type ReceiptTemplate = { subject: string; body: string };
 
-  const payment = [
-    data.amount ? `Cotisation : ${euros(data.amount)}` : '',
-    data.paymentDate ? `reçue le ${dateFr(data.paymentDate)}` : '',
-    data.paymentMethod ? `(${PAYMENT_LABELS[data.paymentMethod] || data.paymentMethod})` : '',
-  ]
-    .filter(Boolean)
-    .join(' ');
-
-  const children = data.children.map((child) =>
-    `${child.firstName} ${child.lastName}${child.className ? ` – ${child.className}` : ''}`.trim()
-  );
-
-  const text = [
-    `Bonjour ${data.firstName},`,
+/*
+ * Texte d'origine du reçu. Il peut être modifié depuis
+ * Adhérents → E-mails → Reçus (enregistré dans Supabase).
+ * Les mots entre accolades sont remplacés pour chaque adhérent.
+ */
+export const DEFAULT_RECEIPT_TEMPLATE: ReceiptTemplate = {
+  subject: 'Votre adhésion au GIPE Villemandeur – {annee}',
+  body: [
+    'Bonjour {prenom},',
     '',
-    `Merci pour votre adhésion au GIPE Villemandeur pour l’année scolaire ${data.schoolYear}. Elle est bien enregistrée.`,
+    'Merci pour votre adhésion au GIPE Villemandeur pour l’année scolaire {annee}. Elle est bien enregistrée.',
     '',
-    payment,
-    children.length ? `Enfant(s) : ${children.join(', ')}` : '',
+    'Cotisation : {montant}, reçue le {date_paiement} ({moyen_paiement}).',
+    'Enfant(s) : {enfants}',
     '',
     'Votre soutien nous permet de représenter les parents auprès du collège, notamment lors des conseils de classe.',
     '',
     'Pour toute question, il suffit de répondre à ce message.',
     '',
     'Le bureau du GIPE Villemandeur',
-  ]
-    .filter((line, index, all) => !(line === '' && all[index - 1] === ''))
-    .join('\n');
+  ].join('\n'),
+};
+
+export const RECEIPT_FIELDS: { key: string; label: string }[] = [
+  { key: 'prenom', label: 'Prénom' },
+  { key: 'nom', label: 'Nom' },
+  { key: 'annee', label: 'Année scolaire' },
+  { key: 'montant', label: 'Montant' },
+  { key: 'date_paiement', label: 'Date du paiement' },
+  { key: 'moyen_paiement', label: 'Moyen de paiement' },
+  { key: 'enfants', label: 'Enfants et classes' },
+];
+
+export function receiptValues(data: ReceiptData): Record<string, string> {
+  return {
+    prenom: data.firstName,
+    nom: data.lastName,
+    annee: data.schoolYear,
+    montant: data.amount ? euros(data.amount) : '—',
+    date_paiement: data.paymentDate ? dateFr(data.paymentDate) : '—',
+    moyen_paiement: data.paymentMethod
+      ? PAYMENT_LABELS[data.paymentMethod] || data.paymentMethod
+      : '—',
+    enfants:
+      data.children
+        .map((child) =>
+          `${child.firstName} ${child.lastName}${child.className ? ` (${child.className})` : ''}`.trim()
+        )
+        .join(', ') || '—',
+  };
+}
+
+export function fillTemplate(text: string, values: Record<string, string>) {
+  return text.replace(/\{([a-z_]+)\}/g, (match, key: string) =>
+    key in values ? values[key] : match
+  );
+}
+
+export function receiptEmail(data: ReceiptData, template: ReceiptTemplate = DEFAULT_RECEIPT_TEMPLATE) {
+  const values = receiptValues(data);
+  const subject = fillTemplate(template.subject, values).trim();
+  const text = fillTemplate(template.body, values).trim();
 
   const html = layout(
-    `<p style="margin:0 0 14px;">Bonjour ${escapeHtml(data.firstName)},</p>
-     <p style="margin:0 0 14px;">Merci pour votre adhésion au <strong>GIPE Villemandeur</strong> pour l’année scolaire <strong>${escapeHtml(data.schoolYear).replace(/-/g, '&#8209;')}</strong>. Elle est bien enregistrée.</p>
-     <div style="margin:0 0 16px;padding:12px 14px;background:#fff7ee;border:1px solid #eadfd5;border-radius:10px;">
-       ${payment ? `<div>${escapeHtml(payment)}</div>` : ''}
-       ${children.length ? `<div style="margin-top:4px;">Enfant(s) : ${escapeHtml(children.join(', '))}</div>` : ''}
-     </div>
-     <p style="margin:0 0 14px;">Votre soutien nous permet de représenter les parents auprès du collège, notamment lors des conseils de classe.</p>
-     <p style="margin:0 0 14px;">Pour toute question, il suffit de répondre à ce message.</p>
-     <p style="margin:0;">Le bureau du GIPE Villemandeur</p>`,
+    paragraphs(text),
     `Vous recevez cet e-mail car vous avez adhéré au GIPE Villemandeur pour l’année ${escapeHtml(data.schoolYear)}.`
   );
 

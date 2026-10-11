@@ -1,8 +1,17 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  RECEIPT_FIELDS,
+  fillTemplate,
+  receiptValues,
+  type ReceiptTemplate,
+} from '@/lib/email';
 import {
   AlertTriangle,
+  Pencil,
+  RotateCcw,
+  Save,
   CheckCircle2,
   History,
   Loader2,
@@ -23,7 +32,10 @@ type MemberLite = {
   boardMember: boolean;
   caMember: boolean;
   paymentReceived: boolean;
-  children: { classId?: string; className: string }[];
+  amount: number | null;
+  paymentDate: string | null;
+  paymentMethod: string | null;
+  children: { classId?: string; className: string; firstName: string; lastName: string }[];
 };
 
 type ClassLite = { id: string; name: string };
@@ -47,6 +59,11 @@ type EmailState = {
   quota: { limit: number; sentToday: number; remaining: number };
   receipts: Record<string, string>;
   history: HistoryItem[];
+  receiptTemplate?: ReceiptTemplate & {
+    customized: boolean;
+    updatedAt?: string;
+    updatedBy?: string | null;
+  };
 };
 
 type AudienceType = 'all' | 'ca' | 'bureau' | 'volunteers' | 'class';
@@ -91,10 +108,12 @@ function uniqueEmails(members: MemberLite[]) {
 export default function AdherentEmails({
   members,
   classes,
+  schoolYear,
   onClose,
 }: {
   members: MemberLite[];
   classes: ClassLite[];
+  schoolYear: string | null;
   onClose: () => void;
 }) {
   const [tab, setTab] = useState<'message' | 'receipts' | 'history'>('message');
@@ -113,6 +132,11 @@ export default function AdherentEmails({
 
   // Reçus
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [editingTemplate, setEditingTemplate] = useState(false);
+  const [tplSubject, setTplSubject] = useState('');
+  const [tplBody, setTplBody] = useState('');
+  const [confirmReset, setConfirmReset] = useState(false);
+  const bodyRef = useRef<HTMLTextAreaElement | null>(null);
 
   async function load() {
     try {
@@ -281,6 +305,85 @@ export default function AdherentEmails({
   }
 
   const neverSent = receiptCandidates.filter((m) => !state?.receipts[m.id]);
+
+  // Aperçu du reçu : premier adhérent coché (sinon le premier de la liste).
+  const previewMember =
+    receiptCandidates.find((m) => selected.has(m.id)) || receiptCandidates[0] || null;
+
+  const previewValues = previewMember
+    ? receiptValues({
+        firstName: previewMember.firstName,
+        lastName: previewMember.lastName,
+        schoolYear: schoolYear || '',
+        amount: previewMember.amount,
+        paymentDate: previewMember.paymentDate,
+        paymentMethod: previewMember.paymentMethod,
+        children: previewMember.children,
+      })
+    : null;
+
+  function startEditTemplate() {
+    setTplSubject(state?.receiptTemplate?.subject || '');
+    setTplBody(state?.receiptTemplate?.body || '');
+    setConfirmReset(false);
+    setEditingTemplate(true);
+  }
+
+  function insertField(key: string) {
+    const token = `{${key}}`;
+    const area = bodyRef.current;
+
+    if (!area) {
+      setTplBody((current) => current + token);
+      return;
+    }
+
+    const start = area.selectionStart ?? tplBody.length;
+    const end = area.selectionEnd ?? tplBody.length;
+    const next = tplBody.slice(0, start) + token + tplBody.slice(end);
+    setTplBody(next);
+
+    requestAnimationFrame(() => {
+      area.focus();
+      area.selectionStart = area.selectionEnd = start + token.length;
+    });
+  }
+
+  async function saveTemplate() {
+    setBusy(true);
+    setError('');
+    setNotice('');
+    try {
+      await post({ action: 'save-template', subject: tplSubject, body: tplBody });
+      setNotice('Le texte du reçu a été enregistré. Il servira pour les prochains envois.');
+      setEditingTemplate(false);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Enregistrement impossible.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function resetTemplate() {
+    if (!confirmReset) {
+      setConfirmReset(true);
+      return;
+    }
+    setBusy(true);
+    setError('');
+    try {
+      await post({ action: 'reset-template' });
+      setNotice('Le texte d’origine du reçu est rétabli.');
+      setEditingTemplate(false);
+      setConfirmReset(false);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Opération impossible.');
+    } finally {
+      setBusy(false);
+    }
+  }
 
   return (
     <div
@@ -484,6 +587,128 @@ export default function AdherentEmails({
 
         {tab === 'receipts' && (
           <div className="ae-body">
+            <div className="ae-template">
+              <div className="ae-template-head">
+                <div>
+                  <strong>Texte du reçu</strong>
+                  <span>
+                    {state?.receiptTemplate?.customized
+                      ? `Modifié${state.receiptTemplate.updatedBy ? ` par ${state.receiptTemplate.updatedBy}` : ''}${state.receiptTemplate.updatedAt ? ` le ${dateTimeFr(state.receiptTemplate.updatedAt)}` : ''}`
+                      : 'Texte d’origine'}
+                  </span>
+                </div>
+                {!editingTemplate && (
+                  <button
+                    type="button"
+                    className="btn"
+                    onClick={startEditTemplate}
+                    disabled={!state?.ready || busy}
+                  >
+                    <Pencil size={14} />
+                    Modifier le texte
+                  </button>
+                )}
+              </div>
+
+              {editingTemplate ? (
+                <div className="ae-template-editor">
+                  <label className="ae-label" htmlFor="ae-tpl-subject">Sujet</label>
+                  <input
+                    id="ae-tpl-subject"
+                    className="input"
+                    value={tplSubject}
+                    maxLength={200}
+                    onChange={(e) => setTplSubject(e.target.value)}
+                  />
+
+                  <label className="ae-label" htmlFor="ae-tpl-body">Texte</label>
+                  <div className="ae-fields">
+                    <span>Insérer :</span>
+                    {RECEIPT_FIELDS.map((field) => (
+                      <button
+                        key={field.key}
+                        type="button"
+                        className="ae-field"
+                        title={`Insère {${field.key}}`}
+                        onClick={() => insertField(field.key)}
+                      >
+                        + {field.label}
+                      </button>
+                    ))}
+                  </div>
+                  <textarea
+                    id="ae-tpl-body"
+                    ref={bodyRef}
+                    className="input ae-textarea"
+                    rows={12}
+                    value={tplBody}
+                    onChange={(e) => setTplBody(e.target.value)}
+                  />
+                  <p className="ae-help">
+                    Clique sur un bouton « + » pour insérer une information : elle apparaît entre
+                    accolades, par exemple {'{prenom}'}, et sera remplacée pour chaque adhérent
+                    (regarde l’aperçu en dessous). Ligne vide = nouveau paragraphe.
+                  </p>
+
+                  {previewValues && (
+                    <div className="ae-preview">
+                      <div className="ae-preview-label">
+                        Aperçu pour {previewMember?.firstName} {previewMember?.lastName}
+                      </div>
+                      <div className="ae-preview-subject">
+                        {fillTemplate(tplSubject, previewValues)}
+                      </div>
+                      <div className="ae-preview-body">{fillTemplate(tplBody, previewValues)}</div>
+                    </div>
+                  )}
+
+                  <div className="ae-actions">
+                    {state?.receiptTemplate?.customized && (
+                      <button type="button" className="btn ae-reset" onClick={resetTemplate} disabled={busy}>
+                        <RotateCcw size={14} />
+                        {confirmReset ? 'Confirmer : texte d’origine' : 'Revenir au texte d’origine'}
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      className="btn"
+                      onClick={() => setEditingTemplate(false)}
+                      disabled={busy}
+                    >
+                      Annuler
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-primary"
+                      onClick={saveTemplate}
+                      disabled={busy || !tplSubject.trim() || !tplBody.trim()}
+                    >
+                      <Save size={14} />
+                      Enregistrer le texte
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                previewValues &&
+                state?.receiptTemplate && (
+                  <details className="ae-preview-toggle">
+                    <summary>Voir le reçu tel qu’il sera envoyé</summary>
+                    <div className="ae-preview">
+                      <div className="ae-preview-label">
+                        Exemple pour {previewMember?.firstName} {previewMember?.lastName}
+                      </div>
+                      <div className="ae-preview-subject">
+                        {fillTemplate(state.receiptTemplate.subject, previewValues)}
+                      </div>
+                      <div className="ae-preview-body">
+                        {fillTemplate(state.receiptTemplate.body, previewValues)}
+                      </div>
+                    </div>
+                  </details>
+                )
+              )}
+            </div>
+
             <p className="ae-help">
               Le reçu remercie l’adhérent et rappelle le montant, la date de paiement et ses enfants.
               Coche les adhérents à qui l’envoyer : rien ne part sans ton clic.
@@ -766,6 +991,110 @@ export default function AdherentEmails({
           color: #8f211c;
           font-size: 13px;
           font-weight: 700;
+        }
+
+        .ae-template {
+          display: grid;
+          gap: 10px;
+          padding: 12px 14px;
+          border: 1px solid #eadfd5;
+          border-radius: 12px;
+          background: #fffdf9;
+        }
+
+        .ae-template-head {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          gap: 10px;
+        }
+
+        .ae-template-head div {
+          display: flex;
+          flex-direction: column;
+        }
+
+        .ae-template-head strong {
+          color: #241c1b;
+          font-size: 14px;
+        }
+
+        .ae-template-head span {
+          color: #756a67;
+          font-size: 12px;
+        }
+
+        .ae-template-editor {
+          display: grid;
+          gap: 8px;
+        }
+
+        .ae-fields {
+          display: flex;
+          flex-wrap: wrap;
+          align-items: center;
+          gap: 6px;
+          color: #756a67;
+          font-size: 12px;
+        }
+
+        .ae-field {
+          padding: 3px 8px;
+          border: 1px solid #e3d4c6;
+          border-radius: 6px;
+          background: #f6eee6;
+          color: #5f514b;
+          font: inherit;
+          font-size: 12px;
+          font-weight: 700;
+          cursor: pointer;
+        }
+
+        .ae-field:hover {
+          border-color: #8f211c;
+          color: #8f211c;
+        }
+
+        .ae-preview-toggle summary {
+          color: #8f211c;
+          font-size: 13px;
+          font-weight: 700;
+          cursor: pointer;
+        }
+
+        .ae-preview {
+          margin-top: 6px;
+          padding: 12px 14px;
+          border: 1px dashed #e3d4c6;
+          border-radius: 10px;
+          background: #fff;
+        }
+
+        .ae-preview-label {
+          color: #756a67;
+          font-size: 11px;
+          font-weight: 800;
+          letter-spacing: 0.06em;
+          text-transform: uppercase;
+        }
+
+        .ae-preview-subject {
+          margin: 6px 0 8px;
+          color: #241c1b;
+          font-weight: 800;
+          font-size: 14px;
+        }
+
+        .ae-preview-body {
+          color: #3a2f2c;
+          font-size: 13.5px;
+          line-height: 1.55;
+          white-space: pre-wrap;
+        }
+
+        .ae-reset {
+          margin-right: auto;
+          color: #8f211c;
         }
 
         .ae-list {

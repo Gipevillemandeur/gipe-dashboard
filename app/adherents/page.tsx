@@ -1105,6 +1105,7 @@ export default function AdherentsPage() {
         <AdherentEmails
           members={members}
           classes={classes}
+          schoolYear={schoolYear}
           onClose={() => setShowEmails(false)}
         />
       )}
