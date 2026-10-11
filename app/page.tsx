@@ -212,12 +212,12 @@ export default async function DashboardPage() {
           <div>
 
             <h2 className="section-title">
-              À faire
+              Événements à venir
             </h2>
 
             <p className="section-sub">
-              Les prochaines réunions et ce qui
-              reste à préparer.
+              Les prochaines réunions et les dates
+              de l’agenda.
             </p>
 
           </div>
@@ -244,36 +244,33 @@ export default async function DashboardPage() {
             </div>
           )}
 
-          {snapshot.upcomingMeetings.map((meeting) => (
+          {snapshot.upcomingEvents.map((event) => (
             <Link
-              key={meeting.id}
-              href={`/instances/${meeting.id}`}
+              key={event.id}
+              href={event.href}
               className="list-item"
               style={{ textDecoration: 'none', color: 'inherit' }}
             >
               <div className="item-main">
-                <strong>
-                  {meeting.type} – {meeting.subject}
-                </strong>
+                <strong>{event.title}</strong>
                 <span>
-                  {meeting.date.split('-').reverse().join('/')}
-                  {meeting.time ? ` à ${meeting.time.slice(0, 5)}` : ''}
+                  {event.date.split('-').reverse().join('/')}
+                  {event.time ? ` à ${event.time.slice(0, 5)}` : ''}
                 </span>
               </div>
               <span className="badge badge-info">
-                À préparer
+                {event.kind === 'meeting' ? 'Réunion' : 'Agenda'}
               </span>
             </Link>
           ))}
 
           {!snapshot.error &&
-            realClasses.length > 0 &&
-            snapshot.upcomingMeetings.length === 0 && (
+            snapshot.upcomingEvents.length === 0 && (
               <div className="list-item">
                 <div className="item-main">
-                  <strong>Aucune réunion à venir</strong>
+                  <strong>Aucun événement à venir</strong>
                   <span>
-                    Les prochaines instances apparaîtront ici.
+                    Les prochaines réunions et dates de l’agenda apparaîtront ici.
                   </span>
                 </div>
               </div>

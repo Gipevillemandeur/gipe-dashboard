@@ -18,6 +18,16 @@ export type UpcomingMeeting = {
   subject: string;
 };
 
+/* Réunion (Instances) ou événement de l'agenda interne. */
+export type UpcomingEvent = {
+  id: string;
+  kind: 'meeting' | 'agenda';
+  date: string;
+  time: string | null;
+  title: string;
+  href: string;
+};
+
 export type RecentActivity = {
   id: number;
   at: string;
@@ -50,6 +60,7 @@ export type DashboardSnapshot = {
   adherents: number;
   role: string;
   upcomingMeetings: UpcomingMeeting[];
+  upcomingEvents: UpcomingEvent[];
   recentActivity: RecentActivity[];
 };
 
@@ -62,6 +73,7 @@ function failure(error: string, role = '', schoolYear = ''): DashboardSnapshot {
     adherents: 0,
     role,
     upcomingMeetings: [],
+    upcomingEvents: [],
     recentActivity: [],
   };
 }
@@ -116,7 +128,7 @@ export async function getDashboardSnapshot(): Promise<DashboardSnapshot> {
       )
       .map(([area]) => area);
 
-    const [classesResult, adherentsResult, meetingsResult, activityResult] = await Promise.all([
+    const [classesResult, adherentsResult, meetingsResult, activityResult, agendaResult] = await Promise.all([
       admin
         .from('classes')
         .select('id,name,level,kind,active,students(count),class_teachers(count)')
@@ -137,7 +149,7 @@ export async function getDashboardSnapshot(): Promise<DashboardSnapshot> {
         .gte('meeting_date', today)
         .order('meeting_date', { ascending: true })
         .order('meeting_time', { ascending: true })
-        .limit(3),
+        .limit(5),
 
       // Table absente (SQL pas encore lancé) : erreur ignorée.
       admin
@@ -146,7 +158,57 @@ export async function getDashboardSnapshot(): Promise<DashboardSnapshot> {
         .in('area', allowedAreas)
         .order('created_at', { ascending: false })
         .limit(4),
+
+      // Agenda interne (seulement pour qui a accès à l'Agenda).
+      access.permissions.includes('agenda')
+        ? admin
+            .from('internal_agenda_events')
+            .select('id,title,event_date,start_time')
+            .gte('event_date', today)
+            .order('event_date', { ascending: true })
+            .order('start_time', { ascending: true })
+            .limit(5)
+        : Promise.resolve({ data: [], error: null }),
     ]);
+
+    const meetings = (meetingsResult.data || []) as any[];
+
+    /*
+     * Une réunion créée depuis l'Agenda existe aussi dans l'Agenda :
+     * on ne l'affiche qu'une fois (même jour et même heure).
+     */
+    const meetingSlots = new Set(
+      meetings.map((m) => `${m.meeting_date}|${String(m.meeting_time || '').slice(0, 5)}`)
+    );
+
+    const upcomingEvents: UpcomingEvent[] = [
+      ...meetings.map((m) => ({
+        id: `m-${m.id}`,
+        kind: 'meeting' as const,
+        date: m.meeting_date,
+        time: m.meeting_time || null,
+        title: [m.type, m.subject].filter(Boolean).join(' – '),
+        href: `/instances/${m.id}`,
+      })),
+      ...((agendaResult as any).error ? [] : ((agendaResult as any).data || []) as any[])
+        .filter(
+          (e) => !meetingSlots.has(`${e.event_date}|${String(e.start_time || '').slice(0, 5)}`)
+        )
+        .map((e) => ({
+          id: `a-${e.id}`,
+          kind: 'agenda' as const,
+          date: e.event_date,
+          time: e.start_time || null,
+          title: e.title || 'Événement',
+          href: '/agenda',
+        })),
+    ]
+      .sort(
+        (a, b) =>
+          a.date.localeCompare(b.date) ||
+          String(a.time || '').localeCompare(String(b.time || ''))
+      )
+      .slice(0, 5);
 
     if (classesResult.error) {
       return failure(
@@ -176,6 +238,7 @@ export async function getDashboardSnapshot(): Promise<DashboardSnapshot> {
       classes,
       adherents: adherentsResult.count || 0,
       role,
+      upcomingEvents,
       upcomingMeetings: (meetingsResult.data || []).map((m: any) => ({
         id: m.id,
         date: m.meeting_date,

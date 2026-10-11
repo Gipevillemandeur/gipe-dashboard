@@ -97,7 +97,7 @@ Ce dashboard réunit tout ce dont le bureau a besoin au quotidien : les classes 
 - En ouvrant une réunion, on peut écrire le **résumé / compte rendu** et joindre des **documents** (50 Mo maximum par fichier).
 - Les réunions des **années clôturées** sont archivées dans le Drive et ne sont plus modifiables.
 
-> Le tableau de bord affiche les 3 prochaines réunions dans « À faire » : un clic ouvre directement la réunion.`,
+> Le tableau de bord affiche les prochaines réunions et dates de l’agenda dans « Événements à venir » : un clic sur une réunion l’ouvre directement.`,
   },
   {
     slug: 'adherents',
