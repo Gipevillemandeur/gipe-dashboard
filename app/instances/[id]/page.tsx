@@ -1,5 +1,7 @@
 'use client'
 
+import ReadOnlyBadge from '@/components/ReadOnlyBadge'
+import { useCanEdit } from '@/lib/use-access'
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import {
@@ -69,6 +71,8 @@ function formatFileSize(size: number | null) {
 export default function InstanceDetailPage({
   params,
 }: PageProps) {
+  const { canEdit, readOnly } = useCanEdit('schooling')
+
   const [meeting, setMeeting] =
     useState<Meeting | null>(null)
 
@@ -524,7 +528,12 @@ export default function InstanceDetailPage({
               setSummary(event.target.value)
               setSaved(false)
             }}
-            placeholder="Saisissez le résumé ou le compte rendu de la réunion…"
+            placeholder={
+              canEdit
+                ? 'Saisissez le résumé ou le compte rendu de la réunion…'
+                : 'Aucun compte rendu pour le moment.'
+            }
+            readOnly={!canEdit}
           />
 
           <div className="actions">
@@ -534,17 +543,19 @@ export default function InstanceDetailPage({
               </span>
             )}
 
-            <button
-              className="primary-button"
-              type="submit"
-              disabled={saving}
-            >
-              <Save size={16} />
+            {canEdit && (
+              <button
+                className="primary-button"
+                type="submit"
+                disabled={saving}
+              >
+                <Save size={16} />
 
-              {saving
-                ? 'Enregistrement…'
-                : 'Enregistrer le résumé'}
-            </button>
+                {saving
+                  ? 'Enregistrement…'
+                  : 'Enregistrer le résumé'}
+              </button>
+            )}
           </div>
         </form>
       </section>
@@ -566,19 +577,23 @@ export default function InstanceDetailPage({
             </div>
           </div>
 
-          <label className="upload-button">
-            <Upload size={16} />
+          {canEdit ? (
+            <label className="upload-button">
+              <Upload size={16} />
 
-            {uploading
-              ? 'Envoi…'
-              : 'Ajouter un document'}
+              {uploading
+                ? 'Envoi…'
+                : 'Ajouter un document'}
 
-            <input
-              type="file"
-              onChange={handleUpload}
-              disabled={uploading}
-            />
-          </label>
+              <input
+                type="file"
+                onChange={handleUpload}
+                disabled={uploading}
+              />
+            </label>
+          ) : (
+            readOnly && <ReadOnlyBadge />
+          )}
         </div>
 
         {documentsLoading ? (
@@ -633,6 +648,7 @@ export default function InstanceDetailPage({
                     </a>
                   )}
 
+                  {canEdit && (
                   <button
                     type="button"
                     className="document-delete"
@@ -654,6 +670,7 @@ export default function InstanceDetailPage({
                       ? 'Suppression…'
                       : 'Supprimer'}
                   </button>
+                  )}
                 </div>
               </div>
             ))}

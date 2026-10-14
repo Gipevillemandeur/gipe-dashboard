@@ -52,7 +52,7 @@ function errorPage(message: string, status: number) {
  */
 export async function GET(request: Request) {
   try {
-    await requireOfficePermission('drive')
+    await requireOfficePermission('drive_view')
 
     const fileId = new URL(request.url).searchParams.get('id')?.trim()
 

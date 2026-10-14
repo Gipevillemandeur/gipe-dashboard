@@ -37,6 +37,7 @@ Ce dashboard réunit tout ce dont le bureau a besoin au quotidien : les classes 
 
 ## Qui voit quoi ?
 - Chaque membre du bureau a un **poste** (Président, Trésorier, Secrétaire…) et chaque poste donne accès à certaines rubriques du menu.
+- Pour chaque rubrique, le poste a un niveau : **Aucun** (la rubrique n’apparaît pas), **Voir** (consultation seulement, badge « Lecture seule ») ou **Modifier**.
 - Le **Président** a accès à tout, et il est le seul à pouvoir clôturer l’année et modifier ce guide.
 - Les droits se règlent dans **Configuration → Membres du bureau**.
 
@@ -222,7 +223,10 @@ Dans **Site internet**, on gère ce que voient les parents sur le site du GIPE :
 - Elle se gère **uniquement ici**, et se trie toute seule : principal(e), adjoint(e), CPE, puis les autres.
 
 ## Membres du bureau
-- Chaque poste a ses **droits** (rubriques accessibles).
+- Chaque poste a ses **droits**. Pour chaque rubrique (Trésorerie, Adhérents, Scolarité, Agenda, Site internet, Docs Drive), choisir **Aucun · Voir · Modifier**, puis **Enregistrer**.
+- **Voir** = la personne consulte tout (opérations, justificatifs, fiches…) mais ne peut rien ajouter, modifier ni supprimer.
+- Le bouton **« Tout en lecture »** met « Voir » partout où il y avait « Aucun » (les « Modifier » sont gardés) et coche le tableau de bord.
+- Tableau de bord, Configuration et Membres du bureau restent de simples cases à cocher.
 - Pour donner accès à quelqu’un : l’ajouter sur son poste avec son adresse e-mail, puis cliquer sur **« Inviter / Envoyer l’accès »** ; il reçoit un e-mail pour créer son mot de passe.
 - Le compte **SUPER ADMIN** est un accès de secours : il ne peut pas être modifié ni supprimé.`,
   },
@@ -292,6 +296,9 @@ Une fois l’archivage terminé, le dashboard fait le ménage dans Supabase (la 
 
 ## « Je ne vois pas une rubrique du menu »
 - Ton poste n’a pas ce droit : demander au Président de le régler dans Configuration → Membres du bureau.
+
+## « Je vois la rubrique mais il n’y a aucun bouton pour ajouter ou modifier »
+- Le badge **« Lecture seule »** est affiché : ton poste est réglé sur « Voir ». Demander au Président de passer la rubrique sur « Modifier ».
 
 ## « Aucune classe n’apparaît »
 - Le listing du collège n’a pas encore été importé pour l’année active.

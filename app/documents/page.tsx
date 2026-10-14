@@ -1,5 +1,7 @@
 'use client';
 
+import ReadOnlyBadge from '@/components/ReadOnlyBadge';
+import { useCanEdit } from '@/lib/use-access';
 import {
   AlertCircle,
   ArrowLeft,
@@ -169,6 +171,7 @@ function sendFileToGoogle(
 const SERVER_UPLOAD_LIMIT = 4 * 1024 * 1024;
 
 export default function DocumentsPage() {
+  const { canEdit, readOnly } = useCanEdit('drive');
   const [files, setFiles] = useState<DriveFile[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -737,6 +740,7 @@ export default function DocumentsPage() {
             </div>
           </div>
 
+          {canEdit ? (
           <div className="documents-drive-actions">
             <button
               type="button"
@@ -782,6 +786,13 @@ export default function DocumentsPage() {
               onChange={uploadFile}
             />
           </div>
+          ) : (
+            readOnly && (
+              <div className="documents-drive-actions">
+                <ReadOnlyBadge />
+              </div>
+            )
+          )}
         </div>
 
         <div className="documents-content">
@@ -1057,6 +1068,7 @@ export default function DocumentsPage() {
                               />
                             </button>
 
+                            {canEdit && (
                             <button
                               type="button"
                               className="documents-delete-button"
@@ -1071,6 +1083,7 @@ export default function DocumentsPage() {
                                 size={16}
                               />
                             </button>
+                            )}
                           </div>
                         </div>
                       )
@@ -1169,6 +1182,7 @@ export default function DocumentsPage() {
                               </a>
                             )}
 
+                            {canEdit && (
                             <button
                               type="button"
                               className="documents-delete-button"
@@ -1184,6 +1198,7 @@ export default function DocumentsPage() {
                                 size={16}
                               />
                             </button>
+                            )}
                           </div>
                         </div>
                       )

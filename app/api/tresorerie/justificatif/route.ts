@@ -31,6 +31,77 @@ function fail(message: string, status = 400) {
   return NextResponse.json({ error: message }, { status })
 }
 
+function errorPage(message: string, status: number) {
+  // Lien ouvert directement par le navigateur : petite page lisible.
+  return new NextResponse(
+    `<!doctype html><meta charset="utf-8"><title>Justificatif indisponible</title>` +
+      `<body style="font-family:system-ui,sans-serif;padding:32px;color:#241c1b">` +
+      `<h1 style="font-size:20px">Justificatif indisponible</h1>` +
+      `<p>${message.replace(/[<>&]/g, '')}</p>` +
+      `<p><a href="/tresorerie" style="color:#8f211c">Retour à la trésorerie</a></p></body>`,
+    { status, headers: { 'Content-Type': 'text/html; charset=utf-8' } }
+  )
+}
+
+/*
+ * GET ?id=<opération> : affiche le justificatif dans le navigateur.
+ * Passe par le compte Google de l'association : il suffit d'avoir
+ * le droit « Voir » la trésorerie (pas besoin d'accès au Drive).
+ */
+export async function GET(request: Request) {
+  try {
+    await requireOfficePermission('treasury_view')
+  } catch {
+    return errorPage('Compte non autorisé.', 403)
+  }
+
+  const transactionId = new URL(request.url).searchParams.get('id')?.trim()
+  if (!transactionId) return errorPage('Opération manquante.', 400)
+
+  try {
+    const { data: tx, error } = await createAdminClient()
+      .from('gipe_transactions')
+      .select('receipt_file_id, receipt_file_name')
+      .eq('id', transactionId)
+      .maybeSingle()
+
+    if (error) return errorPage(error.message, 500)
+    if (!tx?.receipt_file_id || !isValidDriveId(tx.receipt_file_id)) {
+      return errorPage('Aucun justificatif pour cette opération.', 404)
+    }
+
+    const token = await getGoogleAccessToken()
+    const driveResponse = await fetch(
+      `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(tx.receipt_file_id)}?alt=media&supportsAllDrives=true`,
+      { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' }
+    )
+
+    if (!driveResponse.ok || !driveResponse.body) {
+      return errorPage('Le fichier est introuvable dans le Google Drive.', driveResponse.status || 500)
+    }
+
+    const fileName = String(tx.receipt_file_name || 'justificatif')
+    const ascii = fileName
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^\x20-\x7E]/g, '_')
+      .replace(/["\\]/g, '_')
+
+    const headers = new Headers()
+    headers.set('Content-Type', driveResponse.headers.get('content-type') || 'application/octet-stream')
+    headers.set('Content-Disposition', `inline; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(fileName)}`)
+    headers.set('Cache-Control', 'private, no-store')
+    headers.set('X-Content-Type-Options', 'nosniff')
+    const length = driveResponse.headers.get('content-length')
+    if (length) headers.set('Content-Length', length)
+
+    return new NextResponse(driveResponse.body, { status: 200, headers })
+  } catch (error) {
+    console.error('Erreur affichage justificatif:', error)
+    return errorPage('Impossible d’afficher le justificatif.', 500)
+  }
+}
+
 export async function POST(request: Request) {
   try {
     await requireOfficePermission('treasury')

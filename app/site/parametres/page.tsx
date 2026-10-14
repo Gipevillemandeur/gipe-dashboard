@@ -1,5 +1,7 @@
 'use client';
 
+import ReadOnlyBadge from '@/components/ReadOnlyBadge';
+import { useCanEdit } from '@/lib/use-access';
 import { useEffect, useState } from 'react';
 
 interface Settings {
@@ -21,6 +23,7 @@ const defaultSettings: Settings = {
 };
 
 export default function ParametresPage() {
+  const { canEdit, readOnly } = useCanEdit('website');
   const [settings, setSettings] = useState<Settings>(defaultSettings);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -137,6 +140,11 @@ export default function ParametresPage() {
             Informations générales affichées sur le site public.
           </div>
         </div>
+        {readOnly && (
+          <div className="topbar-right">
+            <ReadOnlyBadge />
+          </div>
+        )}
       </div>
 
       {error && (
@@ -173,6 +181,7 @@ export default function ParametresPage() {
         </div>
 
         <div className="parameters-grid">
+          <fieldset disabled={!canEdit} style={{ display: 'contents', border: 0, margin: 0, padding: 0 }}>
           <label className="parameter-field">
             <span>📍 Adresse</span>
             <input
@@ -238,18 +247,21 @@ export default function ParametresPage() {
               placeholder="https://www.instagram.com/..."
             />
           </label>
+          </fieldset>
         </div>
 
-        <div className="parameters-actions">
-          <button
-            className="btn btn-primary parameters-save"
-            type="button"
-            onClick={() => void handleSave()}
-            disabled={saving}
-          >
-            {saving ? 'Enregistrement…' : 'Enregistrer'}
-          </button>
-        </div>
+        {canEdit && (
+          <div className="parameters-actions">
+            <button
+              className="btn btn-primary parameters-save"
+              type="button"
+              onClick={() => void handleSave()}
+              disabled={saving}
+            >
+              {saving ? 'Enregistrement…' : 'Enregistrer'}
+            </button>
+          </div>
+        )}
       </section>
 
       <style jsx>{`

@@ -1,5 +1,7 @@
 'use client'
 
+import ReadOnlyBadge from '@/components/ReadOnlyBadge'
+import { useCanEdit } from '@/lib/use-access'
 import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
 import { ArrowLeft, CalendarDays, Clock3, MapPin, Pencil, Trash2, X } from 'lucide-react'
@@ -42,6 +44,7 @@ function isPast(m:Meeting) {
 }
 
 export default function InstancesPage() {
+  const { canEdit, readOnly } = useCanEdit('schooling')
   const [meetings,setMeetings] = useState<Meeting[]>([])
   const [schoolYear,setSchoolYear] = useState<SchoolYear|null>(null)
   const [loading,setLoading] = useState(true)
@@ -247,13 +250,16 @@ export default function InstancesPage() {
           </p>
         </div>
 
-        <Link
-          href="/conseils"
-          className="back-link"
-        >
-          <ArrowLeft size={16}/>
-          Scolarité
-        </Link>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          {readOnly && <ReadOnlyBadge />}
+          <Link
+            href="/conseils"
+            className="back-link"
+          >
+            <ArrowLeft size={16}/>
+            Scolarité
+          </Link>
+        </div>
       </section>
 
       {error && !modalMode && (
@@ -301,6 +307,7 @@ export default function InstancesPage() {
                     past={false}
                     onEdit={() => edit(m)}
                     onDelete={() => setToDelete(m)}
+                    canEdit={canEdit}
                   />
                 ))}
               </div>
@@ -324,6 +331,7 @@ export default function InstancesPage() {
                     past
                     onEdit={() => edit(m)}
                     onDelete={() => setToDelete(m)}
+                    canEdit={canEdit}
                   />
                 ))}
               </div>
@@ -1092,12 +1100,14 @@ function MeetingCard({
   meeting,
   past,
   onEdit,
-  onDelete
+  onDelete,
+  canEdit
 }:{
   meeting:Meeting
   past:boolean
   onEdit:()=>void
   onDelete:()=>void
+  canEdit:boolean
 }) {
 
   return (
@@ -1145,7 +1155,7 @@ function MeetingCard({
           >
             Ouvrir la réunion
           </Link>
-        ) : (
+        ) : canEdit ? (
           <button
             className="edit-hint"
             onClick={onEdit}
@@ -1153,17 +1163,17 @@ function MeetingCard({
             <Pencil size={15}/>
             Modifier
           </button>
+        ) : null}
+
+        {canEdit && (
+          <button
+            className="delete-hint"
+            onClick={onDelete}
+          >
+            <Trash2 size={15}/>
+            Supprimer
+          </button>
         )}
-
-        {past ? null : null}
-
-        <button
-          className="delete-hint"
-          onClick={onDelete}
-        >
-          <Trash2 size={15}/>
-          Supprimer
-        </button>
 
       </div>
 

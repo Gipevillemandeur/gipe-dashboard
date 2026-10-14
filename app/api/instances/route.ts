@@ -12,9 +12,11 @@ const MEETING_TYPES = [
   'Autre',
 ]
 
-async function requireSchoolingAccess() {
+async function requireSchoolingAccess(
+  permission: string = 'schooling'
+) {
   try {
-    const access = await requireOfficePermission('schooling')
+    const access = await requireOfficePermission(permission)
 
     return {
       admin: createAdminClient(),
@@ -140,7 +142,7 @@ function validateMeetingInput(body: {
 }
 
 export async function GET() {
-  const auth = await requireSchoolingAccess()
+  const auth = await requireSchoolingAccess('schooling_view')
 
   if ('error' in auth) {
     return auth.error

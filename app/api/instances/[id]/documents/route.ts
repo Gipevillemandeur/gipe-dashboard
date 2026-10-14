@@ -13,9 +13,11 @@ type RouteContext = {
   }>
 }
 
-async function requireSchoolingAccess() {
+async function requireSchoolingAccess(
+  permission: string = 'schooling'
+) {
   try {
-    const access = await requireOfficePermission('schooling')
+    const access = await requireOfficePermission(permission)
 
     return {
       admin: createAdminClient(),
@@ -84,7 +86,7 @@ export async function GET(
   { params }: RouteContext
 ) {
   const auth =
-    await requireSchoolingAccess()
+    await requireSchoolingAccess('schooling_view')
 
   if ('error' in auth) {
     return auth.error

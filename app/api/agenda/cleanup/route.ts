@@ -2,9 +2,11 @@ import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { requireOfficePermission } from '@/lib/office-auth';
 
-async function requireAgendaAccess() {
+async function requireAgendaAccess(
+  permission: string = 'agenda'
+) {
   try {
-    await requireOfficePermission('agenda');
+    await requireOfficePermission(permission);
 
     return {
       admin: createAdminClient(),
@@ -121,7 +123,7 @@ async function deleteSupabaseImage(
 
 export async function GET() {
   const auth =
-    await requireAgendaAccess();
+    await requireAgendaAccess('agenda_view');
 
   if ('error' in auth) {
     return auth.error;

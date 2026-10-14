@@ -38,9 +38,11 @@ function fail(message: string, status = 400) {
   return NextResponse.json({ error: message }, { status })
 }
 
-async function requireTreasuryAccess(): Promise<{ admin: Admin } | { error: NextResponse }> {
+async function requireTreasuryAccess(
+  permission: string = 'treasury'
+): Promise<{ admin: Admin } | { error: NextResponse }> {
   try {
-    await requireOfficePermission('treasury')
+    await requireOfficePermission(permission)
     return { admin: createAdminClient() }
   } catch (error) {
     const message = error instanceof Error ? error.message : ''
@@ -242,7 +244,7 @@ function toClient(row: any) {
  * GET
  * --------------------------------------------------------- */
 export async function GET() {
-  const auth = await requireTreasuryAccess()
+  const auth = await requireTreasuryAccess('treasury_view')
   if ('error' in auth) return auth.error
   const { admin } = auth
 

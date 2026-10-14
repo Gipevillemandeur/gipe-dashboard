@@ -4,9 +4,11 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { requireOfficePermission } from '@/lib/office-auth'
 import { requireEditableMeeting } from '@/lib/instance-guard'
 
-async function requireSchoolingAccess() {
+async function requireSchoolingAccess(
+  permission: string = 'schooling'
+) {
   try {
-    const access = await requireOfficePermission('schooling')
+    const access = await requireOfficePermission(permission)
 
     return {
       admin: createAdminClient(),
@@ -64,7 +66,7 @@ export async function GET(
   _request: Request,
   { params }: RouteContext
 ) {
-  const auth = await requireSchoolingAccess()
+  const auth = await requireSchoolingAccess('schooling_view')
 
   if ('error' in auth) {
     return auth.error

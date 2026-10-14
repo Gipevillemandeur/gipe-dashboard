@@ -30,7 +30,7 @@ export default async function ConseilClassePage({
    * l'ancien compte « Administrateur »).
    */
   try {
-    await requireOfficePermission('schooling');
+    await requireOfficePermission('schooling_view');
   } catch {
     redirect('/');
   }

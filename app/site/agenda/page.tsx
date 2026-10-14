@@ -1,5 +1,7 @@
 'use client';
 
+import ReadOnlyBadge from '@/components/ReadOnlyBadge';
+import { useCanEdit } from '@/lib/use-access';
 import {
   FormEvent,
   useEffect,
@@ -45,6 +47,7 @@ function excerpt(value: string | null) {
 }
 
 export default function SiteAgendaPage() {
+  const { canEdit, readOnly } = useCanEdit('website');
   const [events, setEvents] = useState<EventItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -212,10 +215,14 @@ export default function SiteAgendaPage() {
           <div className="kicker">Gestion des événements publiés sur gipevillemandeur.com.</div>
         </div>
         <div className="topbar-right">
-          <button className="btn btn-primary" type="button" onClick={openNew}>
+          {canEdit ? (
+<button className="btn btn-primary" type="button" onClick={openNew}>
             <Plus size={15} />
             Nouvel événement
           </button>
+          ) : (
+            readOnly && <ReadOnlyBadge />
+          )}
         </div>
       </div>
 
@@ -279,7 +286,8 @@ export default function SiteAgendaPage() {
                     {item.description && <span className="agenda-excerpt">{excerpt(item.description)}</span>}
                   </div>
                 </div>
-                <div className="agenda-item-actions">
+                {canEdit && (
+<div className="agenda-item-actions">
                   <button className="btn" type="button" onClick={() => openEdit(item)}>
                     <Pencil size={14} />
                     Modifier
@@ -294,6 +302,7 @@ export default function SiteAgendaPage() {
                     {deletingId === item.id ? 'Suppression…' : 'Supprimer'}
                   </button>
                 </div>
+                )}
               </div>
             ))}
           </div>

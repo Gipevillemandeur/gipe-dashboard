@@ -24,9 +24,11 @@ type SettingKey = (typeof SETTING_KEYS)[number]
 
 const MAX_LENGTH = 500
 
-async function requireWebsiteAccess() {
+async function requireWebsiteAccess(
+  permission: string = 'website'
+) {
   try {
-    await requireOfficePermission('website')
+    await requireOfficePermission(permission)
 
     return { admin: createAdminClient() }
   } catch (error) {
@@ -65,7 +67,7 @@ async function requireWebsiteAccess() {
 }
 
 export async function GET() {
-  const auth = await requireWebsiteAccess()
+  const auth = await requireWebsiteAccess('website_view')
 
   if ('error' in auth) {
     return auth.error

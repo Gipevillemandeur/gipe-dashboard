@@ -1,5 +1,7 @@
 'use client';
 
+import ReadOnlyBadge from '@/components/ReadOnlyBadge';
+import { useCanEdit } from '@/lib/use-access';
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { FileText, Pencil, Plus, Search, Trash2, X } from 'lucide-react';
 
@@ -30,6 +32,7 @@ function excerpt(value: string | null) {
 }
 
 export default function SiteDocumentsPage() {
+  const { canEdit, readOnly } = useCanEdit('website');
   const [documents, setDocuments] = useState<DocumentItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -188,10 +191,14 @@ export default function SiteDocumentsPage() {
           <div className="kicker">Gestion des documents publiés sur gipevillemandeur.com.</div>
         </div>
         <div className="topbar-right">
-          <button className="btn btn-primary" type="button" onClick={openNew}>
+          {canEdit ? (
+<button className="btn btn-primary" type="button" onClick={openNew}>
             <Plus size={15} />
             Nouveau document
           </button>
+          ) : (
+            readOnly && <ReadOnlyBadge />
+          )}
         </div>
       </div>
 
@@ -241,12 +248,14 @@ export default function SiteDocumentsPage() {
                     )}
                   </div>
                 </div>
-                <div className="documents-item-actions">
+                {canEdit && (
+<div className="documents-item-actions">
                   <button className="btn" type="button" onClick={() => openEdit(item)}><Pencil size={14} />Modifier</button>
                   <button className="btn documents-delete-button" type="button" onClick={() => void deleteDocument(item)} disabled={deletingId === item.id}>
                     <Trash2 size={14} />{deletingId === item.id ? 'Suppression…' : 'Supprimer'}
                   </button>
                 </div>
+                )}
               </div>
             ))}
           </div>

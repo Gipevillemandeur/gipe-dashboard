@@ -11,9 +11,11 @@ const CATEGORIES = [
   'Portes Ouvertes',
 ];
 
-async function requireAdmin() {
+async function requireAdmin(
+  permission: string = 'website'
+) {
   try {
-    await requireOfficePermission('website');
+    await requireOfficePermission(permission);
     return { admin: createAdminClient() };
   } catch (error) {
     if (error instanceof Error) {
@@ -155,7 +157,7 @@ async function deleteSupabaseImage(
 }
 
 export async function GET() {
-  const auth = await requireAdmin();
+  const auth = await requireAdmin('website_view');
 
   if ('error' in auth) {
     return auth.error;

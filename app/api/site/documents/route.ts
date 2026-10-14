@@ -15,9 +15,11 @@ type CloudinaryUploadResponse = {
   resource_type?: string;
 };
 
-async function requireWebsiteAccess() {
+async function requireWebsiteAccess(
+  permission: string = 'website'
+) {
   try {
-    await requireOfficePermission('website');
+    await requireOfficePermission(permission);
 
     return {
       admin: createAdminClient(),
@@ -173,7 +175,7 @@ async function uploadPdfToCloudinary(
 
 export async function GET() {
   const auth =
-    await requireWebsiteAccess();
+    await requireWebsiteAccess('website_view');
 
   if ('error' in auth) {
     return auth.error;

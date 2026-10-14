@@ -11,7 +11,7 @@ import {
  */
 export async function GET() {
   try {
-    const access = await requireOfficePermission('drive')
+    const access = await requireOfficePermission('drive_view')
     const info = await getDriveConnectionInfo()
 
     return NextResponse.json({

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import {
   ArrowLeft,
   Check,
+  Eye,
   KeyRound,
   Mail,
   Save,
@@ -26,6 +27,46 @@ type Position = {
   email: string | null;
   permissions: string[];
 };
+
+/*
+ * Rubriques avec 3 niveaux : Aucun · Voir · Modifier.
+ *  - Modifier → on enregistre le code de la rubrique (ex. 'treasury'),
+ *    qui donne aussi le droit de voir ;
+ *  - Voir     → on enregistre le code « _view » (ex. 'treasury_view') ;
+ *  - Aucun    → ni l'un ni l'autre.
+ */
+const SECTIONS: { code: string; label: string }[] = [
+  { code: 'treasury', label: 'Trésorerie' },
+  { code: 'members', label: 'Adhérents' },
+  { code: 'schooling', label: 'Scolarité' },
+  { code: 'agenda', label: 'Agenda' },
+  { code: 'website', label: 'Site internet' },
+  { code: 'drive', label: 'Docs Drive' },
+];
+
+type Level = 'none' | 'view' | 'edit';
+
+const LEVELS: { value: Level; label: string }[] = [
+  { value: 'none', label: 'Aucun' },
+  { value: 'view', label: 'Voir' },
+  { value: 'edit', label: 'Modifier' },
+];
+
+function levelOf(codes: string[], section: string): Level {
+  if (codes.includes(section)) return 'edit';
+  if (codes.includes(`${section}_view`)) return 'view';
+  return 'none';
+}
+
+function withLevel(codes: string[], section: string, level: Level) {
+  const rest = codes.filter(
+    (code) => code !== section && code !== `${section}_view`
+  );
+
+  if (level === 'edit') return [...rest, section];
+  if (level === 'view') return [...rest, `${section}_view`];
+  return rest;
+}
 
 export default function MembresBureauPage() {
   const [positions, setPositions] =
@@ -144,6 +185,59 @@ export default function MembresBureauPage() {
                 code,
               ],
         };
+      })
+    );
+  }
+
+  function setLevel(
+    positionId: string,
+    section: string,
+    level: Level
+  ) {
+    setPositions((current) =>
+      current.map((position) =>
+        position.id === positionId
+          ? {
+              ...position,
+              permissions: withLevel(
+                position.permissions,
+                section,
+                level
+              ),
+            }
+          : position
+      )
+    );
+  }
+
+  /*
+   * « Tout en lecture » : met « Voir » partout où il y
+   * avait « Aucun » (les « Modifier » sont gardés) et
+   * coche le tableau de bord.
+   */
+  function allRead(positionId: string) {
+    setPositions((current) =>
+      current.map((position) => {
+        if (position.id !== positionId) {
+          return position;
+        }
+
+        let codes = position.permissions;
+
+        for (const section of sectionsReady) {
+          if (levelOf(codes, section.code) === 'none') {
+            codes = withLevel(codes, section.code, 'view');
+          }
+        }
+
+        if (
+          hasPermissionRow('dashboard') &&
+          !codes.includes('dashboard')
+        ) {
+          codes = [...codes, 'dashboard'];
+        }
+
+        return { ...position, permissions: codes };
       })
     );
   }
@@ -301,6 +395,41 @@ export default function MembresBureauPage() {
     }
   }
 
+  function hasPermissionRow(code: string) {
+    return permissions.some(
+      (permission) => permission.code === code
+    );
+  }
+
+  /*
+   * Rubriques à 3 niveaux : seulement si le SQL
+   * (migration_droits_v1.sql) a créé les codes « _view ».
+   */
+  const sectionsReady = SECTIONS.filter(
+    (section) =>
+      hasPermissionRow(section.code) &&
+      hasPermissionRow(`${section.code}_view`)
+  );
+
+  const sectionCodes = new Set(
+    sectionsReady.flatMap((section) => [
+      section.code,
+      `${section.code}_view`,
+    ])
+  );
+
+  // Autres autorisations (tableau de bord, configuration…) : cases à cocher.
+  const otherPermissions = permissions.filter(
+    (permission) =>
+      !sectionCodes.has(permission.code) &&
+      !permission.code.endsWith('_view')
+  );
+
+  const viewCodesMissing =
+    !loading &&
+    permissions.length > 0 &&
+    sectionsReady.length === 0;
+
   if (loading) {
     return (
       <>
@@ -372,6 +501,21 @@ export default function MembresBureauPage() {
 
           <div>
             {error || message}
+          </div>
+        </div>
+      )}
+
+      {viewCodesMissing && (
+        <div
+          className="notice notice-error"
+          style={{ marginBottom: 18 }}
+        >
+          <ShieldCheck size={17} />
+          <div>
+            Le choix « Voir / Modifier » n’est pas encore
+            installé : lance{' '}
+            <strong>migration_droits_v1.sql</strong> dans
+            Supabase (SQL Editor), puis recharge la page.
           </div>
         </div>
       )}
@@ -504,23 +648,82 @@ export default function MembresBureauPage() {
                         Autorisations
                       </strong>
 
-                      <span>
-                        {
-                          position
-                            .permissions
-                            .length
-                        }{' '}
-                        sélectionnée
-                        {position.permissions
-                          .length > 1
-                          ? 's'
-                          : ''}
-                      </span>
+                      {sectionsReady.length > 0 && (
+                        <button
+                          type="button"
+                          className="bureau-all-read"
+                          onClick={() =>
+                            allRead(position.id)
+                          }
+                          title="Met « Voir » sur toutes les rubriques encore à « Aucun » (les « Modifier » sont gardés)."
+                        >
+                          <Eye size={13} />
+                          Tout en lecture
+                        </button>
+                      )}
                     </div>
                   </div>
 
+                  {sectionsReady.length > 0 && (
+                    <div className="bureau-levels">
+                      {sectionsReady.map((section) => {
+                        const level = levelOf(
+                          position.permissions,
+                          section.code
+                        );
+
+                        return (
+                          <div
+                            className="bureau-level-row"
+                            key={section.code}
+                          >
+                            <span className="bureau-level-label">
+                              {section.label}
+                            </span>
+
+                            <div
+                              className="bureau-level-switch"
+                              role="radiogroup"
+                              aria-label={`${section.label} : niveau d’accès`}
+                            >
+                              {LEVELS.map((option) => (
+                                <button
+                                  key={option.value}
+                                  type="button"
+                                  role="radio"
+                                  aria-checked={
+                                    level ===
+                                    option.value
+                                  }
+                                  className={`bureau-level-option level-${option.value} ${
+                                    level ===
+                                    option.value
+                                      ? 'is-active'
+                                      : ''
+                                  }`}
+                                  onClick={() =>
+                                    setLevel(
+                                      position.id,
+                                      section.code,
+                                      option.value
+                                    )
+                                  }
+                                >
+                                  {option.label}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
                   <div className="bureau-permission-list">
-                    {permissions.map(
+                    {(sectionsReady.length > 0
+                      ? otherPermissions
+                      : permissions
+                    ).map(
                       (
                         permission
                       ) => {
@@ -719,6 +922,94 @@ export default function MembresBureauPage() {
         .bureau-permissions-head span {
           color: #64748b;
           font-size: 11px;
+        }
+
+        .bureau-all-read {
+          display: inline-flex;
+          align-items: center;
+          gap: 5px;
+          padding: 5px 10px;
+          border: 1px solid #e2d8cc;
+          border-radius: 999px;
+          background: #fff;
+          color: #6b5d57;
+          font-size: 11px;
+          font-weight: 700;
+          cursor: pointer;
+          white-space: nowrap;
+        }
+
+        .bureau-all-read:hover {
+          background: #f6f1eb;
+        }
+
+        .bureau-levels {
+          display: grid;
+          gap: 6px;
+          margin-bottom: 10px;
+        }
+
+        .bureau-level-row {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 10px;
+          padding: 6px 6px 6px 10px;
+          border: 1px solid #eadfd5;
+          border-radius: 9px;
+          background: #fffdf9;
+          min-width: 0;
+        }
+
+        .bureau-level-label {
+          font-size: 12.5px;
+          font-weight: 700;
+          color: #241c1b;
+          min-width: 0;
+        }
+
+        .bureau-level-switch {
+          display: inline-flex;
+          flex-shrink: 0;
+          padding: 2px;
+          border-radius: 8px;
+          background: #f3ede6;
+          gap: 2px;
+        }
+
+        .bureau-level-option {
+          border: 0;
+          background: transparent;
+          padding: 5px 10px;
+          border-radius: 6px;
+          font-size: 11.5px;
+          font-weight: 700;
+          color: #8a7c76;
+          cursor: pointer;
+          white-space: nowrap;
+        }
+
+        .bureau-level-option:hover {
+          color: #241c1b;
+        }
+
+        .bureau-level-option.is-active {
+          background: #fff;
+          box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+        }
+
+        .bureau-level-option.level-none.is-active {
+          color: #6b5d57;
+        }
+
+        .bureau-level-option.level-view.is-active {
+          color: #1e4f8a;
+          background: #e8f0fb;
+        }
+
+        .bureau-level-option.level-edit.is-active {
+          color: #fff;
+          background: #8f211c;
         }
 
         .bureau-permission-list {

@@ -1,5 +1,7 @@
 'use client';
 
+import ReadOnlyBadge from '@/components/ReadOnlyBadge';
+import { useCanEdit } from '@/lib/use-access';
 import {
   FormEvent,
   useEffect,
@@ -77,6 +79,7 @@ function excerpt(value: string | null) {
 }
 
 export default function AgendaPage() {
+  const { canEdit, readOnly } = useCanEdit('agenda');
   const [events, setEvents] = useState<EventItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -654,14 +657,18 @@ export default function AgendaPage() {
         </div>
 
         <div className="topbar-right">
-          <button
-            className="btn btn-primary"
-            type="button"
-            onClick={openNew}
-          >
-            <Plus size={15} />
-            Nouvel événement
-          </button>
+          {canEdit ? (
+            <button
+              className="btn btn-primary"
+              type="button"
+              onClick={openNew}
+            >
+              <Plus size={15} />
+              Nouvel événement
+            </button>
+          ) : (
+            readOnly && <ReadOnlyBadge />
+          )}
         </div>
       </div>
 
@@ -823,7 +830,7 @@ export default function AgendaPage() {
                         />
                         Déjà envoyé sur le site
                       </div>
-                    ) : (
+                    ) : canEdit ? (
                       <>
                         <button
                           className="btn"
@@ -875,7 +882,7 @@ export default function AgendaPage() {
                           Envoyer sur le site
                         </button>
                       </>
-                    )}
+                    ) : null}
                   </div>
                 </div>
               )

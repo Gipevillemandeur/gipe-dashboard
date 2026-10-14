@@ -23,7 +23,7 @@ type GoogleDriveFolder = {
  */
 export async function GET(request: Request) {
   try {
-    await requireOfficePermission('drive')
+    await requireOfficePermission('drive_view')
 
     const parentId =
       new URL(request.url).searchParams.get('parentId') || 'root'

@@ -1,5 +1,7 @@
 'use client';
 
+import ReadOnlyBadge from '@/components/ReadOnlyBadge';
+import { useCanEdit } from '@/lib/use-access';
 import {
   FormEvent,
   useEffect,
@@ -107,6 +109,7 @@ function excerpt(
 }
 
 export default function SiteActualitesPage() {
+  const { canEdit, readOnly } = useCanEdit('website');
   const [news, setNews] =
     useState<NewsItem[]>([]);
 
@@ -464,7 +467,8 @@ export default function SiteActualitesPage() {
         </div>
 
         <div className="topbar-right">
-          <button
+          {canEdit ? (
+<button
             className="btn btn-primary"
             type="button"
             onClick={openNew}
@@ -472,6 +476,9 @@ export default function SiteActualitesPage() {
             <Plus size={15} />
             Nouvelle actualité
           </button>
+          ) : (
+            readOnly && <ReadOnlyBadge />
+          )}
         </div>
       </div>
 
@@ -695,7 +702,8 @@ export default function SiteActualitesPage() {
                     </div>
                   </div>
 
-                  <div
+                  {canEdit && (
+<div
                     className="btn-row actualites-item-actions"
                     style={{
                       flexShrink: 0,
@@ -744,6 +752,7 @@ export default function SiteActualitesPage() {
                         : 'Supprimer'}
                     </button>
                   </div>
+                )}
                 </div>
               )
             )}

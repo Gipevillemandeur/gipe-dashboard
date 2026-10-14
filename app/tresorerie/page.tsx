@@ -1,5 +1,7 @@
 'use client';
 
+import ReadOnlyBadge from '@/components/ReadOnlyBadge';
+import { useCanEdit } from '@/lib/use-access';
 import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowDownCircle,
@@ -167,6 +169,7 @@ function putToGoogle(uploadUrl: string, file: File): Promise<{ ok: boolean; file
 }
 
 export default function TresoreriePage() {
+  const { canEdit, readOnly } = useCanEdit('treasury');
   const [schoolYear, setSchoolYear] = useState<string | null>(null);
   const [initialBalances, setInitialBalances] = useState<Record<Account, number>>({
     bank: 0,
@@ -783,6 +786,29 @@ export default function TresoreriePage() {
   function actionsCell(item: Transaction) {
     const busy = receiptBusyId === item.id;
 
+    // Lien interne : le fichier est lu par le serveur avec le compte
+    // Google de l'association (pas besoin d'accès au Drive).
+    const receiptLink = item.receipt ? (
+      <a
+        className="btn tresorerie-receipt-link"
+        href={`/api/tresorerie/justificatif?id=${encodeURIComponent(item.id)}`}
+        target="_blank"
+        rel="noopener noreferrer"
+        title={`Voir le justificatif : ${item.receipt.name}`}
+      >
+        <FileCheck2 size={14} />
+      </a>
+    ) : null;
+
+    // Lecture seule : uniquement le justificatif (s'il y en a un).
+    if (!canEdit) {
+      return (
+        <td style={{ textAlign: 'right' }}>
+          <div className="tresorerie-row-actions">{receiptLink}</div>
+        </td>
+      );
+    }
+
     return (
       <td style={{ textAlign: 'right' }}>
         <div className="tresorerie-row-actions">
@@ -792,15 +818,7 @@ export default function TresoreriePage() {
             </span>
           ) : item.receipt ? (
             <>
-              <a
-                className="btn tresorerie-receipt-link"
-                href={item.receipt.url || '#'}
-                target="_blank"
-                rel="noopener noreferrer"
-                title={`Voir le justificatif : ${item.receipt.name}`}
-              >
-                <FileCheck2 size={14} />
-              </a>
+              {receiptLink}
               <button
                 type="button"
                 className="btn"
@@ -873,10 +891,14 @@ export default function TresoreriePage() {
         </div>
 
         <div className="topbar-right">
-          <button type="button" className="btn btn-primary" onClick={openNew}>
-            <Plus size={14} />
-            Ajouter une opération
-          </button>
+          {canEdit ? (
+            <button type="button" className="btn btn-primary" onClick={openNew}>
+              <Plus size={14} />
+              Ajouter une opération
+            </button>
+          ) : (
+            readOnly && <ReadOnlyBadge />
+          )}
         </div>
       </div>
 
@@ -917,10 +939,12 @@ export default function TresoreriePage() {
               <span>Banque {formatMoney(initialBalances.bank)}</span>
               <span>Caisse {formatMoney(initialBalances.cash)}</span>
             </div>
-            <button type="button" className="btn" onClick={openInitialBalanceForm} style={{ marginTop: 10 }}>
-              <Pencil size={13} />
-              Modifier
-            </button>
+            {canEdit && (
+              <button type="button" className="btn" onClick={openInitialBalanceForm} style={{ marginTop: 10 }}>
+                <Pencil size={13} />
+                Modifier
+              </button>
+            )}
           </div>
 
           <div className="tresorerie-stat">
@@ -1029,19 +1053,21 @@ export default function TresoreriePage() {
             ) : (
               <>
                 <div className="tresorerie-cheque-tools">
-                  <button
-                    type="button"
-                    className="btn"
-                    onClick={() =>
-                      setSelectedCheques(
-                        selectedCheques.size === pendingCheques.length
-                          ? new Set()
-                          : new Set(pendingCheques.map((item) => item.id))
-                      )
-                    }
-                  >
-                    {selectedCheques.size === pendingCheques.length ? 'Tout décocher' : 'Tout cocher'}
-                  </button>
+                  {canEdit && (
+                    <button
+                      type="button"
+                      className="btn"
+                      onClick={() =>
+                        setSelectedCheques(
+                          selectedCheques.size === pendingCheques.length
+                            ? new Set()
+                            : new Set(pendingCheques.map((item) => item.id))
+                        )
+                      }
+                    >
+                      {selectedCheques.size === pendingCheques.length ? 'Tout décocher' : 'Tout cocher'}
+                    </button>
+                  )}
                   <span>
                     {pendingCheques.length} chèque{pendingCheques.length > 1 ? 's' : ''} en attente ·{' '}
                     {formatMoney(totals.cheques)}
@@ -1058,6 +1084,8 @@ export default function TresoreriePage() {
                         type="checkbox"
                         checked={selectedCheques.has(item.id)}
                         onChange={() => toggleCheque(item.id)}
+                        disabled={!canEdit}
+                        style={canEdit ? undefined : { visibility: 'hidden' }}
                       />
                       <span className="tresorerie-cheque-date">{formatDate(item.date)}</span>
                       <span className="tresorerie-cheque-label">
@@ -1069,6 +1097,7 @@ export default function TresoreriePage() {
                   ))}
                 </div>
 
+                {canEdit && (
                 <div className="tresorerie-deposit-bar">
                   <div>
                     <strong>{selectedCheques.size}</strong> chèque{selectedCheques.size > 1 ? 's' : ''} coché
@@ -1093,13 +1122,16 @@ export default function TresoreriePage() {
                     Remis en banque
                   </button>
                 </div>
+                )}
               </>
             )}
 
+            {canEdit && (
             <p className="tresorerie-help">
               Un chèque revient impayé ? Supprime l’opération (ou, pour une cotisation, modifie l’adhésion dans
               Adhérents) : le compte bancaire n’a jamais été faussé.
             </p>
+            )}
 
             {deposits.length > 0 && (
               <div className="tresorerie-deposits">
@@ -1118,16 +1150,20 @@ export default function TresoreriePage() {
                         <span>{formatDate(item.date)}</span>
                         <span className="tresorerie-cheque-label">{item.label}</span>
                         <span>{formatMoney(item.amount)}</span>
-                        <button
-                          type="button"
-                          className="btn"
-                          onClick={() => undeposit(item)}
-                          disabled={depositing}
-                          title="Annuler la remise de ce chèque"
-                        >
-                          <Undo2 size={13} />
-                          Annuler
-                        </button>
+                        {canEdit ? (
+                          <button
+                            type="button"
+                            className="btn"
+                            onClick={() => undeposit(item)}
+                            disabled={depositing}
+                            title="Annuler la remise de ce chèque"
+                          >
+                            <Undo2 size={13} />
+                            Annuler
+                          </button>
+                        ) : (
+                          <span />
+                        )}
                       </div>
                     ))}
                   </details>
@@ -1139,7 +1175,9 @@ export default function TresoreriePage() {
           <div className="tresorerie-empty">
             <CreditCard size={34} style={{ opacity: 0.35 }} />
             <h3 style={{ margin: '12px 0 4px' }}>Aucune opération</h3>
-            <p className="section-sub">Ajoute la première recette ou dépense de l’année.</p>
+            <p className="section-sub">
+              {canEdit ? 'Ajoute la première recette ou dépense de l’année.' : 'Aucune opération saisie pour cette année.'}
+            </p>
           </div>
         ) : view === 'all' ? (
           <div className="tresorerie-table-wrap">

@@ -31,7 +31,7 @@ const MAX_PAGES = 20
  */
 export async function GET(request: Request) {
   try {
-    await requireOfficePermission('drive')
+    await requireOfficePermission('drive_view')
 
     const folderId =
       new URL(request.url).searchParams.get('folderId') || 'root'

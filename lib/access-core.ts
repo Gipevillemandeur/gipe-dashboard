@@ -32,7 +32,37 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 
-export const FULL_PERMISSIONS = [
+/*
+ * Rubriques qui existent en deux niveaux :
+ *   - « X_view » : voir (lecture seule) ;
+ *   - « X »      : modifier (et donc voir).
+ */
+export const VIEWABLE_SECTIONS = [
+  'schooling',
+  'members',
+  'treasury',
+  'website',
+  'agenda',
+  'drive',
+] as const;
+
+export function viewCode(section: string) {
+  return `${section}_view`;
+}
+
+/*
+ * « Modifier » donne aussi « Voir » : on ajoute les codes
+ * de lecture correspondants.
+ */
+export function withImpliedViews(codes: Iterable<string>) {
+  const set = new Set(codes);
+  for (const section of VIEWABLE_SECTIONS) {
+    if (set.has(section)) set.add(viewCode(section));
+  }
+  return [...set];
+}
+
+export const FULL_PERMISSIONS = withImpliedViews([
   'dashboard',
   'schooling',
   'members',
@@ -42,7 +72,7 @@ export const FULL_PERMISSIONS = [
   'drive',
   'configuration',
   'office_members',
-];
+]);
 
 export type OfficeAccess = {
   authenticated: boolean;
@@ -274,7 +304,7 @@ export async function resolveOfficeAccess(
     positionName: positionList
       .map((p) => p.name)
       .join(' / '),
-    permissions: [...permissions],
+    permissions: withImpliedViews(permissions),
   };
 }
 
@@ -289,13 +319,13 @@ export function permissionForPage(
     ['/configuration/membres-bureau', 'office_members'],
     ['/configuration', 'configuration'],
     ['/import-college', 'configuration'],
-    ['/conseils', 'schooling'],
-    ['/instances', 'schooling'],
-    ['/adherents', 'members'],
-    ['/tresorerie', 'treasury'],
-    ['/site', 'website'],
-    ['/agenda', 'agenda'],
-    ['/documents', 'drive'],
+    ['/conseils', 'schooling_view'],
+    ['/instances', 'schooling_view'],
+    ['/adherents', 'members_view'],
+    ['/tresorerie', 'treasury_view'],
+    ['/site', 'website_view'],
+    ['/agenda', 'agenda_view'],
+    ['/documents', 'drive_view'],
   ];
 
   if (pathname === '/') {
@@ -323,12 +353,12 @@ export function firstAllowedPage(
 ): string | null {
   const order: [string, string][] = [
     ['dashboard', '/'],
-    ['schooling', '/conseils'],
-    ['members', '/adherents'],
-    ['treasury', '/tresorerie'],
-    ['website', '/site'],
-    ['agenda', '/agenda'],
-    ['drive', '/documents'],
+    ['schooling_view', '/conseils'],
+    ['members_view', '/adherents'],
+    ['treasury_view', '/tresorerie'],
+    ['website_view', '/site'],
+    ['agenda_view', '/agenda'],
+    ['drive_view', '/documents'],
     ['configuration', '/configuration'],
     ['office_members', '/configuration/membres-bureau'],
   ];

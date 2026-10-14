@@ -5,9 +5,11 @@ import { requireOfficePermission } from '@/lib/office-auth'
 
 const MAX_FILE_SIZE = 8 * 1024 * 1024
 
-async function requireWebsiteAccess() {
+async function requireWebsiteAccess(
+  permission: string = 'website'
+) {
   try {
-    await requireOfficePermission('website')
+    await requireOfficePermission(permission)
     return { admin: createAdminClient() }
   } catch (error) {
     if (error instanceof Error) {
@@ -169,7 +171,7 @@ async function deleteSupabaseImage(
 
 export async function GET() {
   const auth =
-    await requireWebsiteAccess()
+    await requireWebsiteAccess('website_view')
 
   if ('error' in auth) {
     return auth.error

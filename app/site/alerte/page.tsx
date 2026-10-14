@@ -1,5 +1,7 @@
 'use client';
 
+import ReadOnlyBadge from '@/components/ReadOnlyBadge';
+import { useCanEdit } from '@/lib/use-access';
 import { useEffect, useState } from 'react';
 
 type AlertType = 'info' | 'urgent';
@@ -14,6 +16,7 @@ const smileys = ['😊','😃','😄','😁','😂','🤣','😍','🥳','🤩',
 const symbols = ['⚠️','🚨','✅','❌','📢','📣','🔔','📅','📌','❗','⭐','💡','🎉','🎊','🎓','📚','🏫'];
 
 export default function AlertePage() {
+  const { canEdit, readOnly } = useCanEdit('website');
   const [settings, setSettings] = useState<AlertSettings>({ enabled: false, message: '', type: 'info' });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -76,6 +79,7 @@ export default function AlertePage() {
     <>
       <div className="topbar">
         <div><div className="eyebrow">Site internet</div><h1>Bandeau d’alerte</h1><div className="kicker">Gestion du message affiché sur le site public.</div></div>
+        {readOnly && <div className="topbar-right"><ReadOnlyBadge /></div>}
       </div>
 
       {error && <div className="notice notice-error alerte-notice">{error}</div>}
@@ -90,6 +94,7 @@ export default function AlertePage() {
         </div>
 
         <div className="alerte-config-grid">
+          <fieldset disabled={!canEdit} style={{ display: 'contents', border: 0, margin: 0, padding: 0 }}>
           <div className="alerte-toggle-row">
             <div className="alerte-toggle-text">
               <strong>Afficher le bandeau</strong>
@@ -150,11 +155,15 @@ export default function AlertePage() {
             </div>
           </div>
 
-          <div className="btn-row alerte-save-row">
-            <button className="btn btn-primary" type="button" onClick={() => void handleSave()} disabled={saving}>
-              {saving ? 'Enregistrement…' : 'Enregistrer'}
-            </button>
-          </div>
+          </fieldset>
+
+          {canEdit && (
+            <div className="btn-row alerte-save-row">
+              <button className="btn btn-primary" type="button" onClick={() => void handleSave()} disabled={saving}>
+                {saving ? 'Enregistrement…' : 'Enregistrer'}
+              </button>
+            </div>
+          )}
         </div>
       </section>
 

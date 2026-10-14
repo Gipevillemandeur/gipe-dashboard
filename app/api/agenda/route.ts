@@ -5,9 +5,11 @@ import { requireOfficePermission } from '@/lib/office-auth'
 
 const MAX_FILE_SIZE = 8 * 1024 * 1024
 
-async function requireAgendaAccess() {
+async function requireAgendaAccess(
+  permission: string = 'agenda'
+) {
   try {
-    await requireOfficePermission('agenda')
+    await requireOfficePermission(permission)
 
     return {
       admin: createAdminClient(),
@@ -222,7 +224,7 @@ function validateEventInput(values: {
 
 export async function GET() {
   const auth =
-    await requireAgendaAccess()
+    await requireAgendaAccess('agenda_view')
 
   if ('error' in auth) {
     return auth.error

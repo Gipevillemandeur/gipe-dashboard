@@ -41,13 +41,13 @@ export type RecentActivity = {
  * qui ont accès à cette rubrique.
  */
 const AREA_PERMISSIONS: Record<string, string | null> = {
-  'Trésorerie': 'treasury',
-  'Adhérents': 'members',
-  'Agenda': 'agenda',
-  'Instances': 'schooling',
-  'Site internet': 'website',
+  'Trésorerie': 'treasury_view',
+  'Adhérents': 'members_view',
+  'Agenda': 'agenda_view',
+  'Instances': 'schooling_view',
+  'Site internet': 'website_view',
   'Configuration': 'configuration',
-  'Docs Drive': 'drive',
+  'Docs Drive': 'drive_view',
   'Clôture': null,
   'Guide': null,
 };
@@ -163,7 +163,7 @@ export async function getDashboardSnapshot(): Promise<DashboardSnapshot> {
         .limit(4),
 
       // Agenda interne (seulement pour qui a accès à l'Agenda).
-      access.permissions.includes('agenda')
+      access.permissions.includes('agenda_view')
         ? admin
             .from('internal_agenda_events')
             .select('id,title,event_date,start_time')

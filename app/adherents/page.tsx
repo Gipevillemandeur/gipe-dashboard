@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import AdherentEmails from '@/components/AdherentEmails';
+import ReadOnlyBadge from '@/components/ReadOnlyBadge';
+import { useCanEdit } from '@/lib/use-access';
 import {
   Users,
   Plus,
@@ -115,6 +117,7 @@ const emptyForm: AdherentForm = {
 };
 
 export default function AdherentsPage() {
+  const { canEdit, readOnly } = useCanEdit('members');
   const [members, setMembers] = useState<Member[]>([]);
   const [classes, setClasses] = useState<ClassItem[]>([]);
   const [schoolYear, setSchoolYear] = useState<string | null>(null);
@@ -590,22 +593,28 @@ export default function AdherentsPage() {
         </div>
 
         <div className="topbar-right adherents-topbar-action">
-          <button
-            className="btn"
-            onClick={() => setShowEmails(true)}
-            disabled={loading}
-          >
-            <Mail size={14} />
-            E-mails
-          </button>
+          {canEdit ? (
+            <>
+              <button
+                className="btn"
+                onClick={() => setShowEmails(true)}
+                disabled={loading}
+              >
+                <Mail size={14} />
+                E-mails
+              </button>
 
-          <button
-            className="btn btn-primary"
-            onClick={openNewMember}
-          >
-            <Plus size={14} />
-            Ajouter un adhérent
-          </button>
+              <button
+                className="btn btn-primary"
+                onClick={openNewMember}
+              >
+                <Plus size={14} />
+                Ajouter un adhérent
+              </button>
+            </>
+          ) : (
+            readOnly && <ReadOnlyBadge />
+          )}
         </div>
       </div>
 
@@ -1101,7 +1110,7 @@ export default function AdherentsPage() {
         </section>
       )}
 
-      {showEmails && (
+      {showEmails && canEdit && (
         <AdherentEmails
           members={members}
           classes={classes}
@@ -1139,6 +1148,12 @@ export default function AdherentsPage() {
             </div>
 
             <div className="adherents-form">
+              {/* Lecture seule : la fiche est affichée, champs grisés. */}
+              <fieldset
+                className="adherents-readonly-fieldset"
+                disabled={!canEdit}
+                style={{ display: 'contents', border: 0, margin: 0, padding: 0 }}
+              >
               <label className="adherents-renewal">
                 <input
                   type="checkbox"
@@ -1712,6 +1727,8 @@ export default function AdherentsPage() {
                 </div>
               )}
 
+              </fieldset>
+
               <div className="adherents-form-actions">
                 <button
                   className="btn"
@@ -1719,9 +1736,10 @@ export default function AdherentsPage() {
                   onClick={closeForm}
                   disabled={saving}
                 >
-                  Annuler
+                  {canEdit ? 'Annuler' : 'Fermer'}
                 </button>
 
+                {canEdit && (
                 <button
                   className="btn btn-primary"
                   type="button"
@@ -1734,11 +1752,19 @@ export default function AdherentsPage() {
                       ? 'Enregistrer les modifications'
                       : 'Enregistrer l’adhérent'}
                 </button>
+                )}
               </div>
             </div>
           </div>
         </div>
       )}
+
+      <style jsx global>{`
+        /* Fiche en lecture seule : pas de boutons d’ajout / suppression. */
+        .adherents-readonly-fieldset:disabled button {
+          display: none !important;
+        }
+      `}</style>
 
       <style jsx>{`
         .adherents-topbar-action {

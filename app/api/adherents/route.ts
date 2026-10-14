@@ -20,9 +20,11 @@ import { requireOfficePermission } from '@/lib/office-auth';
 
 type Admin = ReturnType<typeof createAdminClient>;
 
-async function requireMembersAccess(): Promise<Admin | NextResponse> {
+async function requireMembersAccess(
+  permission: string = 'members'
+): Promise<Admin | NextResponse> {
   try {
-    await requireOfficePermission('members');
+    await requireOfficePermission(permission);
     return createAdminClient();
   } catch (error) {
     if (error instanceof Error) {
@@ -76,7 +78,7 @@ async function activeYear(admin: Admin) {
  * --------------------------------------------------------- */
 
 export async function GET(request: Request) {
-  const auth = await requireMembersAccess();
+  const auth = await requireMembersAccess('members_view');
   if (auth instanceof NextResponse) return auth;
   const admin = auth;
 
