@@ -1,7 +1,9 @@
 'use client';
 
 import ReadOnlyBadge from '@/components/ReadOnlyBadge';
-import { useCanEdit } from '@/lib/use-access';
+import { useCanEdit, usePermissions } from '@/lib/use-access';
+import { saveFacebookDraft, eventToFacebookText } from '@/lib/facebook-draft';
+import { useRouter } from 'next/navigation';
 import {
   FormEvent,
   useEffect,
@@ -13,6 +15,7 @@ import {
 import {
   CalendarDays,
   CheckCircle2,
+  Facebook,
   Pencil,
   Plus,
   Search,
@@ -80,6 +83,22 @@ function excerpt(value: string | null) {
 
 export default function AgendaPage() {
   const { canEdit, readOnly } = useCanEdit('agenda');
+  const permissions = usePermissions();
+  const canFacebook = Boolean(permissions?.includes('facebook'));
+  const router = useRouter();
+
+  /*
+   * Prépare une publication Facebook (texte + photo de l'événement)
+   * et ouvre la page Facebook, où on la relit avant de publier.
+   */
+  function sendToFacebook(item: EventItem) {
+    saveFacebookDraft({
+      message: eventToFacebookText(item),
+      imageUrl: item.image_url || null,
+      source: `l’Agenda (« ${item.title || 'événement'} »)`,
+    });
+    router.push('/facebook');
+  }
   const [events, setEvents] = useState<EventItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -883,6 +902,20 @@ export default function AgendaPage() {
                         </button>
                       </>
                     ) : null}
+
+                    {canFacebook && (
+                      <button
+                        className="btn agenda-facebook-button"
+                        type="button"
+                        onClick={() =>
+                          sendToFacebook(item)
+                        }
+                        title="Préparer une publication Facebook avec cet événement"
+                      >
+                        <Facebook size={14} />
+                        Facebook
+                      </button>
+                    )}
                   </div>
                 </div>
               )
@@ -1524,6 +1557,12 @@ export default function AgendaPage() {
 
         .agenda-publish-button {
           min-width: 165px !important;
+        }
+
+        .agenda-item-actions .agenda-facebook-button {
+          color: #1877f2 !important;
+          border-color: #c9dcf7 !important;
+          background: #f3f8ff !important;
         }
 
         .agenda-published-info {

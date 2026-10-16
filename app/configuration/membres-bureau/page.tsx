@@ -42,6 +42,7 @@ const SECTIONS: { code: string; label: string }[] = [
   { code: 'agenda', label: 'Agenda' },
   { code: 'website', label: 'Site internet' },
   { code: 'drive', label: 'Docs Drive' },
+  { code: 'facebook', label: 'Facebook' },
 ];
 
 type Level = 'none' | 'view' | 'edit';

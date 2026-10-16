@@ -203,6 +203,27 @@ Dans **Site internet**, on gère ce que voient les parents sur le site du GIPE :
 > En haut de la page, la ligne « Relié au compte… » indique quel compte Google est utilisé. Seul le Président peut le changer ou le reconnecter.`,
   },
   {
+    slug: 'facebook',
+    title: 'Facebook',
+    summary: 'Publier et programmer sur la Page Facebook du GIPE.',
+    presidentOnly: false,
+    body: `La rubrique **Facebook** publie directement sur la **Page Facebook** du GIPE, sans ouvrir Facebook.
+
+## Publier
+- Écrire le texte, ajouter **une photo** si besoin (elle est réduite automatiquement), puis **« Publier sur Facebook »**.
+- Pour plus tard : choisir **« Programmer »**, la date et l’heure (au moins 10 minutes après maintenant, au plus 6 mois).
+- Les publications programmées apparaissent dans **« Programmées »** : le bouton **Annuler** les supprime avant leur départ.
+- **« Dernières publications »** montre les 10 dernières, avec les réactions, commentaires et partages.
+
+## Depuis l’Agenda et les Actualités
+- Dans l’**Agenda**, le bouton **Facebook** d’un événement prépare une publication (titre, date, heure, lieu, description, photo) : on la relit puis on publie ou on programme.
+- Dans **Site internet → Actualités**, après avoir publié une **nouvelle** actualité, la question **« Publier aussi sur Facebook ? »** s’affiche : **Non** (site seulement), **Oui** (publiée tout de suite) ou **Programmer…**.
+
+! Facebook ne permet plus de créer de vrais « Événements Facebook » depuis un autre site : un événement de l’agenda part comme une publication.
+
+> Un album de plusieurs photos se fait directement sur Facebook.`,
+  },
+  {
     slug: 'configuration',
     title: 'Configuration',
     summary: 'Import du collège, classes et codes, direction, membres du bureau.',
@@ -223,7 +244,7 @@ Dans **Site internet**, on gère ce que voient les parents sur le site du GIPE :
 - Elle se gère **uniquement ici**, et se trie toute seule : principal(e), adjoint(e), CPE, puis les autres.
 
 ## Membres du bureau
-- Chaque poste a ses **droits**. Pour chaque rubrique (Trésorerie, Adhérents, Scolarité, Agenda, Site internet, Docs Drive), choisir **Aucun · Voir · Modifier**, puis **Enregistrer**.
+- Chaque poste a ses **droits**. Pour chaque rubrique (Trésorerie, Adhérents, Scolarité, Agenda, Site internet, Docs Drive, Facebook), choisir **Aucun · Voir · Modifier**, puis **Enregistrer**.
 - **Voir** = la personne consulte tout (opérations, justificatifs, fiches…) mais ne peut rien ajouter, modifier ni supprimer.
 - Le bouton **« Tout en lecture »** met « Voir » partout où il y avait « Aucun » (les « Modifier » sont gardés) et coche le tableau de bord.
 - Tableau de bord, Configuration et Membres du bureau restent de simples cases à cocher.
@@ -271,6 +292,7 @@ Une fois l’archivage terminé, le dashboard fait le ménage dans Supabase (la 
 3. Vérifier avec chaque nouveau membre qu’il arrive à se connecter et voit les bonnes rubriques.
 4. Retirer les accès des membres qui quittent le bureau.
 5. Transmettre au nouveau Président les **accès techniques** (voir la partie technique de ce guide, visible par le Président).
+6. **Facebook** : nommer le nouveau Président **administrateur de la Page** Facebook et de l’**application Meta** (developers.facebook.com → l’application → Rôles de l’application). Il clique ensuite sur **« Reconnecter Facebook »** dans la rubrique Facebook. L’ancien Président peut alors être retiré.
 
 ## Pour le nouveau bureau
 1. Accepter l’invitation reçue par e-mail et créer son mot de passe.
@@ -327,6 +349,12 @@ Ne jamais les montrer ni les copier dans un document partagé :
 - GOOGLE_DRIVE_APPS_SCRIPT_URL, GOOGLE_DRIVE_APPS_SCRIPT_TOKEN : script d’archivage.
 - RESEND_API_KEY, CONSEILS_FROM_EMAIL, CONSEILS_ALLOWED_ORIGIN : app des conseils.
 - CRON_SECRET : nettoyage automatique de l’agenda chaque nuit.
+- FACEBOOK_APP_ID, FACEBOOK_APP_SECRET (et FACEBOOK_CONFIG_ID si l’application en a une) : publication sur la Page Facebook.
+
+## Facebook
+- L’**application Meta** « GIPE Dashboard » se gère sur **developers.facebook.com** (compte Facebook du Président).
+- Adresse de retour déclarée dans l’application : **https://admin.gipevillemandeur.com/api/facebook/callback**
+- La connexion à la Page dépend du compte Facebook de la personne qui a cliqué sur « Connecter Facebook » : si elle change son mot de passe ou n’est plus administratrice de la Page, il faut **reconnecter**.
 
 ## Réglages du script d’archivage (Apps Script → Paramètres du projet → Propriétés du script)
 - GIPE_ARCHIVES_FOLDER_ID : identifiant du dossier « Archives » du Drive.
@@ -353,6 +381,7 @@ Ne jamais les montrer ni les copier dans un document partagé :
 - **Vercel** (hébergement) : propriétaire actuel : à compléter.
 - **Supabase** (base de données) : propriétaire actuel : à compléter.
 - **Resend** (envoi d’e-mails) : propriétaire actuel : à compléter.
+- **Page Facebook** et **application Meta** (developers.facebook.com) : administrateurs actuels : à compléter.
 - **Nom de domaine gipevillemandeur.com** : chez quel hébergeur, date de renouvellement : à compléter.
 - **Boîte e-mail contact@gipevillemandeur.com** : à compléter.
 

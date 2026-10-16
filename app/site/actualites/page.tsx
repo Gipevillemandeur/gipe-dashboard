@@ -1,7 +1,9 @@
 'use client';
 
 import ReadOnlyBadge from '@/components/ReadOnlyBadge';
-import { useCanEdit } from '@/lib/use-access';
+import { useCanEdit, usePermissions } from '@/lib/use-access';
+import { saveFacebookDraft } from '@/lib/facebook-draft';
+import { useRouter } from 'next/navigation';
 import {
   FormEvent,
   useEffect,
@@ -11,6 +13,7 @@ import {
 } from 'react';
 
 import {
+  Facebook,
   ImagePlus,
   Newspaper,
   Pencil,
@@ -110,6 +113,72 @@ function excerpt(
 
 export default function SiteActualitesPage() {
   const { canEdit, readOnly } = useCanEdit('website');
+  const permissions = usePermissions();
+  const canFacebook = Boolean(permissions?.includes('facebook'));
+  const router = useRouter();
+
+  /*
+   * « Publier aussi sur Facebook ? » après une nouvelle actualité.
+   * Proposé seulement si la Page Facebook est reliée.
+   */
+  const [facebookConnected, setFacebookConnected] =
+    useState(false);
+  const [facebookOffer, setFacebookOffer] =
+    useState<{ message: string; imageUrl: string | null; title: string } | null>(null);
+  const [facebookSending, setFacebookSending] =
+    useState(false);
+  const [facebookError, setFacebookError] =
+    useState('');
+  const [facebookDone, setFacebookDone] =
+    useState('');
+
+  useEffect(() => {
+    if (!canFacebook) return;
+
+    fetch('/api/facebook/connection', { cache: 'no-store' })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data) => setFacebookConnected(Boolean(data?.connected)))
+      .catch(() => setFacebookConnected(false));
+  }, [canFacebook]);
+
+  async function publishOnFacebook() {
+    if (!facebookOffer || facebookSending) return;
+
+    setFacebookSending(true);
+    setFacebookError('');
+
+    try {
+      const form = new FormData();
+      form.set('message', facebookOffer.message.trim());
+      if (facebookOffer.imageUrl) form.set('imageUrl', facebookOffer.imageUrl);
+      form.set('source', 'une actualité du site');
+
+      const response = await fetch('/api/facebook/posts', { method: 'POST', body: form });
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(data?.error || 'Impossible de publier sur Facebook.');
+      }
+
+      setFacebookDone(`« ${facebookOffer.title} » est aussi publiée sur Facebook.`);
+      setFacebookOffer(null);
+    } catch (err) {
+      setFacebookError(err instanceof Error ? err.message : 'Impossible de publier sur Facebook.');
+    } finally {
+      setFacebookSending(false);
+    }
+  }
+
+  function scheduleOnFacebook() {
+    if (!facebookOffer) return;
+
+    saveFacebookDraft({
+      message: facebookOffer.message,
+      imageUrl: facebookOffer.imageUrl,
+      source: `l’actualité « ${facebookOffer.title} »`,
+    });
+    router.push('/facebook');
+  }
   const [news, setNews] =
     useState<NewsItem[]>([]);
 
@@ -378,6 +447,24 @@ export default function SiteActualitesPage() {
           data?.error ||
             'Impossible d’enregistrer l’actualité.'
         );
+      }
+
+      // Nouvelle actualité : proposer de la publier aussi sur Facebook.
+      if (
+        !editingId &&
+        canFacebook &&
+        facebookConnected &&
+        data?.news
+      ) {
+        setFacebookDone('');
+        setFacebookError('');
+        setFacebookOffer({
+          title: data.news.title || 'Actualité',
+          imageUrl: data.news.image_url || null,
+          message: [data.news.title, data.news.content]
+            .filter(Boolean)
+            .join('\n\n'),
+        });
       }
 
       await loadNews();
@@ -759,6 +846,194 @@ export default function SiteActualitesPage() {
           </div>
         )}
       </section>
+
+      {facebookDone && (
+        <div className="notice fbq-done">
+          <Facebook size={16} />
+          <div>{facebookDone}</div>
+          <button
+            type="button"
+            className="fbq-close"
+            onClick={() => setFacebookDone('')}
+            aria-label="Fermer"
+          >
+            <X size={14} />
+          </button>
+        </div>
+      )}
+
+      {facebookOffer && (
+        <div className="fbq-backdrop" role="dialog" aria-modal="true">
+          <div className="card fbq-dialog">
+            <div className="fbq-head">
+              <span className="fbq-icon">
+                <Facebook size={18} />
+              </span>
+              <div>
+                <h2>Publier aussi sur Facebook ?</h2>
+                <p>L’actualité est en ligne sur le site. Tu peux retoucher le texte pour Facebook.</p>
+              </div>
+            </div>
+
+            <div className="fbq-body">
+              <textarea
+                className="input fbq-text"
+                value={facebookOffer.message}
+                onChange={(event) =>
+                  setFacebookOffer({ ...facebookOffer, message: event.target.value.slice(0, 5000) })
+                }
+                rows={7}
+              />
+              {facebookOffer.imageUrl && (
+                <img className="fbq-image" src={facebookOffer.imageUrl} alt="Photo de l’actualité" />
+              )}
+            </div>
+
+            {facebookError && <div className="fbq-error">{facebookError}</div>}
+
+            <div className="fbq-actions">
+              <button
+                type="button"
+                className="btn"
+                onClick={() => setFacebookOffer(null)}
+                disabled={facebookSending}
+              >
+                Non, seulement le site
+              </button>
+              <button
+                type="button"
+                className="btn"
+                onClick={scheduleOnFacebook}
+                disabled={facebookSending}
+              >
+                Programmer…
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary fbq-yes"
+                onClick={() => void publishOnFacebook()}
+                disabled={facebookSending || !facebookOffer.message.trim()}
+              >
+                <Facebook size={14} />
+                {facebookSending ? 'Publication…' : 'Oui, publier sur Facebook'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <style jsx global>{`
+        .fbq-done {
+          margin-bottom: 18px;
+          background: #eef5ff;
+          border-color: #c9dcf7;
+          color: #1d4f91;
+        }
+        .fbq-close {
+          margin-left: auto;
+          border: 0;
+          background: transparent;
+          color: inherit;
+          cursor: pointer;
+          display: inline-flex;
+        }
+        .fbq-backdrop {
+          position: fixed;
+          inset: 0;
+          z-index: 80;
+          background: rgba(36, 28, 27, 0.45);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 16px;
+        }
+        .fbq-dialog {
+          width: min(620px, 100%);
+          max-height: calc(100vh - 32px);
+          overflow: auto;
+          padding: 22px;
+          display: grid;
+          gap: 14px;
+        }
+        .fbq-head {
+          display: flex;
+          gap: 12px;
+          align-items: flex-start;
+        }
+        .fbq-head h2 {
+          margin: 0 0 4px;
+          font-size: 18px;
+        }
+        .fbq-head p {
+          margin: 0;
+          font-size: 13px;
+          color: #756a67;
+        }
+        .fbq-icon {
+          width: 36px;
+          height: 36px;
+          border-radius: 10px;
+          background: #eef5ff;
+          color: #1877f2;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          flex-shrink: 0;
+        }
+        .fbq-body {
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) 150px;
+          gap: 12px;
+          align-items: start;
+        }
+        .fbq-text {
+          width: 100%;
+          resize: vertical;
+          line-height: 1.45;
+          font-size: 13.5px;
+        }
+        .fbq-image {
+          width: 100%;
+          border-radius: 10px;
+          border: 1px solid #eadfd5;
+          object-fit: cover;
+          max-height: 180px;
+        }
+        .fbq-error {
+          font-size: 13px;
+          color: #b91c1c;
+          background: #fdecec;
+          border: 1px solid #f3c6c6;
+          border-radius: 9px;
+          padding: 9px 11px;
+        }
+        .fbq-actions {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 8px;
+          justify-content: flex-end;
+        }
+        .fbq-actions .btn {
+          display: inline-flex !important;
+          flex-direction: row !important;
+          align-items: center !important;
+          justify-content: center;
+          gap: 7px !important;
+        }
+        .fbq-yes {
+          background: #1877f2 !important;
+          border-color: #1877f2 !important;
+        }
+        @media (max-width: 560px) {
+          .fbq-body {
+            grid-template-columns: minmax(0, 1fr);
+          }
+          .fbq-actions .btn {
+            flex: 1 1 100%;
+            justify-content: center;
+          }
+        }
+      `}</style>
 
       {showForm && (
         <div

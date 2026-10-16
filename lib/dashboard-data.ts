@@ -48,6 +48,7 @@ const AREA_PERMISSIONS: Record<string, string | null> = {
   'Site internet': 'website_view',
   'Configuration': 'configuration',
   'Docs Drive': 'drive_view',
+  'Facebook': 'facebook_view',
   'Clôture': null,
   'Guide': null,
 };

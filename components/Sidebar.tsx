@@ -15,6 +15,7 @@ import {
   Menu,
   X,
   ShieldCheck,
+  Facebook,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
@@ -62,6 +63,12 @@ const items = [
     permission: 'drive_view',
     label: 'Docs Drive',
     icon: FileText,
+  },
+  {
+    href: '/facebook',
+    permission: 'facebook_view',
+    label: 'Facebook',
+    icon: Facebook,
   },
 ];
 

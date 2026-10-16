@@ -44,6 +44,7 @@ export const VIEWABLE_SECTIONS = [
   'website',
   'agenda',
   'drive',
+  'facebook',
 ] as const;
 
 export function viewCode(section: string) {
@@ -70,6 +71,7 @@ export const FULL_PERMISSIONS = withImpliedViews([
   'website',
   'agenda',
   'drive',
+  'facebook',
   'configuration',
   'office_members',
 ]);
@@ -326,6 +328,7 @@ export function permissionForPage(
     ['/site', 'website_view'],
     ['/agenda', 'agenda_view'],
     ['/documents', 'drive_view'],
+    ['/facebook', 'facebook_view'],
   ];
 
   if (pathname === '/') {
@@ -359,6 +362,7 @@ export function firstAllowedPage(
     ['website_view', '/site'],
     ['agenda_view', '/agenda'],
     ['drive_view', '/documents'],
+    ['facebook_view', '/facebook'],
     ['configuration', '/configuration'],
     ['office_members', '/configuration/membres-bureau'],
   ];
